@@ -23,6 +23,7 @@ import chess.engine
 
 import arena
 import pool
+import play
 import rules
 import solve
 import stats
@@ -573,6 +574,80 @@ def test_expand_smoke(engine_path, tmpdir):
           "resume kept its rounds)" % (len(state["rounds"]), len(state["armies"])))
 
 
+def test_drafter():
+    champ = play.load_army("campaigns/champion_v2.json")
+    ok, why = rules.validate_army(champ)
+    if not ok:
+        fail("frozen champion is illegal: %s" % why)
+
+    # unobstructed, the drafter must realise its target army exactly -- the
+    # opponent places only in their own zone, so nothing can block us
+    for color in (chess.WHITE, chess.BLACK):
+        us = play.Drafter(champ, color)
+        them = play.Drafter(play.load_army("classic"), not color)
+        state = play.draft(*( (us, them) if color == chess.WHITE
+                              else (them, us) ))
+        if state.result:
+            fail("draft ended in a setup result against a passive opponent")
+        want = {(pt, sq) for pt, sq in us.target}
+        got = {(p.piece_type, sq)
+               for sq, p in state.board.piece_map().items() if p.color == color}
+        if got != want:
+            fail("drafter as %s built %d/%d target pieces"
+                 % (chess.COLOR_NAMES[color], len(got & want), len(want)))
+        ok, why = rules.validate_fen(state.handoff_fen())
+        if not ok:
+            fail("drafted handoff FEN invalid: %s" % why)
+
+    # tactics beat the plan: with mate available the drafter must take it.
+    # Black king on e6, e-file open, White to place -> @Qe1 is mate.
+    state = rules.SetupState()
+    for pt, sq in [(chess.QUEEN, chess.D1), (chess.QUEEN, chess.D8),
+                   (chess.PAWN, chess.A2), (chess.KING, chess.E6)]:
+        state.place(pt, sq)
+    d = play.Drafter(champ, chess.WHITE)
+    pt, sq = d.choose(state)
+    state.place(pt, sq)
+    if state.result != "1-0":
+        fail("drafter missed the setup mate, played %s%s"
+             % (chess.piece_symbol(pt).upper(), chess.square_name(sq)))
+
+    # forced blocks: in check, every choice must answer the check
+    state = rules.SetupState()
+    state.place(chess.PAWN, chess.A2)
+    state.place(chess.KING, chess.E7)
+    state.place(chess.QUEEN, chess.E1)
+    d = play.Drafter(champ, chess.BLACK)
+    pt, sq = d.choose(state)
+    if sq != chess.E6:
+        fail("drafter did not block a setup check (played %s)"
+             % chess.square_name(sq))
+    print("PASS: drafter realises its target for both colours, takes a setup "
+          "mate over the plan, and blocks a forced check")
+
+
+def test_play_smoke(engine_path, tmpdir):
+    out = os.path.join(tmpdir, "selftest_play_%d.json" % os.getpid())
+    r = subprocess.run([sys.executable, "play.py", "--target",
+                        "campaigns/champion_v2.json", "--opponent", "classic",
+                        "--engine", engine_path, "--nodes", "400",
+                        "--out", out], capture_output=True, text=True)
+    if r.returncode != 0:
+        fail("play.py exited %d:\n%s\n%s" % (r.returncode, r.stdout, r.stderr))
+    with open(out) as f:
+        games = json.load(f)["games"]
+    if len(games) != 2:
+        fail("expected one game each way, got %d" % len(games))
+    for g in games:
+        if g["result"] not in ("1-0", "0-1", "1/2-1/2"):
+            fail("game ended %r" % g["result"])
+        if g["fen"]:
+            ok, why = rules.validate_fen(g["fen"])
+            if not ok:
+                fail("played-out FEN invalid: %s" % why)
+    print("PASS: play.py end to end, one game each colour, both reached a result")
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--engine", default="stockfish",
@@ -593,9 +668,11 @@ def main():
     test_solver_holes(args.scratch or tempfile.gettempdir())
     test_stats()
     test_expand_units(args.scratch or tempfile.gettempdir())
+    test_drafter()
     test_engine(args.fens, args.engine, rng)
     test_arena_smoke(args.engine, args.scratch or tempfile.gettempdir())
     test_expand_smoke(args.engine, args.scratch or tempfile.gettempdir())
+    test_play_smoke(args.engine, args.scratch or tempfile.gettempdir())
     print("OK: all selftests passed")
 
 
