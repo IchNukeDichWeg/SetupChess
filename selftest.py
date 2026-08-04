@@ -10,13 +10,19 @@ checkmate-during-setup sequence observed on the live analysis board.
 """
 
 import argparse
+import json
+import os
 import random
 import shutil
+import subprocess
 import sys
+import tempfile
 
 import chess
 import chess.engine
 
+import arena
+import pool
 import rules
 
 
@@ -233,6 +239,90 @@ def test_engine(n, engine_path, rng):
           % (tried, n, skipped_invalid, skipped_over))
 
 
+def test_pool(rng):
+    seen = set()
+    for name, army in pool.ARCHETYPES.items():
+        if rules.army_cost(army) > rules.BUDGET:
+            fail("archetype %s costs %d" % (name, rules.army_cost(army)))
+        filled = pool.complete(army, rng)
+        ok, why = rules.validate_army(filled)
+        if not ok:
+            fail("archetype %s invalid after top-up: %s" % (name, why))
+        seen.add(pool.army_key(filled))
+    if len(seen) != len(pool.ARCHETYPES):
+        fail("archetypes collapse to %d distinct armies" % len(seen))
+
+    base = pool.seed_pool(rng)
+    army = base[0]
+    for _ in range(2000):
+        army = pool.mutate(army, rng)  # raises on any illegal product
+    sized = pool.seed_pool(rng, size=len(pool.ARCHETYPES) + 60)
+    if len(sized) != len(pool.ARCHETYPES) + 60:
+        fail("seed_pool returned %d armies" % len(sized))
+    if len({pool.army_key(a) for a in sized}) != len(sized):
+        fail("seed_pool produced duplicates")
+    for a in sized:
+        ok, why = rules.validate_army(a)
+        if not ok:
+            fail("pooled army invalid: %s" % why)
+    print("PASS: %d archetypes legal and distinct, 2000 mutations legal, "
+          "%d-army pool with no duplicates" % (len(pool.ARCHETYPES), len(sized)))
+
+
+def test_arena_units():
+    # jitter must vary by game and colour but repeat for identical inputs
+    a = arena.game_nodes(20000, 0.15, 1, 2, 0, 0)
+    if arena.game_nodes(20000, 0.15, 1, 2, 0, 0) != a:
+        fail("game_nodes is not reproducible")
+    varied = {arena.game_nodes(20000, 0.15, 1, 2, g, c)
+              for g in range(8) for c in (0, 1)}
+    if len(varied) < 12:
+        fail("game_nodes gives only %d distinct counts over 16 games"
+             % len(varied))
+    if arena.game_nodes(20000, 0.0, 1, 2, 0, 0) != 20000:
+        fail("jitter 0 should return the base node count")
+    for v in varied:
+        if not 17000 <= v <= 23000:
+            fail("jittered node count %d outside the 15%% band" % v)
+
+    cells = {(0, 0, 0): 0.5, (0, 1, 0): 1.0, (0, 1, 1): 0.0, (1, 0, 0): 0.25}
+    m = arena.matrix_from_cells(cells, 2)
+    if m[0][1] != 0.5 or m[1][0] != 0.25 or m[1][1] is not None:
+        fail("matrix_from_cells averaged wrong: %r" % m)
+    print("PASS: arena node jitter reproducible and banded, "
+          "matrix averaging correct")
+
+
+def test_arena_smoke(engine_path, tmpdir):
+    """One real 2-setup campaign end to end, into a scratch path."""
+    out = os.path.join(tmpdir, "selftest_arena_%d.json" % os.getpid())
+    armies = pool.seed_pool(random.Random(1))[:2]
+    with open(os.path.join(tmpdir, "selftest_pool.json"), "w") as f:
+        json.dump([pool.to_json(a) for a in armies], f)
+    cmd = [sys.executable, "arena.py", "--out", out,
+           "--pool", os.path.join(tmpdir, "selftest_pool.json"),
+           "--engine", engine_path, "--nodes", "600", "--pairs", "1",
+           "--workers", "2"]
+    r = subprocess.run(cmd, capture_output=True, text=True)
+    if r.returncode != 0:
+        fail("arena.py exited %d:\n%s\n%s" % (r.returncode, r.stdout, r.stderr))
+    with open(out) as f:
+        state = json.load(f)
+    if len(state["cells"]) != 4:
+        fail("expected 4 cells, got %d" % len(state["cells"]))
+    for key, score in state["cells"].items():
+        if not 0.0 <= score <= 1.0:
+            fail("score %r out of range in cell %s" % (score, key))
+    # resume: a second run must play nothing and leave the cells untouched
+    r2 = subprocess.run(cmd, capture_output=True, text=True)
+    if "nothing to do" not in r2.stdout:
+        fail("resume replayed finished cells:\n%s" % r2.stdout)
+    with open(out) as f:
+        if json.load(f)["cells"] != state["cells"]:
+            fail("resume rewrote existing cells")
+    print("PASS: arena end to end (4 cells played, resume replayed nothing)")
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--engine", default="stockfish",
@@ -240,12 +330,17 @@ def main():
     ap.add_argument("--armies", type=int, default=10000)
     ap.add_argument("--fens", type=int, default=1000)
     ap.add_argument("--seed", type=int, default=2026)
+    ap.add_argument("--scratch", help="scratch dir for the arena smoke test "
+                    "(default: the system temp dir; never a repo path)")
     args = ap.parse_args()
     rng = random.Random(args.seed)
     test_armies(args.armies, rng)
     test_validate_fen()
     test_setup_game()
+    test_pool(rng)
+    test_arena_units()
     test_engine(args.fens, args.engine, rng)
+    test_arena_smoke(args.engine, args.scratch or tempfile.gettempdir())
     print("OK: all selftests passed")
 
 
