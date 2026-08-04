@@ -22,6 +22,7 @@ import chess
 import chess.engine
 
 import arena
+import cengine
 import pool
 import play
 import rules
@@ -648,6 +649,75 @@ def test_play_smoke(engine_path, tmpdir):
     print("PASS: play.py end to end, one game each colour, both reached a result")
 
 
+def _pyperft(board, depth):
+    if depth == 0:
+        return 1
+    if depth == 1:
+        return board.legal_moves.count()
+    n = 0
+    for m in board.legal_moves:
+        board.push(m)
+        n += _pyperft(board, depth - 1)
+        board.pop()
+    return n
+
+
+def test_c_core(rng):
+    """The C generator must agree with python-chess node for node.
+
+    Published perft numbers assume castling, which the variant does not have,
+    so python-chess with the rights stripped is the reference. The dense
+    cases are the point: they are what Stockfish cannot take.
+    """
+    try:
+        start = chess.Board()
+        start.set_castling_fen("-")
+        if cengine.perft(start, 4) != 197281:
+            fail("startpos perft(4) is %d, want 197281"
+                 % cengine.perft(start, 4))
+    except OSError as e:
+        fail("%s" % e)
+
+    armies = pool.seed_pool(rng, size=24)
+    champ = play.load_army("campaigns/champion_v2.json")
+    wall = pool.complete(pool.ARCHETYPES["pawn_wall"], random.Random(0))
+    cases = [("champion mirror", rules.setup_fen(champ, champ)),
+             ("42-piece wall mirror", rules.setup_fen(wall, wall))]
+    for k in range(6):
+        cases.append(("random %d" % k,
+                      rules.setup_fen(rng.choice(armies), rng.choice(armies))))
+
+    dense = 0
+    for label, fen in cases:
+        board = chess.Board(fen)
+        n = len(board.piece_map())
+        dense = max(dense, n)
+        depth = 2 if n > 34 else 3
+        got, want = cengine.perft(board, depth), _pyperft(board, depth)
+        if got != want:
+            fail("perft mismatch on %s at depth %d: C %d, python-chess %d\n%s"
+                 % (label, depth, got, want, fen))
+        # the move lists themselves must match, not just their counts
+        mine = sorted(m.uci() for m in cengine.legal_moves(board))
+        theirs = sorted(m.uci() for m in board.legal_moves)
+        if mine != theirs:
+            fail("move list differs on %s: only C %r, only py %r"
+                 % (label, set(mine) - set(theirs), set(theirs) - set(mine)))
+
+    # en passant and promotion, the two places a generator usually breaks
+    for label, fen, depth in [
+            ("en passant available", "4k3/8/8/3pP3/8/8/8/4K3 w - d6 0 1", 4),
+            ("promotion race", "4k3/1P6/8/8/8/8/6p1/4K3 w - - 0 1", 4),
+            ("pawn on rank 3, no double step",
+             "4k3/8/8/8/8/4P3/8/4K3 w - - 0 1", 4)]:
+        board = chess.Board(fen)
+        got, want = cengine.perft(board, depth), _pyperft(board, depth)
+        if got != want:
+            fail("perft mismatch on %s: C %d, python-chess %d" % (label, got, want))
+    print("PASS: C core matches python-chess on %d positions up to %d pieces, "
+          "plus en passant, promotion and the rank-3 pawn" % (len(cases), dense))
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--engine", default="stockfish",
@@ -669,6 +739,7 @@ def main():
     test_stats()
     test_expand_units(args.scratch or tempfile.gettempdir())
     test_drafter()
+    test_c_core(rng)
     test_engine(args.fens, args.engine, rng)
     test_arena_smoke(args.engine, args.scratch or tempfile.gettempdir())
     test_expand_smoke(args.engine, args.scratch or tempfile.gettempdir())
