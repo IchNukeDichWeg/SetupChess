@@ -113,8 +113,22 @@ def test_validate_fen():
         ok, why = rules.validate_fen(fen)
         if not ok:
             fail("validate_fen rejected a legal setup (%s): %s" % (label, why))
+    # engine_safe is stricter than validate_fen: legal Setup Chess positions
+    # with too many pieces crash Stockfish once the search runs (the pawn-wall
+    # mirror below segfaults at 20,000 nodes but answers depth 4 fine).
+    wall = "rn1qk2r/pppppppp/pppppppp/8/8/PPPPPPPP/PPPPPPPP/RN1QK2R w - - 0 1"
+    if not rules.validate_fen(wall)[0]:
+        fail("validate_fen rejected the pawn-wall mirror")
+    ok, why = rules.engine_safe(wall)
+    if ok:
+        fail("engine_safe accepted a %d-piece position" % 42)
+    if "42 pieces" not in why:
+        fail("engine_safe reason lacks the piece count: %s" % why)
+    if not rules.engine_safe(legal[0][1])[0]:
+        fail("engine_safe rejected an ordinary position")
     print("PASS: validate_fen rejected %d illegal FENs, accepted %d legal ones "
-          "including setup-only piece counts" % (len(cases), len(legal)))
+          "including setup-only piece counts; engine_safe caught the "
+          "%d-piece wall" % (len(cases), len(legal), 42))
 
 
 def test_setup_game():

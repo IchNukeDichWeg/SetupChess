@@ -121,6 +121,35 @@ def validate_fen(fen):
     return False, ", ".join(reasons)
 
 
+# Stockfish segfaults on high piece counts once the search gets going: the
+# pawn-wall mirror (42 pieces) answers depth 4 and 600 nodes fine and then
+# dies with SIGSEGV at 20,000. Measured threshold on Homebrew Stockfish,
+# arm64 macOS: 36 pieces survive, 38 crash. The guard sits at the ordinary
+# chess maximum of 32, which is the count the data structures are actually
+# designed for, rather than at the empirical cliff which is one build away
+# from moving. Our own C core has to handle up to 48 (24 placeable squares
+# a side), which is a reason to start it on a hand-crafted eval: an NNUE
+# trained on normal material is exactly what breaks here.
+ENGINE_MAX_PIECES = 32
+
+
+def engine_safe(fen):
+    """Can a standard chess engine be trusted with this position?
+
+    Separate from validate_fen: these positions are perfectly legal Setup
+    Chess, they just exceed what an ordinary engine's data structures
+    expect. Returns (ok, reason).
+    """
+    ok, why = validate_fen(fen)
+    if not ok:
+        return False, why
+    n = len(chess.Board(fen).piece_map())
+    if n > ENGINE_MAX_PIECES:
+        return False, "%d pieces exceeds the %d an engine can be trusted with" % (
+            n, ENGINE_MAX_PIECES)
+    return True, ""
+
+
 class SetupState:
     """The alternating placement game. White places first (docs/RULES.md).
 

@@ -37,6 +37,10 @@ _ENGINE = None
 _ENGINE_PATH = None
 
 
+class Unplayable(Exception):
+    """The position is legal Setup Chess but not safe for this engine."""
+
+
 def _worker_init(engine_path):
     global _ENGINE, _ENGINE_PATH
     _ENGINE_PATH = engine_path
@@ -62,10 +66,9 @@ def game_nodes(base, jitter, i, j, g, color):
 def play_game(white_army, black_army, engine, nodes):
     """Returns White's score (1.0 / 0.5 / 0.0) and the ply count."""
     fen = rules.setup_fen(white_army, black_army)
-    ok, why = rules.validate_fen(fen)
+    ok, why = rules.engine_safe(fen)
     if not ok:
-        raise ValueError("refusing to play an invalid position: %s (%s)"
-                         % (why, fen))
+        raise Unplayable("%s (%s)" % (why, fen))
     board = chess.Board(fen)
     limit = chess.engine.Limit(nodes=nodes)
     while not board.is_game_over(claim_draw=True) and board.ply() < PLY_LIMIT:
@@ -85,6 +88,11 @@ def _play_cell(task):
     engine = _worker_engine()
     ai, aj = armies
     try:
+        # checked once per pair so an unplayable cell is recorded, not retried
+        for w, b in ((ai, aj), (aj, ai)):
+            ok, why = rules.engine_safe(rules.setup_fen(w, b))
+            if not ok:
+                return i, j, g, "unplayable", why
         w, ply_w = play_game(ai, aj, engine,
                              game_nodes(nodes, jitter, i, j, g, 0))
         b, ply_b = play_game(aj, ai, engine,
@@ -121,6 +129,8 @@ def matrix_from_cells(cells, n):
     """Average the game pairs per cell. Missing cells come back as None."""
     acc = {}
     for (i, j, _g), v in cells.items():
+        if v is None:  # unplayable cell, recorded so it is not retried
+            continue
         acc.setdefault((i, j), []).append(v)
     return [[(sum(acc[(i, j)]) / len(acc[(i, j)]) if (i, j) in acc else None)
              for j in range(n)] for i in range(n)]
@@ -170,12 +180,15 @@ def main():
         return
 
     start = time.time()
-    done = errors = 0
+    done = errors = unplayable = 0
     with mp.Pool(workers, initializer=_worker_init,
                  initargs=(args.engine,)) as p:
         for i, j, g, score, info in p.imap_unordered(_play_cell, tasks):
             done += 1
-            if score is None:
+            if score == "unplayable":
+                unplayable += 1
+                cells[(i, j, g)] = None
+            elif score is None:
                 errors += 1
                 print("  engine error on (%d,%d,%d): %s" % (i, j, g, info))
             else:
@@ -199,6 +212,9 @@ def main():
     if sym:
         print("P[i][j]+P[j][i] mean %.4f (want 1.00), min %.3f max %.3f"
               % (sum(sym) / len(sym), min(sym), max(sym)))
+    if unplayable:
+        print("%d game pairs skipped: too many pieces for this engine "
+              "(rules.ENGINE_MAX_PIECES)" % unplayable)
     if errors:
         print("%d game pairs failed and were not recorded; re-run to fill them"
               % errors)
