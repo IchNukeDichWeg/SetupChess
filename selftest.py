@@ -24,6 +24,7 @@ import chess.engine
 import arena
 import pool
 import rules
+import solve
 
 
 def fail(msg):
@@ -348,6 +349,60 @@ def test_arena_smoke(engine_path, tmpdir):
     print("PASS: arena end to end (4 cells played, resume replayed nothing)")
 
 
+def test_solver():
+    # the kickoff gate: rock-paper-scissors must come back (1/3, 1/3, 1/3)
+    rps = [[0.5, 0.0, 1.0], [1.0, 0.5, 0.0], [0.0, 1.0, 0.5]]
+    x, value = solve.nash(rps)
+    if max(abs(v - 1 / 3) for v in x) > 1e-6:
+        fail("RPS equilibrium is %r, want thirds" % (list(x),))
+    if abs(value - 0.5) > 1e-9:
+        fail("RPS value is %.6f, want 0.5" % value)
+    if abs(solve.exploitability(rps, x)) > 1e-9:
+        fail("RPS equilibrium reads as exploitable")
+
+    # a dominant row must take the whole mix and be unexploitable
+    dom = [[0.5, 1.0], [0.0, 0.5]]
+    x, value = solve.nash(dom)
+    if abs(x[0] - 1.0) > 1e-6 or abs(value - 0.5) > 1e-6:
+        fail("dominant row not found: %r value %.4f" % (list(x), value))
+
+    # a pure strategy in RPS is maximally exploitable: rock loses to paper
+    if abs(solve.exploitability(rps, [1.0, 0.0, 0.0]) - 0.5) > 1e-9:
+        fail("exploitability of pure rock is %.4f, want 0.5"
+             % solve.exploitability(rps, [1.0, 0.0, 0.0]))
+
+    # best_response picks the counter, not the mirror
+    i, v = solve.best_response(rps, [1.0, 0.0, 0.0])
+    if i != 1 or abs(v - 1.0) > 1e-9:
+        fail("best response to pure rock is %d (%.3f), want paper" % (i, v))
+
+    print("PASS: RPS solves to thirds at value 0.500, dominant row found, "
+          "exploitability and best response correct")
+
+
+def test_solver_holes(tmpdir):
+    """A setup whose row is mostly unmeasured must be dropped, not imputed."""
+    path = os.path.join(tmpdir, "selftest_holes_%d.json" % os.getpid())
+    cells = {}
+    for i in range(3):
+        for j in range(3):
+            # setup 2 is unplayable against everything except itself
+            cells["%d,%d,0" % (i, j)] = None if 2 in (i, j) and i != j else 0.5
+    with open(path, "w") as f:
+        json.dump({"meta": {"n": 3}, "cells": cells}, f)
+    m, keep, rep = solve.load_matrix(path, max_holes=1)
+    if keep != [0, 1]:
+        fail("hole filter kept %r, want [0, 1]" % keep)
+    if rep["dropped"] != [(2, 2)]:
+        fail("hole filter reported %r" % rep["dropped"])
+    if rep["filled"]:
+        fail("filled %d cells that were all measured" % rep["filled"])
+    m2, keep2, rep2 = solve.load_matrix(path, max_holes=2)
+    if keep2 != [0, 1, 2] or rep2["filled"] != 4:
+        fail("loose filter kept %r filling %d" % (keep2, rep2["filled"]))
+    print("PASS: unmeasured rows dropped at the threshold, imputed cells counted")
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--engine", default="stockfish",
@@ -364,6 +419,8 @@ def main():
     test_setup_game()
     test_pool(rng)
     test_arena_units()
+    test_solver()
+    test_solver_holes(args.scratch or tempfile.gettempdir())
     test_engine(args.fens, args.engine, rng)
     test_arena_smoke(args.engine, args.scratch or tempfile.gettempdir())
     print("OK: all selftests passed")

@@ -1,0 +1,144 @@
+"""Solve the payoff matrix: equilibrium mix, best response, exploitability.
+
+Two jobs, one matrix:
+
+* `nash()` -- the unexploitable mix over the pool, by linear programming. For
+  a symmetric zero-sum game the value is 0.5 by construction, so the useful
+  output is the support: which setups the equilibrium actually plays and how
+  often.
+* `best_response()` -- the highest-scoring single setup against a known
+  opponent distribution. This is the online path, since placement on
+  chess.com is alternating and visible (docs/RULES.md).
+
+Holes matter here. The arena leaves a cell empty when the engine cannot be
+trusted with the position (rules.ENGINE_MAX_PIECES), so a row can be mostly
+unmeasured. An unmeasured cell is NOT a draw, and quietly filling it with 0.5
+would let a setup nobody could measure walk into the equilibrium support. Any
+setup missing more than --max-holes of its row is dropped outright and named
+in the output; whatever remains is filled with 0.5 and counted, so the number
+is on screen rather than hidden.
+"""
+
+import argparse
+import json
+
+import numpy as np
+from scipy.optimize import linprog
+
+
+def nash(matrix):
+    """Row player's equilibrium mix for a zero-sum matrix. Returns (x, value).
+
+    maximise v subject to  sum_i x_i * P[i][j] >= v for every column j,
+    sum_i x_i == 1, x >= 0. Variables are [x_0 .. x_n-1, v].
+    """
+    p = np.asarray(matrix, dtype=float)
+    n = p.shape[0]
+    # -sum_i x_i P[i][j] + v <= 0
+    a_ub = np.hstack([-p.T, np.ones((p.shape[1], 1))])
+    b_ub = np.zeros(p.shape[1])
+    a_eq = np.hstack([np.ones((1, n)), np.zeros((1, 1))])
+    b_eq = np.array([1.0])
+    c = np.zeros(n + 1)
+    c[-1] = -1.0  # maximise v
+    bounds = [(0.0, None)] * n + [(None, None)]
+    res = linprog(c, A_ub=a_ub, b_ub=b_ub, A_eq=a_eq, b_eq=b_eq,
+                  bounds=bounds, method="highs")
+    if not res.success:
+        raise RuntimeError("LP failed: %s" % res.message)
+    x = np.clip(res.x[:n], 0.0, None)
+    return x / x.sum(), float(res.x[-1])
+
+
+def best_response(matrix, opponent):
+    """Best single row against an opponent mix. Returns (index, value)."""
+    p = np.asarray(matrix, dtype=float)
+    scores = p @ np.asarray(opponent, dtype=float)
+    i = int(np.argmax(scores))
+    return i, float(scores[i])
+
+
+def exploitability(matrix, x):
+    """How far below the equilibrium value a best-responding opponent pushes.
+
+    0.0 means unexploitable within the pool; higher is worse.
+    """
+    p = np.asarray(matrix, dtype=float)
+    guaranteed = float(np.min(np.asarray(x, dtype=float) @ p))
+    return 0.5 - guaranteed
+
+
+def load_matrix(path, max_holes):
+    """Read an arena state file into (matrix, kept indices, report)."""
+    with open(path) as f:
+        state = json.load(f)
+    n = state["meta"]["n"]
+    acc = {}
+    for key, v in state["cells"].items():
+        if v is None:
+            continue
+        i, j, _g = (int(x) for x in key.split(","))
+        acc.setdefault((i, j), []).append(v)
+    full = [[(sum(acc[(i, j)]) / len(acc[(i, j)]) if (i, j) in acc else None)
+             for j in range(n)] for i in range(n)]
+
+    holes = [sum(1 for j in range(n) if full[i][j] is None) for i in range(n)]
+    keep = [i for i in range(n) if holes[i] <= max_holes]
+    dropped = [(i, holes[i]) for i in range(n) if holes[i] > max_holes]
+    filled = 0
+    m = []
+    for i in keep:
+        row = []
+        for j in keep:
+            v = full[i][j]
+            if v is None:
+                filled += 1
+                v = 0.5
+            row.append(v)
+        m.append(row)
+    return m, keep, {"n": n, "dropped": dropped, "filled": filled,
+                     "meta": state["meta"]}
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument("--matrix", required=True, help="arena state JSON")
+    ap.add_argument("--out", help="write the solved mix here (no default)")
+    ap.add_argument("--max-holes", type=int, default=2,
+                    help="drop a setup with more unmeasured cells than this")
+    ap.add_argument("--top", type=int, default=10)
+    args = ap.parse_args()
+
+    m, keep, rep = load_matrix(args.matrix, args.max_holes)
+    print("%d setups in the file, %d kept, %d dropped for holes"
+          % (rep["n"], len(keep), len(rep["dropped"])))
+    for i, h in rep["dropped"]:
+        print("   dropped setup %d (%d unmeasured cells)" % (i, h))
+    if rep["filled"]:
+        print("%d surviving cells were unmeasured and filled with 0.5"
+              % rep["filled"])
+    if not m:
+        raise SystemExit("nothing left to solve; raise --max-holes")
+
+    x, value = nash(m)
+    expl = exploitability(m, x)
+    print("\nequilibrium value %.4f (0.50 expected for a symmetric game), "
+          "exploitability %.4f" % (value, expl))
+    print("\nsupport:")
+    order = sorted(range(len(x)), key=lambda i: -x[i])
+    for i in order[:args.top]:
+        if x[i] < 1e-6:
+            break
+        print("   %6.2f%%  setup %d" % (100 * x[i], keep[i]))
+
+    if args.out:
+        with open(args.out, "w") as f:
+            json.dump({"pool_index": keep, "weights": x.tolist(),
+                       "value": value, "exploitability": expl,
+                       "dropped": rep["dropped"], "filled": rep["filled"],
+                       "matrix_meta": rep["meta"]}, f, indent=1)
+        print("\nwrote %s" % args.out)
+
+
+if __name__ == "__main__":
+    main()
