@@ -16,10 +16,12 @@ The whole file is CLI-driven and writes only to --out, which has no default.
 """
 
 import argparse
+import atexit
 import json
 import multiprocessing as mp
 import os
 import random
+import signal
 import sys
 import time
 
@@ -41,10 +43,32 @@ class Unplayable(Exception):
     """The position is legal Setup Chess but not safe for this engine."""
 
 
+def _kill_engine(*_args):
+    """Take the engine down with the worker.
+
+    A worker blocked in engine.play() does not notice its parent dying, so
+    without this an interrupted campaign leaves one Stockfish per core
+    running at 100% with no parent (observed: 8 orphans after signalling a
+    run's parent process alone). SIGINT from a terminal reaches the whole
+    process group and would be fine; a signal sent to the parent only is not.
+    """
+    global _ENGINE
+    eng, _ENGINE = _ENGINE, None
+    if eng is not None:
+        try:
+            eng.close()
+        except Exception:
+            pass
+    os._exit(0)
+
+
 def worker_init(engine_path):
     global _ENGINE, _ENGINE_PATH
     _ENGINE_PATH = engine_path
     _ENGINE = chess.engine.SimpleEngine.popen_uci(engine_path)
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        signal.signal(sig, _kill_engine)
+    atexit.register(_kill_engine)
 
 
 def _worker_engine():
@@ -53,6 +77,24 @@ def _worker_engine():
     if _ENGINE is None:
         _ENGINE = chess.engine.SimpleEngine.popen_uci(_ENGINE_PATH)
     return _ENGINE
+
+
+def stop_pool():
+    """Bring workers down so their engines go with them.
+
+    Pool.terminate() joins handler threads that can block forever when a
+    worker is stuck in blocking engine I/O, which leaves the parent hung and
+    one Stockfish per core running (measured: parent alive at 0% CPU with 4
+    orphans 50 seconds after the signal). SIGTERM reaches each worker's
+    _kill_engine handler, which closes its engine first.
+    """
+    for w in mp.active_children():
+        w.terminate()
+    deadline = time.time() + 3.0
+    while time.time() < deadline and mp.active_children():
+        time.sleep(0.05)
+    for w in mp.active_children():
+        w.kill()
 
 
 def game_nodes(base, jitter, i, j, g, color):

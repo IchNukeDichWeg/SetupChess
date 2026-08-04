@@ -23,6 +23,7 @@ import json
 import multiprocessing as mp
 import os
 import random
+import signal
 import sys
 import time
 
@@ -76,6 +77,28 @@ def solve_pool(state, max_holes):
     return weights, rep
 
 
+_CHECKPOINT = None       # set by run_pairs so the signal handler can save
+
+
+def _on_sigint(*_args):
+    """Save, take the engines down, and leave immediately.
+
+    Catching KeyboardInterrupt around the pool loop does not work: the parent
+    blocks inside Pool teardown before the except body runs, leaving one
+    Stockfish per core alive at 100% CPU (measured). An explicit handler
+    plus os._exit avoids Pool.__exit__ entirely.
+    """
+    if _CHECKPOINT:
+        try:
+            _CHECKPOINT()
+        except Exception:
+            pass
+    arena.stop_pool()
+    print("\ninterrupted -- progress saved to the last checkpoint; re-run the "
+          "same command to resume", flush=True)
+    os._exit(130)
+
+
 def run_pairs(tasks, engine_path, workers, cells, label, on_save=None):
     """Play a list of arena tasks into `cells`, checkpointing as they land.
 
@@ -85,6 +108,8 @@ def run_pairs(tasks, engine_path, workers, cells, label, on_save=None):
     """
     if not tasks:
         return 0, 0
+    global _CHECKPOINT
+    _CHECKPOINT = (lambda: on_save(cells)) if on_save else None
     done = errors = unplayable = 0
     start = time.time()
     with mp.Pool(workers, initializer=arena.worker_init,
@@ -182,6 +207,7 @@ def main():
                     help="pairs in the gate match against the archetypes")
     args = ap.parse_args()
 
+    signal.signal(signal.SIGINT, _on_sigint)
     workers = args.workers or os.cpu_count()
     meta = {"nodes": args.nodes, "jitter": args.jitter, "pairs": args.pairs,
             "screen_pairs": args.screen_pairs,
@@ -382,7 +408,7 @@ def main():
 if __name__ == "__main__":
     try:
         main()
-    except KeyboardInterrupt:
+    except KeyboardInterrupt:   # before the handler is installed
         # the state is written every 25 pairs, so the run resumes from the
         # last checkpoint; say so instead of dumping a multiprocessing stack
         # flush explicitly: the pool teardown can take the interpreter down
