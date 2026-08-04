@@ -352,7 +352,7 @@ def test_arena_smoke(engine_path, tmpdir):
     cmd = [sys.executable, "arena.py", "--out", out,
            "--pool", os.path.join(tmpdir, "selftest_pool.json"),
            "--engine", engine_path, "--nodes", "600", "--pairs", "1",
-           "--workers", "2"]
+           "--workers", "1"]
     r = subprocess.run(cmd, capture_output=True, text=True)
     if r.returncode != 0:
         fail("arena.py exited %d:\n%s\n%s" % (r.returncode, r.stdout, r.stderr))
@@ -539,7 +539,7 @@ def test_expand_smoke(engine_path, tmpdir):
     cmd = [sys.executable, "expand.py", "--state", path,
            "--engine", engine_path, "--rounds", "2", "--challengers", "3",
            "--screen-pairs", "1", "--pairs", "1", "--nodes", "400",
-           "--max-pool", "14", "--workers", "2", "--final-games", "4"]
+           "--max-pool", "14", "--workers", "1", "--final-games", "4"]
     r = subprocess.run(cmd, capture_output=True, text=True)
     if r.returncode != 0:
         fail("expand.py exited %d:\n%s\n%s" % (r.returncode, r.stdout, r.stderr))
@@ -766,6 +766,34 @@ def test_c_core(rng):
           "plus en passant, promotion and the rank-3 pawn" % (len(cases), dense))
 
 
+def test_match_smoke(engine_path, tmpdir):
+    """The paired A/B harness runs and reports a difference with its CI."""
+    out = os.path.join(tmpdir, "selftest_match_%d.json" % os.getpid())
+    r = subprocess.run([sys.executable, "match.py",
+                        "--target", "campaigns/champion_v2.json",
+                        "--pool", "campaigns/expand_v2.json", "--out", out,
+                        "--games", "4", "--nodes", "300", "--workers", "1",
+                        "--engine", engine_path],
+                       capture_output=True, text=True)
+    if r.returncode != 0:
+        fail("match.py exited %d:\n%s\n%s" % (r.returncode, r.stdout, r.stderr))
+    for needed in ("paired difference", "SPRT", "Elo:"):
+        if needed not in r.stdout:
+            fail("match.py report is missing %r:\n%s" % (needed, r.stdout))
+    with open(out) as f:
+        d = json.load(f)
+    if len(d["plain"]) != len(d["retarget"]) != len(d["diffs"]):
+        fail("paired arrays are ragged: %d/%d/%d"
+             % (len(d["plain"]), len(d["retarget"]), len(d["diffs"])))
+    for a, b, diff in zip(d["plain"], d["retarget"], d["diffs"]):
+        if abs((b - a) - diff) > 1e-12:
+            fail("recorded diff %r does not match %r - %r" % (diff, b, a))
+        for s_ in (a, b):
+            if s_ not in (0.0, 0.5, 1.0):
+                fail("score %r is not a game result" % s_)
+    print("PASS: match.py paired A/B harness runs and its pairing is consistent")
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--engine", default="stockfish",
@@ -792,6 +820,7 @@ def main():
     test_arena_smoke(args.engine, args.scratch or tempfile.gettempdir())
     test_expand_smoke(args.engine, args.scratch or tempfile.gettempdir())
     test_play_smoke(args.engine, args.scratch or tempfile.gettempdir())
+    test_match_smoke(args.engine, args.scratch or tempfile.gettempdir())
     print("OK: all selftests passed")
 
 
