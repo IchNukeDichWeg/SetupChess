@@ -94,20 +94,13 @@ def antisymmetrize(full):
     return out
 
 
-def load_matrix(path, max_holes, symmetric=True):
-    """Read an arena state file into (matrix, kept indices, report)."""
-    with open(path) as f:
-        state = json.load(f)
-    n = state["meta"]["n"]
-    acc = {}
-    for key, v in state["cells"].items():
-        if v is None:
-            continue
-        i, j, _g = (int(x) for x in key.split(","))
-        acc.setdefault((i, j), []).append(v)
-    full = [[(sum(acc[(i, j)]) / len(acc[(i, j)]) if (i, j) in acc else None)
-             for j in range(n)] for i in range(n)]
+def prepare(full, max_holes, symmetric=True):
+    """Antisymmetrise, drop hole-ridden rows, impute the rest.
 
+    Returns (matrix, kept indices, report). Split out from load_matrix so
+    expand.py can solve an in-memory matrix without a round trip to disk.
+    """
+    n = len(full)
     if symmetric:
         full = antisymmetrize(full)
     holes = [sum(1 for j in range(n) if full[i][j] is None) for i in range(n)]
@@ -125,7 +118,27 @@ def load_matrix(path, max_holes, symmetric=True):
             row.append(v)
         m.append(row)
     return m, keep, {"n": n, "dropped": dropped, "filled": filled,
-                     "symmetric": symmetric, "meta": state["meta"]}
+                     "symmetric": symmetric}
+
+
+def load_matrix(path, max_holes, symmetric=True):
+    """Read an arena state file into (matrix, kept indices, report)."""
+    with open(path) as f:
+        state = json.load(f)
+    # arena state files carry the setup count in meta; expand state files
+    # carry the armies themselves and grow, so read whichever is there
+    n = state["meta"].get("n") or len(state["armies"])
+    acc = {}
+    for key, v in state["cells"].items():
+        if v is None:
+            continue
+        i, j, _g = (int(x) for x in key.split(","))
+        acc.setdefault((i, j), []).append(v)
+    full = [[(sum(acc[(i, j)]) / len(acc[(i, j)]) if (i, j) in acc else None)
+             for j in range(n)] for i in range(n)]
+    m, keep, rep = prepare(full, max_holes, symmetric)
+    rep["meta"] = state["meta"]
+    return m, keep, rep
 
 
 def main():

@@ -41,7 +41,7 @@ class Unplayable(Exception):
     """The position is legal Setup Chess but not safe for this engine."""
 
 
-def _worker_init(engine_path):
+def worker_init(engine_path):
     global _ENGINE, _ENGINE_PATH
     _ENGINE_PATH = engine_path
     _ENGINE = chess.engine.SimpleEngine.popen_uci(engine_path)
@@ -82,27 +82,54 @@ def play_game(white_army, black_army, engine, nodes):
     return (1.0 if outcome.winner == chess.WHITE else 0.0), board.ply()
 
 
-def _play_cell(task):
+def play_pair(ai, aj, nodes, jitter, i, j, g):
+    """Both colours of one matchup. Returns the two scores from ai's side.
+
+    Raises Unplayable before any game starts, so a cell that the engine
+    cannot take is recorded once rather than half-played.
+    """
+    for w, b in ((ai, aj), (aj, ai)):
+        ok, why = rules.engine_safe(rules.setup_fen(w, b))
+        if not ok:
+            raise Unplayable(why)
+    engine = _worker_engine()
+    w, ply_w = play_game(ai, aj, engine, game_nodes(nodes, jitter, i, j, g, 0))
+    b, ply_b = play_game(aj, ai, engine, game_nodes(nodes, jitter, i, j, g, 1))
+    return (w, 1.0 - b), ply_w + ply_b
+
+
+def play_cell(task):
     """One game pair for cell (i, j): i as White, then i as Black."""
     i, j, g, armies, nodes, jitter = task
-    engine = _worker_engine()
     ai, aj = armies
     try:
-        # checked once per pair so an unplayable cell is recorded, not retried
-        for w, b in ((ai, aj), (aj, ai)):
-            ok, why = rules.engine_safe(rules.setup_fen(w, b))
-            if not ok:
-                return i, j, g, "unplayable", why
-        w, ply_w = play_game(ai, aj, engine,
-                             game_nodes(nodes, jitter, i, j, g, 0))
-        b, ply_b = play_game(aj, ai, engine,
-                             game_nodes(nodes, jitter, i, j, g, 1))
+        (w, b), plies = play_pair(ai, aj, nodes, jitter, i, j, g)
+    except Unplayable as e:
+        return i, j, g, "unplayable", str(e)
     except (chess.engine.EngineError, chess.engine.EngineTerminatedError) as e:
         global _ENGINE
         _ENGINE = None
         return i, j, g, None, str(e)
     # both games scored from i's perspective, then averaged
-    return i, j, g, (w + (1.0 - b)) / 2.0, (ply_w + ply_b)
+    return i, j, g, (w + b) / 2.0, plies
+
+
+def play_match(task):
+    """A standalone matchup outside the matrix: returns per-game scores.
+
+    Used by the final gate match, which needs independent games for a real
+    confidence interval rather than averaged cells.
+    """
+    tag, ai, aj, nodes, jitter, k = task
+    try:
+        scores, _plies = play_pair(ai, aj, nodes, jitter, k, k + 1, k)
+    except Unplayable as e:
+        return tag, None, str(e)
+    except (chess.engine.EngineError, chess.engine.EngineTerminatedError) as e:
+        global _ENGINE
+        _ENGINE = None
+        return tag, None, str(e)
+    return tag, list(scores), ""
 
 
 def load_state(path):
@@ -181,9 +208,9 @@ def main():
 
     start = time.time()
     done = errors = unplayable = 0
-    with mp.Pool(workers, initializer=_worker_init,
+    with mp.Pool(workers, initializer=worker_init,
                  initargs=(args.engine,)) as p:
-        for i, j, g, score, info in p.imap_unordered(_play_cell, tasks):
+        for i, j, g, score, info in p.imap_unordered(play_cell, tasks):
             done += 1
             if score == "unplayable":
                 unplayable += 1
