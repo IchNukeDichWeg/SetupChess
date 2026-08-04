@@ -623,8 +623,56 @@ def test_drafter():
     if sq != chess.E6:
         fail("drafter did not block a setup check (played %s)"
              % chess.square_name(sq))
+    # king hunt: an opponent that holds its king back while buying few, big
+    # pieces can be locked out entirely -- ending setup with no king loses
+    # outright. Pins the ablation so a change to either feature shows up.
+    S = chess.parse_square
+
+    def _army(spec):
+        return [(chess.PIECE_SYMBOLS.index(tok[0].lower()), S(tok[1:]))
+                for tok in spec.split()]
+
+    styles = {
+        "dense": "Ra8 Nb8 Bc8 Qd8 Bf8 Ng8 Rh8 Pa7 Pb7 Pc7 Pd7 Pe7 Pf7 Pg7 Ph7",
+        "queen_spam": "Qa8 Qb8 Qc8 Qd8 Ng8",
+        "rank3": "Qd6 Qe6 Rc6 Rf6 Bb6 Bg6 Pa6 Ph6 Pd7",
+        "heavy": "Qd8 Qe8 Ra8 Rh8 Bc8 Pf7 Pg7 Ph7",
+    }
+
+    def run(plan, **kw):
+        drafter = play.Drafter(champ, chess.WHITE, **kw)
+        st, bi = rules.SetupState(), 0
+        for _ in range(200):
+            if st.result or st.complete:
+                break
+            if st.turn == chess.WHITE:
+                mv = drafter.choose(st)
+            else:
+                legal = set(st.legal_placements())
+                mv = next((x for x in plan[bi:] if x in legal), None)
+                if mv is None:
+                    kings = [x for x in legal if x[0] == chess.KING]
+                    if not kings:
+                        return "lockout"
+                    mv = kings[0]
+                else:
+                    bi = plan.index(mv) + 1
+            st.place(*mv)
+        return st.result or "survived"
+
+    got = {k: run(_army(v)) for k, v in styles.items()}
+    want = {"dense": "survived", "queen_spam": "1-0",
+            "rank3": "lockout", "heavy": "lockout"}
+    if got != want:
+        fail("king hunt changed outcomes: %r, want %r" % (got, want))
+    # with the hunt disabled, heavy is a mate rather than a lockout: the hunt
+    # is what converts it, and neither loses a win the baseline had
+    if run(_army(styles["heavy"]), hunt_when=-1) != "1-0":
+        fail("baseline no longer mates the heavy style")
     print("PASS: drafter realises its target for both colours, takes a setup "
-          "mate over the plan, and blocks a forced check")
+          "mate over the plan, blocks a forced check, and locks out %d of %d "
+          "king-last styles" % (sum(1 for v in got.values() if v == "lockout"),
+                                len(got)))
 
 
 def test_play_smoke(engine_path, tmpdir):

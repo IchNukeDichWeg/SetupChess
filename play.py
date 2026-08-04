@@ -36,22 +36,88 @@ import rules
 # of the budget first, then places it while there is still room to manoeuvre.
 KING_AT_POINTS_LEFT = 12
 
+# Hunt an unplaced enemy king once its safe squares are this few. 6 measured
+# strictly better than 8: both win the same three of four king-last styles,
+# but at 8 the drafter abandoned 5 of its 14 target pieces chasing a dense
+# opponent that was never in danger, and at 6 it builds all 14. Ending setup
+# without a king is an outright loss, not a checkmate ("failed to set up his
+# king" in the shipped client), so covering every empty square in their zone
+# wins on its own. Measured against a 23/24-coverage army: sparse armies that
+# hold the king back get locked out, dense ones survive because their own
+# sixteen pieces block every ray to the back rank.
+HUNT_WHEN = 6
+
+# ...but only once they can no longer buy their way out. Hunting a king that
+# is going to be placed anyway just wrecks our own army: with the threshold
+# alone the drafter built 9 of its 14 target pieces against a dense opponent
+# that was never in danger. A side still holding a big budget can fill its
+# zone with blockers and hand the squares back, so the hunt waits until their
+# remaining points are this low.
+HUNT_THEIR_POINTS = 12
+
 
 class Drafter:
     """Realises a target army, with tactics taking priority over the plan.
 
-    ponytail: the target is chosen once, up front. Because the opponent
-    cannot touch our squares, the only reason to switch mid-draft is their
-    revealed army, and re-targeting has to respect what we have already
-    spent. Upgrade path: solve.best_response over the pool armies still
-    reachable from our current placements, re-run each turn.
+    Priority each turn:
+      1. a placement that mates them during setup
+      2. hunt an unplaced enemy king once its safe squares are running out
+      3. place our own king before the budget runs down
+      4. follow the plan (a check restricts the legal set, so this becomes
+         "block" on its own)
+
     """
 
-    def __init__(self, target, color):
+    def __init__(self, target, color, hunt_when=HUNT_WHEN):
         self.color = color
         self.target = (target if color == chess.WHITE
                        else rules.mirror_army(target))
         self.placed = set()
+        self.hunt_when = hunt_when
+
+    # --- king hunt -------------------------------------------------------
+
+    def _their_safe_squares(self, state):
+        """Empty squares in their zone their king could still legally take.
+
+        None once their king is on the board -- the hunt is over then.
+        """
+        opp = not self.color
+        if state.board.king(opp) is not None:
+            return None
+        out = []
+        for r in rules.zone_ranks(opp):
+            for f in range(8):
+                sq = chess.square(f, r)
+                if state.board.piece_at(sq):
+                    continue
+                if state.board.is_attacked_by(self.color, sq):
+                    continue
+                out.append(sq)
+        return out
+
+    def _hunt_move(self, state, legal, safe):
+        """The placement that removes the most of their remaining king squares.
+
+        ponytail: greedy, one ply. Their own later placements can block our
+        rays and hand squares back, so a count of zero is pressure rather than
+        a proven win. Upgrade path: search the placement tree for a forced
+        lockout, which is what the C core is for.
+        """
+        target_sq = {sq for _, sq in self.target}
+        best, best_key = None, None
+        for pt, sq in legal:
+            if pt == chess.KING:
+                continue
+            state.board.set_piece_at(sq, chess.Piece(pt, self.color))
+            left = sum(1 for s in safe
+                       if not state.board.is_attacked_by(self.color, s))
+            state.board.remove_piece_at(sq)
+            # fewest squares left, then stay on plan, then spend cheaply
+            key = (left, 0 if sq in target_sq else 1, rules.PIECE_COST[pt])
+            if best_key is None or key < best_key:
+                best, best_key = (pt, sq), key
+        return best
 
     def _remaining(self, state):
         """Target pieces not yet on the board, dearest first."""
@@ -105,6 +171,14 @@ class Drafter:
         mate = self._mate_in_one(state, legal)
         if mate:
             return mate
+
+        safe = self._their_safe_squares(state)
+        opp_points = state.points[not self.color]
+        if (safe is not None and len(safe) <= self.hunt_when
+                and opp_points <= HUNT_THEIR_POINTS):
+            hunt = self._hunt_move(state, legal, safe)
+            if hunt:
+                return hunt
 
         must_king = state.board.king(self.color) is None
         if must_king and state.points[self.color] <= KING_AT_POINTS_LEFT:
@@ -207,6 +281,8 @@ def main():
     ap.add_argument("--nodes", type=int, default=20000)
     ap.add_argument("--color", choices=("white", "black", "both"),
                     default="both", help="'both' plays one game each way")
+    ap.add_argument("--hunt-when", type=int, default=HUNT_WHEN,
+                    help="hunt an unplaced enemy king at this many safe squares")
     ap.add_argument("--out", help="write the game log here (no default)")
     args = ap.parse_args()
 
@@ -221,7 +297,7 @@ def main():
     games = []
     try:
         for color in colors:
-            us = Drafter(ours, color)
+            us = Drafter(ours, color, hunt_when=args.hunt_when)
             if args.opponent == "stdin":
                 them = StdinDrafter(not color)
             else:
