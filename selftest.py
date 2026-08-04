@@ -98,12 +98,23 @@ def test_validate_fen():
         ok, why = rules.validate_fen(fen)
         if ok:
             fail("validate_fen accepted %s: %s" % (label, fen))
-    good = "4k3/pppp4/8/8/8/8/PPPP4/4K3 w - - 0 1"
-    ok, why = rules.validate_fen(good)
-    if not ok:
-        fail("validate_fen rejected a fine position: %s" % why)
-    print("PASS: validate_fen rejected %d illegal FENs, accepted a legal one"
-          % len(cases))
+    # Setup-Chess-legal but not standard-chess-legal: these must PASS, since
+    # Stockfish plays them and the 39 points genuinely reach them.
+    legal = [
+        ("plain position", "4k3/pppp4/8/8/8/8/PPPP4/4K3 w - - 0 1"),
+        ("16 black pawns",
+         "rn1qk2r/pppppppp/pppppppp/8/8/8/PPPPPPPP/RNBQKBNR w - - 0 1"),
+        ("four queens a side",
+         "qqqqk3/8/8/8/8/8/8/QQQQK3 w - - 0 1"),
+        ("White in check from two black rooks at handoff",
+         "4k3/8/8/8/8/8/8/r3K2r w - - 0 1"),
+    ]
+    for label, fen in legal:
+        ok, why = rules.validate_fen(fen)
+        if not ok:
+            fail("validate_fen rejected a legal setup (%s): %s" % (label, why))
+    print("PASS: validate_fen rejected %d illegal FENs, accepted %d legal ones "
+          "including setup-only piece counts" % (len(cases), len(legal)))
 
 
 def test_setup_game():

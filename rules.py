@@ -88,13 +88,33 @@ def setup_fen(white_army, black_army):
     return board.fen()
 
 
+# python-chess judges a FEN by ordinary-chess history, which Setup Chess
+# positions do not have: 16 pawns, 20 pieces or four queens a side are all
+# reachable inside the 39 points, and two black pieces can be checking White
+# at handoff. Stockfish plays every one of them (verified: the 16-pawn wall
+# above returns e2e4 at +17.36 rather than erroring), so these flags are
+# noise here. Everything NOT on this list still rejects, because the rest
+# genuinely breaks an engine or cannot arise from a legal setup.
+SETUP_LEGAL_STATUS = (
+    chess.STATUS_TOO_MANY_WHITE_PAWNS | chess.STATUS_TOO_MANY_BLACK_PAWNS
+    | chess.STATUS_TOO_MANY_WHITE_PIECES | chess.STATUS_TOO_MANY_BLACK_PIECES
+    | chess.STATUS_TOO_MANY_CHECKERS | chess.STATUS_IMPOSSIBLE_CHECK
+)
+
+
 def validate_fen(fen):
-    """Is this FEN safe to hand to a UCI engine? Returns (ok, reason)."""
+    """Is this FEN safe to hand to a UCI engine? Returns (ok, reason).
+
+    Setup-Chess-legal oddities (pawn and piece counts above the standard
+    army, multi-piece check at handoff) pass; pawns on a back rank, missing
+    or duplicate kings, castling rights no rook supports, a bad en passant
+    square and a non-mover left in check all still fail.
+    """
     try:
         board = chess.Board(fen)
     except ValueError as e:
         return False, "unparseable: %s" % e
-    status = board.status()
+    status = board.status() & ~SETUP_LEGAL_STATUS
     if status == chess.STATUS_VALID:
         return True, ""
     reasons = [s.name.lower() for s in chess.Status if s and status & s]
