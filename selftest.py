@@ -25,6 +25,7 @@ import arena
 import pool
 import rules
 import solve
+import stats
 
 
 def fail(msg):
@@ -422,6 +423,124 @@ def test_solver_holes(tmpdir):
     print("PASS: unmeasured rows dropped at the threshold, imputed cells counted")
 
 
+def test_stats():
+    if abs(stats.elo(0.5)) > 1e-9:
+        fail("elo(0.5) is %r, want 0" % stats.elo(0.5))
+    for e in (-400.0, -50.0, 0.0, 7.5, 300.0):
+        back = stats.elo(stats.score_of(e))
+        if abs(back - e) > 1e-6:
+            fail("elo/score_of round trip broke at %g (got %g)" % (e, back))
+    if stats.elo(0.75) <= 0 or stats.elo(0.25) >= 0:
+        fail("elo sign is inverted")
+
+    # a coin flip must not clear either SPRT bound, and its CI must span 0
+    rng = random.Random(5)
+    coin = [rng.choice([0.0, 0.5, 1.0]) for _ in range(400)]
+    e, lo, hi, st = stats.elo_with_ci(coin)
+    if not lo < 0 < hi:
+        fail("coin-flip CI [%g, %g] excludes 0" % (lo, hi))
+    if stats.sprt_verdict(stats.sprt_llr(coin)) != "CONTINUE":
+        fail("coin flip reached an SPRT bound")
+
+    # a decisive edge must accept H1 and report a positive lower bound
+    strong = [1.0] * 150 + [0.5] * 40 + [0.0] * 10
+    e, lo, hi, st = stats.elo_with_ci(strong)
+    if lo <= 0:
+        fail("a 74%% scorer has lower Elo bound %g" % lo)
+    if stats.sprt_verdict(stats.sprt_llr(strong)) != "ACCEPT H1":
+        fail("decisive edge did not accept H1 (LLR %.3f)"
+             % stats.sprt_llr(strong))
+    # and a decisive loss must accept H0
+    if stats.sprt_verdict(stats.sprt_llr([0.0] * 150 + [0.5] * 50)) != "ACCEPT H0":
+        fail("decisive loss did not accept H0")
+    if "+/-" not in stats.report(coin):
+        fail("report() omitted the error margin")
+    print("PASS: elo round trip, coin flip continues with a CI spanning zero, "
+          "decisive edge accepts H1")
+
+
+def test_expand_units(tmpdir):
+    import expand
+    path = os.path.join(tmpdir, "selftest_expand_%d.json" % os.getpid())
+    meta = {"m": 1}
+    state = expand.new_state(2026, meta)
+    n = len(state["armies"])
+    if n != len(pool.ARCHETYPES):
+        fail("new_state seeded %d armies" % n)
+
+    # cell_tasks must cover both directions and never re-queue a done cell
+    armies = [pool.from_json(a) for a in state["armies"]]
+    tasks = expand.cell_tasks(armies, 1, {}, [0], [1], 100, 0.0)
+    if {(t[0], t[1]) for t in tasks} != {(0, 1), (1, 0)}:
+        fail("cell_tasks missed a direction: %r" % [(t[0], t[1]) for t in tasks])
+    tasks = expand.cell_tasks(armies, 1, {(0, 1, 0): 0.5}, [0], [1], 100, 0.0)
+    if {(t[0], t[1]) for t in tasks} != {(1, 0)}:
+        fail("cell_tasks re-queued a finished cell")
+
+    # screen_scores must weight by the mix and ignore unmeasured opponents.
+    # It reads a plain cells dict, not the state, so a challenger that fails
+    # the screen never touches the pool matrix.
+    scratch = {(2, 0, 0): 1.0, (0, 2, 0): 0.0, (2, 1, 0): 0.0, (1, 2, 0): 1.0}
+    got = expand.screen_scores(scratch, n, [2], {0: 0.75, 1: 0.25})
+    if abs(got[2] - 0.75) > 1e-9:
+        fail("screen_scores gave %r, want 0.75" % got[2])
+    got = expand.screen_scores(scratch, n, [3], {0: 1.0})
+    if got[3] is not None:
+        fail("screen_scores invented a score for an unmeasured challenger")
+    if state["cells"]:
+        fail("screening leaked cells into the pool state")
+
+    # round trip through disk
+    expand.save_state(path, state)
+    back = expand.load_state(path, 2026, meta)
+    if back["armies"] != state["armies"] or back["cells"] != state["cells"]:
+        fail("state did not survive a save/load round trip")
+    print("PASS: expand state round trip, cell_tasks covers both directions "
+          "and skips done cells, screen_scores weights by the mix")
+
+
+def test_expand_smoke(engine_path, tmpdir):
+    """Two real rounds end to end, into a scratch path."""
+    path = os.path.join(tmpdir, "selftest_expand_run_%d.json" % os.getpid())
+    cmd = [sys.executable, "expand.py", "--state", path,
+           "--engine", engine_path, "--rounds", "2", "--challengers", "3",
+           "--screen-pairs", "1", "--pairs", "1", "--nodes", "400",
+           "--max-pool", "14", "--workers", "2", "--final-games", "4"]
+    r = subprocess.run(cmd, capture_output=True, text=True)
+    if r.returncode != 0:
+        fail("expand.py exited %d:\n%s\n%s" % (r.returncode, r.stdout, r.stderr))
+    if "gate match" not in r.stdout or "SPRT" not in r.stdout:
+        fail("expand.py produced no gate report:\n%s" % r.stdout)
+    with open(path) as f:
+        state = json.load(f)
+    if not state["rounds"]:
+        fail("expand.py recorded no rounds")
+    for a in state["armies"]:
+        ok, why = rules.validate_army(pool.from_json(a))
+        if not ok:
+            fail("expansion produced an illegal army: %s" % why)
+    if len(state["armies"]) > 14:
+        fail("pool grew past --max-pool: %d" % len(state["armies"]))
+    # killed challengers must not sit in the pool as unplayed columns: every
+    # surviving setup needs a row the solver can actually use
+    admitted = sum(r.get("admitted", 0) for r in state["rounds"])
+    if len(state["armies"]) > len(pool.ARCHETYPES) + admitted:
+        fail("pool holds %d setups but only %d were admitted on top of %d "
+             "archetypes" % (len(state["armies"]), admitted, len(pool.ARCHETYPES)))
+    m, keep, rep = solve.load_matrix(path, max_holes=2)
+    if not keep:
+        fail("no setup survived the hole filter after expansion")
+    # resume must not redo finished rounds
+    r2 = subprocess.run(cmd, capture_output=True, text=True)
+    if r2.returncode != 0:
+        fail("resume exited %d:\n%s" % (r2.returncode, r2.stderr))
+    with open(path) as f:
+        if len(json.load(f)["rounds"]) < len(state["rounds"]):
+            fail("resume lost rounds")
+    print("PASS: expand end to end (%d rounds, %d setups, gate match reported, "
+          "resume kept its rounds)" % (len(state["rounds"]), len(state["armies"])))
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--engine", default="stockfish",
@@ -440,8 +559,11 @@ def main():
     test_arena_units()
     test_solver()
     test_solver_holes(args.scratch or tempfile.gettempdir())
+    test_stats()
+    test_expand_units(args.scratch or tempfile.gettempdir())
     test_engine(args.fens, args.engine, rng)
     test_arena_smoke(args.engine, args.scratch or tempfile.gettempdir())
+    test_expand_smoke(args.engine, args.scratch or tempfile.gettempdir())
     print("OK: all selftests passed")
 
 
