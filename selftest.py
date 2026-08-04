@@ -283,6 +283,26 @@ def test_pool(rng):
     army = base[0]
     for _ in range(2000):
         army = pool.mutate(army, rng)  # raises on any illegal product
+    for _ in range(2000):
+        pool.breed(base, rng)          # crossover and multi-step edits
+    # crossover recombines rank bands, and a band covering all or none of one
+    # parent legitimately reproduces a parent; breed() is what has to
+    # guarantee a novel challenger, so that is what gets asserted.
+    a, b = base[0], base[3]
+    for _ in range(200):
+        ok, why = rules.validate_army(pool.crossover(a, b, rng))
+        if not ok:
+            fail("crossover produced %s" % why)
+    keys = {pool.army_key(x) for x in base}
+    repeats = sum(1 for _ in range(300)
+                  if pool.army_key(pool.breed(base, rng, crossover_rate=1.0))
+                  in keys)
+    if repeats > 15:
+        fail("breed returned an existing army %d/300 times" % repeats)
+    # a multi-step mutation must move further than a single one
+    far = pool.mutate(base[0], rng, steps=3)
+    if len(set(base[0]) - set(far)) < 2:
+        fail("steps=3 changed fewer than two pieces")
     sized = pool.seed_pool(rng, size=len(pool.ARCHETYPES) + 60)
     if len(sized) != len(pool.ARCHETYPES) + 60:
         fail("seed_pool returned %d armies" % len(sized))
@@ -292,8 +312,9 @@ def test_pool(rng):
         ok, why = rules.validate_army(a)
         if not ok:
             fail("pooled army invalid: %s" % why)
-    print("PASS: %d archetypes legal and distinct, 2000 mutations legal, "
-          "%d-army pool with no duplicates" % (len(pool.ARCHETYPES), len(sized)))
+    print("PASS: %d archetypes legal and distinct, 2000 mutations and 2000 "
+          "bred armies legal, crossover recombines, %d-army pool with no "
+          "duplicates" % (len(pool.ARCHETYPES), len(sized)))
 
 
 def test_arena_units():

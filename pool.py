@@ -148,13 +148,63 @@ def _mutate_king(army, rng):
 MUTATORS = (_mutate_move, _mutate_swap, _mutate_drop, _mutate_king)
 
 
-def mutate(army, rng):
-    """One random mutation, re-completed to spend what it freed up."""
-    out = complete(rng.choice(MUTATORS)(army, rng), rng)
+def crossover(a, b, rng):
+    """Take one rank band from a, the rest from b, then re-spend the change.
+
+    Single-piece edits cannot escape a local optimum: measured on the first
+    expansion run, 13 of 13 mutants of a 12-bishop champion lost their screen,
+    which for equal-strength challengers would happen 0.7% of the time. They
+    were genuinely worse, so the champion sits in a hole that one edit cannot
+    climb out of. Recombining whole bands moves several pieces at once.
+    """
+    band = rng.choice(((0,), (1,), (2,), (0, 1), (1, 2)))
+    out = [(pt, sq) for pt, sq in a if chess.square_rank(sq) in band]
+    used = {sq for _, sq in out}
+    for pt, sq in b:
+        if sq not in used and rules.army_cost(out) + rules.PIECE_COST[pt] <= rules.BUDGET:
+            out.append((pt, sq))
+            used.add(sq)
+    kings = [x for x in out if x[0] == chess.KING]
+    out = [x for x in out if x[0] != chess.KING]
+    if kings:
+        out.insert(0, kings[0])
+    else:
+        free = _free_squares(out, chess.KING)
+        if not free:
+            return list(a)
+        out.insert(0, (chess.KING, rng.choice(free)))
+    return complete(out, rng)
+
+
+def mutate(army, rng, steps=1):
+    """`steps` random mutations, re-completed to spend what they freed up."""
+    out = army
+    for _ in range(max(1, steps)):
+        out = complete(rng.choice(MUTATORS)(out, rng), rng)
     ok, why = rules.validate_army(out)
     if not ok:  # a mutator may never produce an illegal army
         raise AssertionError("mutation produced %s: %r" % (why, out))
     return out
+
+
+def breed(parents, rng, crossover_rate=0.35, max_steps=3):
+    """One challenger from a parent list: crossover, else a multi-step mutation."""
+    if len(parents) >= 2 and rng.random() < crossover_rate:
+        a, b = rng.sample(parents, 2)
+        out = crossover(a, b, rng)
+        # a band that covers all of one parent, or none of it, recombines to
+        # that parent exactly (measured: 36% of classic x queen_spam children).
+        # That is arithmetically right but useless as a challenger, so nudge it.
+        if army_key(out) in (army_key(a), army_key(b)):
+            out = mutate(out, rng)
+        ok, why = rules.validate_army(out)
+        if not ok:
+            raise AssertionError("crossover produced %s: %r" % (why, out))
+        return out
+    # most edits are single-step; the tail is what escapes a local optimum
+    steps = rng.choices(range(1, max_steps + 1),
+                        weights=[2 ** -k for k in range(max_steps)])[0]
+    return mutate(rng.choice(parents), rng, steps)
 
 
 def army_key(army):

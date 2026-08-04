@@ -160,6 +160,11 @@ def main():
                     help="screen score a challenger must beat to be admitted")
     ap.add_argument("--pairs", type=int, default=4,
                     help="pairs per cell when filling an admitted row")
+    ap.add_argument("--breadth", type=int, default=4,
+                    help="extra non-support parents bred from each round")
+    ap.add_argument("--crossover-rate", type=float, default=0.35)
+    ap.add_argument("--dry-rounds", type=int, default=2,
+                    help="consecutive rounds admitting nothing before stopping")
     ap.add_argument("--max-pool", type=int, default=60)
     ap.add_argument("--max-holes", type=int, default=2)
     ap.add_argument("--nodes", type=int, default=20000)
@@ -174,6 +179,7 @@ def main():
     meta = {"nodes": args.nodes, "jitter": args.jitter, "pairs": args.pairs,
             "screen_pairs": args.screen_pairs,
             "screen_margin": args.screen_margin,
+            "breadth": args.breadth, "crossover_rate": args.crossover_rate,
             "engine": os.path.basename(args.engine),
             "ply_limit": arena.PLY_LIMIT}
     state = load_state(args.state, args.seed, meta)
@@ -205,12 +211,24 @@ def main():
 
         # challengers are mutations of what the equilibrium actually plays
         support = sorted(weights, key=lambda i: -weights[i])
-        parents = rng.choices(support, weights=[weights[i] for i in support],
-                              k=args.challengers)
+        # breeding only from the support collapses to one parent whenever the
+        # equilibrium is pure, and single edits of one champion cannot leave a
+        # local optimum. --breadth adds the next-best setups by mean score as
+        # extra parents so crossover has something to recombine with.
+        full_now = arena.matrix_from_cells(cells_of(state), len(armies))
+
+        def mean_score(i):
+            vals = [full_now[i][j] for j in range(len(armies))
+                    if j != i and full_now[i][j] is not None]
+            return sum(vals) / len(vals) if vals else -1.0
+
+        extra = sorted((i for i in range(len(armies)) if i not in weights),
+                       key=mean_score, reverse=True)[:args.breadth]
+        parent_pool = [armies[i] for i in support + extra]
         seen = {poolmod.army_key(a) for a in armies}
         fresh = []
-        for parent in parents:
-            cand = poolmod.mutate(armies[parent], rng)
+        for _ in range(args.challengers):
+            cand = poolmod.breed(parent_pool, rng, args.crossover_rate)
             if poolmod.army_key(cand) not in seen:
                 seen.add(poolmod.army_key(cand))
                 fresh.append(cand)
@@ -246,8 +264,17 @@ def main():
                                     "pool": len(armies),
                                     "value": rep["value"]})
             save_state(args.state, state)
-            print("  nothing survived the screen; the pool has converged")
-            break
+            dry = 0
+            for r in reversed(state["rounds"]):
+                if r.get("admitted", 0):
+                    break
+                dry += 1
+            print("  nothing survived the screen (%d dry round(s) of %d)"
+                  % (dry, args.dry_rounds))
+            if dry >= args.dry_rounds:
+                print("  the pool has converged")
+                break
+            continue
 
         # only survivors join the pool, carrying their screen cells with them
         remap = {old: first + k for k, old in enumerate(sorted(admitted))}
