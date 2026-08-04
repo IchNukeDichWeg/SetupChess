@@ -27,8 +27,10 @@ import sys
 import chess
 import chess.engine
 
+import arena
 import pool as poolmod
 import rules
+import solve
 
 # Placing the king first invites a rank-3 checkmate before move one (the live
 # @Qe1+# game in docs/RULES.md). Holding it to the very end is also wrong: the
@@ -56,24 +58,109 @@ HUNT_WHEN = 6
 HUNT_THEIR_POINTS = 12
 
 
+def load_pool(path):
+    """Armies and the antisymmetrised payoff matrix from a campaign state."""
+    with open(path) as f:
+        state = json.load(f)
+    armies = [poolmod.from_json(a) for a in state["armies"]]
+    cells = {tuple(int(x) for x in k.split(",")): v
+             for k, v in state["cells"].items()}
+    full = solve.antisymmetrize(arena.matrix_from_cells(cells, len(armies)))
+    return armies, full
+
+
 class Drafter:
     """Realises a target army, with tactics taking priority over the plan.
 
     Priority each turn:
       1. a placement that mates them during setup
-      2. hunt an unplaced enemy king once its safe squares are running out
-      3. place our own king before the budget runs down
-      4. follow the plan (a check restricts the legal set, so this becomes
+      2. re-target: best response to what their revealed pieces imply,
+         restricted to pool armies still reachable from what we have placed
+      3. hunt an unplaced enemy king once its safe squares are running out
+      4. place our own king before the budget runs down
+      5. follow the plan (a check restricts the legal set, so this becomes
          "block" on its own)
 
+    Re-targeting is only possible while we are not yet committed: an army is
+    reachable exactly when every piece we have already placed appears in it,
+    so the option set narrows with each placement. That is why the opening
+    placements matter more than the closing ones.
+
+    Re-targeting is OPT-IN (pass a pool) and measured negative on the only
+    screen that exists so far: it drops from 3/4 to 2/4 setup-phase wins
+    against the four opponent styles below, giving up a forced mate against
+    queen spam. The cause is that the payoff matrix is measured by playing
+    the CHESS phase from two finished armies -- arena.py never simulates the
+    placement game -- so the matrix cannot see a setup mate or a lockout and
+    happily trades one away for a slightly better middlegame. That screen
+    cannot see re-targeting's upside either, since it only scores the setup
+    phase. Judging it needs a full-game match; until then the default is off.
     """
 
-    def __init__(self, target, color, hunt_when=HUNT_WHEN):
+    def __init__(self, target, color, pool=None, matrix=None,
+                 hunt_when=HUNT_WHEN):
         self.color = color
         self.target = (target if color == chess.WHITE
                        else rules.mirror_army(target))
         self.placed = set()
+        self.pool = pool
+        self.matrix = matrix
         self.hunt_when = hunt_when
+        self.retargets = 0
+
+    # --- best response ---------------------------------------------------
+
+    def _own_perspective(self, squares_pieces, color):
+        """Pieces of `color` as a White-perspective set, to match the pool."""
+        if color == chess.WHITE:
+            return {(pt, sq) for pt, sq in squares_pieces}
+        return {(pt, chess.square_mirror(sq)) for pt, sq in squares_pieces}
+
+    def _revealed(self, state, color):
+        return self._own_perspective(
+            [(p.piece_type, sq) for sq, p in state.board.piece_map().items()
+             if p.color == color], color)
+
+    def _opponent_weights(self, state):
+        """How much each pool army looks like what they have shown so far."""
+        opp = not self.color
+        shown = self._revealed(state, opp)
+        if not shown:
+            return [1.0 / len(self.pool)] * len(self.pool)
+        raw = []
+        for army in self.pool:
+            hits = len(shown & set(army))
+            raw.append((hits / len(shown)) ** 4)  # sharpen; ties stay ties
+        total = sum(raw)
+        if total <= 0:
+            return [1.0 / len(self.pool)] * len(self.pool)
+        return [r / total for r in raw]
+
+    def _retarget(self, state):
+        """Swap the plan for the best still-reachable answer to their army."""
+        if not self.pool or self.matrix is None:
+            return
+        ours = self._revealed(state, self.color)
+        reachable = [i for i, a in enumerate(self.pool)
+                     if ours <= set(a)]
+        if len(reachable) < 2:
+            return
+        w = self._opponent_weights(state)
+        best, best_val = None, None
+        for i in reachable:
+            row = self.matrix[i]
+            val = sum(w[j] * (row[j] if row[j] is not None else 0.5)
+                      for j in range(len(self.pool)))
+            if best_val is None or val > best_val:
+                best, best_val = i, val
+        if best is None:
+            return
+        want = (self.pool[best] if self.color == chess.WHITE
+                else rules.mirror_army(self.pool[best]))
+        if set(want) != set(self.target):
+            self.target = want
+            self.placed = set()
+            self.retargets += 1
 
     # --- king hunt -------------------------------------------------------
 
@@ -171,6 +258,8 @@ class Drafter:
         mate = self._mate_in_one(state, legal)
         if mate:
             return mate
+
+        self._retarget(state)
 
         safe = self._their_safe_squares(state)
         opp_points = state.points[not self.color]
@@ -281,6 +370,8 @@ def main():
     ap.add_argument("--nodes", type=int, default=20000)
     ap.add_argument("--color", choices=("white", "black", "both"),
                     default="both", help="'both' plays one game each way")
+    ap.add_argument("--pool", help="campaign state JSON; enables best-response "
+                    "re-targeting against the opponent's revealed army")
     ap.add_argument("--hunt-when", type=int, default=HUNT_WHEN,
                     help="hunt an unplaced enemy king at this many safe squares")
     ap.add_argument("--out", help="write the game log here (no default)")
@@ -291,13 +382,19 @@ def main():
     if not ok:
         sys.exit("our army is illegal: %s" % why)
 
+    armies = matrix = None
+    if args.pool:
+        armies, matrix = load_pool(args.pool)
+        print("best-response enabled over %d pool armies" % len(armies))
+
     colors = ({"white": [chess.WHITE], "black": [chess.BLACK],
                "both": [chess.WHITE, chess.BLACK]})[args.color]
     engine = chess.engine.SimpleEngine.popen_uci(args.engine)
     games = []
     try:
         for color in colors:
-            us = Drafter(ours, color, hunt_when=args.hunt_when)
+            us = Drafter(ours, color, pool=armies, matrix=matrix,
+                         hunt_when=args.hunt_when)
             if args.opponent == "stdin":
                 them = StdinDrafter(not color)
             else:
@@ -317,7 +414,7 @@ def main():
             if fen:
                 print("   fen:   %s" % fen)
             games.append({"our_color": side, "result": result, "fen": fen,
-                          "note": note, "log": log})
+                          "note": note, "log": log, "retargets": us.retargets})
     finally:
         engine.quit()
 
