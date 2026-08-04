@@ -376,8 +376,27 @@ def test_solver():
     if i != 1 or abs(v - 1.0) > 1e-9:
         fail("best response to pure rock is %d (%.3f), want paper" % (i, v))
 
+    # antisymmetrisation must repair a noisy matrix back to value 0.5 and
+    # leave an already-exact one untouched
+    noisy = [[0.55, 0.80], [0.30, 0.48]]
+    fixed = solve.antisymmetrize(noisy)
+    for i in range(2):
+        for j in range(2):
+            if abs(fixed[i][j] + fixed[j][i] - 1.0) > 1e-12:
+                fail("antisymmetrize left %d,%d asymmetric" % (i, j))
+    if abs(solve.nash(fixed)[1] - 0.5) > 1e-9:
+        fail("symmetric matrix did not solve to value 0.5")
+    if abs(solve.nash(noisy)[1] - 0.5) < 1e-6:
+        fail("the noisy matrix was already symmetric; test proves nothing")
+    if solve.antisymmetrize(rps) != rps:
+        fail("antisymmetrize changed an already-exact matrix")
+    # a one-sided measurement is recovered from its mirror
+    half = [[0.5, None], [0.25, 0.5]]
+    if solve.antisymmetrize(half)[0][1] != 0.75:
+        fail("missing cell not recovered from its mirror")
     print("PASS: RPS solves to thirds at value 0.500, dominant row found, "
-          "exploitability and best response correct")
+          "exploitability and best response correct, antisymmetrisation "
+          "restores value 0.5")
 
 
 def test_solver_holes(tmpdir):

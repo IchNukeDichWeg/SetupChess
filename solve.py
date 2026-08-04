@@ -68,7 +68,33 @@ def exploitability(matrix, x):
     return 0.5 - guaranteed
 
 
-def load_matrix(path, max_holes):
+def antisymmetrize(full):
+    """Force P[i][j] + P[j][i] == 1 using both measurements of a matchup.
+
+    Setup Chess is symmetric: the same two armies, colours rotated. The
+    arena measures each direction separately, so noise leaves the raw matrix
+    slightly off (1.0106 on the 12-archetype run) and the LP happily
+    exploits that asymmetry, reporting an equilibrium value above 0.5 for a
+    game whose value is 0.5 by construction. Averaging the two directions
+    halves the variance and puts the value back where it belongs. The raw
+    matrix is what arena.py reports the symmetry gate on; this is only for
+    solving.
+    """
+    n = len(full)
+    out = [[None] * n for _ in range(n)]
+    for i in range(n):
+        for j in range(n):
+            a, b = full[i][j], full[j][i]
+            if a is not None and b is not None:
+                out[i][j] = (a + (1.0 - b)) / 2.0
+            elif a is not None:
+                out[i][j] = a
+            elif b is not None:
+                out[i][j] = 1.0 - b
+    return out
+
+
+def load_matrix(path, max_holes, symmetric=True):
     """Read an arena state file into (matrix, kept indices, report)."""
     with open(path) as f:
         state = json.load(f)
@@ -82,6 +108,8 @@ def load_matrix(path, max_holes):
     full = [[(sum(acc[(i, j)]) / len(acc[(i, j)]) if (i, j) in acc else None)
              for j in range(n)] for i in range(n)]
 
+    if symmetric:
+        full = antisymmetrize(full)
     holes = [sum(1 for j in range(n) if full[i][j] is None) for i in range(n)]
     keep = [i for i in range(n) if holes[i] <= max_holes]
     dropped = [(i, holes[i]) for i in range(n) if holes[i] > max_holes]
@@ -97,7 +125,7 @@ def load_matrix(path, max_holes):
             row.append(v)
         m.append(row)
     return m, keep, {"n": n, "dropped": dropped, "filled": filled,
-                     "meta": state["meta"]}
+                     "symmetric": symmetric, "meta": state["meta"]}
 
 
 def main():
@@ -107,9 +135,12 @@ def main():
     ap.add_argument("--max-holes", type=int, default=2,
                     help="drop a setup with more unmeasured cells than this")
     ap.add_argument("--top", type=int, default=10)
+    ap.add_argument("--raw", action="store_true",
+                    help="skip antisymmetrisation (see antisymmetrize())")
     args = ap.parse_args()
 
-    m, keep, rep = load_matrix(args.matrix, args.max_holes)
+    m, keep, rep = load_matrix(args.matrix, args.max_holes,
+                               symmetric=not args.raw)
     print("%d setups in the file, %d kept, %d dropped for holes"
           % (rep["n"], len(keep), len(rep["dropped"])))
     for i, h in rep["dropped"]:
