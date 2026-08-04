@@ -497,6 +497,17 @@ def test_expand_units(tmpdir):
     tasks = expand.cell_tasks(armies, 1, {(0, 1, 0): 0.5}, [0], [1], 100, 0.0)
     if {(t[0], t[1]) for t in tasks} != {(1, 0)}:
         fail("cell_tasks re-queued a finished cell")
+    # overlapping index lists must not queue a cell twice: the (i, j) and
+    # (j, i) passes meet in the middle and used to double the seeding bill
+    idx = list(range(len(armies)))
+    tasks = expand.cell_tasks(armies, 2, {}, idx, idx, 100, 0.0)
+    distinct = {(t[0], t[1], t[2]) for t in tasks}
+    if len(tasks) != len(distinct):
+        fail("cell_tasks queued %d tasks for %d cells"
+             % (len(tasks), len(distinct)))
+    if len(distinct) != len(armies) ** 2 * 2:
+        fail("cell_tasks covered %d of %d cells"
+             % (len(distinct), len(armies) ** 2 * 2))
 
     # screen_scores must weight by the mix and ignore unmeasured opponents.
     # It reads a plain cells dict, not the state, so a challenger that fails

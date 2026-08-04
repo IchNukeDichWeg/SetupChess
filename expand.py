@@ -111,13 +111,20 @@ def run_pairs(tasks, engine_path, workers, cells, label, on_save=None):
 
 
 def cell_tasks(armies, pairs, cells, indices_a, indices_b, nodes, jitter):
-    """Game pairs needed to fill (a, b) and (b, a) for the given indices."""
+    """Game pairs needed to fill (a, b) and (b, a) for the given indices.
+
+    Deduplicated: when the two index lists overlap, the (i, j) pass and the
+    (j, i) pass both reach the same cell, which queued every seeding cell
+    twice and doubled the bill for the first phase of a run.
+    """
     out = []
+    queued = set()
     for i in indices_a:
         for j in indices_b:
             for g in range(pairs):
                 for cell in ((i, j, g), (j, i, g)):
-                    if cell not in cells:
+                    if cell not in cells and cell not in queued:
+                        queued.add(cell)
                         out.append((cell[0], cell[1],
                                     g, (armies[cell[0]], armies[cell[1]]),
                                     nodes, jitter))
@@ -373,4 +380,13 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except KeyboardInterrupt:
+        # the state is written every 25 pairs, so the run resumes from the
+        # last checkpoint; say so instead of dumping a multiprocessing stack
+        # flush explicitly: the pool teardown can take the interpreter down
+        # before buffered stdout reaches a redirected log
+        print("\ninterrupted -- progress up to the last checkpoint is saved; "
+              "re-run the same command to resume", flush=True)
+        sys.exit(130)
