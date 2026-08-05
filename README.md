@@ -91,6 +91,7 @@ so python-chess with the rights stripped is the reference.
 | file | what it is |
 |---|---|
 | `docs/RULES.md` | the rules, every line sourced, assumptions explicit |
+| `docs/BOT_MODEL.md` | chess.com's own bot, decoded from its shipped client: king to a corner on move one, material ignored while drafting |
 | `rules.py` | placement legality, points, FEN emission, validation |
 | `pool.py` | archetype seeds, mutation and crossover operators |
 | `arena.py` | fills the payoff matrix, engine vs engine, resumable |
