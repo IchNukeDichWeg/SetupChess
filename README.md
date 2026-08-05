@@ -153,9 +153,9 @@ Both are resumable; Ctrl-C checkpoints and exits cleanly.
   +10.237, so it wins more afterwards than it loses to that. `--no-pool`
   disables it. Teaching the matrix about the placement phase is the open
   work here.
-* **One rule is assumed, not verified**: that a king may not be placed onto
-  an attacked square. The lockout tactic depends on it. It needs one
-  placement on chess.com's analysis board to settle.
+* ~~One rule is assumed~~ **Verified on the live board 2026-08-05**: a king
+  may not be placed onto an attacked square, and non-king pieces may. The
+  lockout tactic rests on real rules, not an assumption.
 * **The pool is small.** 19 armies after five expansion rounds. The
   equilibrium is a pure strategy, which says more about the pool than about
   the game.
