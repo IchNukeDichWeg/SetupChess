@@ -1,0 +1,33 @@
+{
+ "spearman": 0.8881118881118881,
+ "n": 12,
+ "stockfish": {
+  "classic": 0.321875,
+  "classic_castled": 0.365625,
+  "pawn_wall": 0.28125,
+  "queen_spam": 0.4236111111111111,
+  "bishop_swarm": 0.921875,
+  "rook_battery": 0.03515625,
+  "heavy": 0.46875,
+  "knight_horde": 0.71875,
+  "fortress": 0.484375,
+  "rank3_rush": 0.6015625,
+  "double_queen": 0.2125,
+  "minors": 0.90625
+ },
+ "own_core": {
+  "classic": 0.44176136363636365,
+  "classic_castled": 0.3068181818181818,
+  "pawn_wall": 0.296875,
+  "queen_spam": 0.5642361111111112,
+  "bishop_swarm": 0.6477272727272727,
+  "rook_battery": 0.2829861111111111,
+  "heavy": 0.5503472222222222,
+  "knight_horde": 0.6548295454545454,
+  "fortress": 0.5454545454545454,
+  "rank3_rush": 0.6649305555555556,
+  "double_queen": 0.30823863636363635,
+  "minors": 0.7471590909090909
+ },
+ "note": "mean score vs the field, per referee engine; the question is whether our core ranks armies like Stockfish, not whether it plays like Stockfish"
+}
