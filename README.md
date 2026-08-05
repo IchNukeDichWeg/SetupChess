@@ -14,13 +14,15 @@ Python is the harness; the move generator is C.
 
 ## What it found
 
-**Bishops dominate.** The solved army is nine bishops, a queen and three
-pawns, bred by the expansion loop rather than hand-written:
+**Bishops dominate.** The solved army is twelve bishops and three pawns, bred
+by the expansion loop rather than hand-written. It beat the earlier
+nine-bishop-plus-queen champion head to head by **+120.09 Elo
+[+110.17, +130.20]** over 400 pairs:
 
 ```
-  3 | B B B B B . . .
-  2 | . . . . P P P .
-  1 | B B B Q K . B .
+  3 | . B B . . B P .
+  2 | . B B P B P B .
+  1 | B . B B K . B B
       a b c d e f g h
 ```
 
@@ -28,17 +30,18 @@ Against the twelve hand-written archetypes, sampled uniformly:
 
 ```
 Games   | 1,820 of 2,000 (90 pairs unplayable)
-Score   | 0.9104 +/- 0.0106
-W/D/L   | 1,555 / 204 / 61
-Elo     | +402.85 +/- 22.7   [+381.33, +426.82]
-SPRT    | [0,4] LLR +79.738 -> ACCEPT H1
+Score   | 0.9346 +/- 0.0079
+W/D/L   | 1,586 / 230 / 4
+Elo     | +462.06 +/- 22.5   [+440.79, +485.88]
+SPRT    | [0,4] LLR +153.155 -> ACCEPT H1
+Pool    | 87 setups after 21 expansion rounds
 TC      | 20,000 nodes fixed, 15% per-game jitter
 Machine | Mac14,9 arm64, macOS, Stockfish 17
 ```
 
-Read that as "much better than hand-written guesses", not "strong". The
-archetype field includes deliberately bad armies, and one of them scores
-0.016. See [Known limits](#known-limits).
+Four losses in 1,820 games. Read that as "much better than hand-written
+guesses", not "strong": the archetype field includes deliberately bad armies
+and one of them scores 0.016. See [Known limits](#known-limits).
 
 ## The setup phase has real tactics
 
@@ -99,8 +102,10 @@ so python-chess with the rights stripped is the reference.
 | `expand.py` | the double-oracle pool expansion loop |
 | `stats.py` | Elo, confidence intervals, SPRT |
 | `play.py` | drafts an army and plays the game out |
-| `Constants.h`, `movegen.c` | the C core |
-| `cengine.py` | ctypes binding to it |
+| `match.py` | paired full-game A/B for a drafting change |
+| `duel.py` | engine versus engine over setup positions |
+| `Constants.h`, `movegen.c`, `eval.c`, `search.c` | the C core |
+| `cengine.py`, `cuci.py` | ctypes binding and the UCI front end |
 | `selftest.py` | run before every commit |
 | `campaigns/` | campaign state and gate results, in git on purpose |
 
@@ -118,7 +123,7 @@ python3 selftest.py
 ```
 
 ```bash
-python3 play.py --target campaigns/champion_v2.json --opponent classic
+python3 play.py --opponent classic
 ```
 
 Plays one game each colour, setup through result. `--opponent stdin` reads
@@ -138,7 +143,7 @@ Both are resumable; Ctrl-C checkpoints and exits cleanly.
 
 ## Known limits
 
-* **The baseline is weak.** +403 Elo is against hand-written archetypes, one
+* **The baseline is weak.** +462 Elo is against hand-written archetypes, one
   of which scores 0.016 against the field. It is not a measurement against
   strong opposition.
 * **9% of gate pairs are unmeasured**, and more games will not fix it. Those
@@ -157,6 +162,9 @@ Both are resumable; Ctrl-C checkpoints and exits cleanly.
 * ~~One rule is assumed~~ **Verified on the live board 2026-08-05**: a king
   may not be placed onto an attacked square, and non-king pieces may. The
   lockout tactic rests on real rules, not an assumption.
-* **The pool is small.** 19 armies after five expansion rounds. The
-  equilibrium is a pure strategy, which says more about the pool than about
-  the game.
+* **The pool is finite.** 87 armies after 21 expansion rounds, and it stopped
+  because it filled rather than because it converged: at `--max-pool` every
+  further round only prunes and re-admits at rising cost while exploitability
+  has been pinned at 0 throughout. The equilibrium is now genuinely mixed over
+  11 setups, which is a better sign than the old pure one, but the pool is
+  still a sample of the space rather than a cover of it.
