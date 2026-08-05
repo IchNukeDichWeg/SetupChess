@@ -37,6 +37,9 @@ PLY_LIMIT = 300
 
 _ENGINE = None
 _ENGINE_PATH = None
+# Piece ceiling for whichever engine the workers are running. Stockfish's by
+# default; our own core takes 0 (no ceiling), which is the whole point of it.
+MAX_PIECES = rules.ENGINE_MAX_PIECES
 
 
 class Unplayable(Exception):
@@ -62,8 +65,10 @@ def _kill_engine(*_args):
     os._exit(0)
 
 
-def worker_init(engine_path):
-    global _ENGINE, _ENGINE_PATH
+def worker_init(engine_path, max_pieces=None):
+    global _ENGINE, _ENGINE_PATH, MAX_PIECES
+    if max_pieces is not None:
+        MAX_PIECES = max_pieces
     _ENGINE_PATH = engine_path
     _ENGINE = chess.engine.SimpleEngine.popen_uci(engine_path)
     for sig in (signal.SIGINT, signal.SIGTERM):
@@ -108,7 +113,7 @@ def game_nodes(base, jitter, i, j, g, color):
 def play_game(white_army, black_army, engine, nodes):
     """Returns White's score (1.0 / 0.5 / 0.0) and the ply count."""
     fen = rules.setup_fen(white_army, black_army)
-    ok, why = rules.engine_safe(fen)
+    ok, why = rules.engine_safe(fen, MAX_PIECES)
     if not ok:
         raise Unplayable("%s (%s)" % (why, fen))
     board = chess.Board(fen)
@@ -131,7 +136,7 @@ def play_pair(ai, aj, nodes, jitter, i, j, g):
     cannot take is recorded once rather than half-played.
     """
     for w, b in ((ai, aj), (aj, ai)):
-        ok, why = rules.engine_safe(rules.setup_fen(w, b))
+        ok, why = rules.engine_safe(rules.setup_fen(w, b), MAX_PIECES)
         if not ok:
             raise Unplayable(why)
     engine = _worker_engine()
@@ -217,6 +222,9 @@ def main():
     ap.add_argument("--pairs", type=int, default=1,
                     help="game pairs per cell; each pair is 2 games")
     ap.add_argument("--workers", type=int, default=0, help="0 = all cores")
+    ap.add_argument("--max-pieces", type=int, default=rules.ENGINE_MAX_PIECES,
+                    help="piece ceiling for the engine; 0 for none, which is "
+                         "correct for ./cuci.py (default: %(default)s)")
     ap.add_argument("--seed", type=int, default=2026)
     args = ap.parse_args()
 
@@ -240,7 +248,8 @@ def main():
     workers = args.workers or os.cpu_count()
     meta = {"n": n, "nodes": args.nodes, "jitter": args.jitter,
             "pairs": args.pairs, "engine": os.path.basename(args.engine),
-            "seed": args.seed, "ply_limit": PLY_LIMIT}
+            "seed": args.seed, "ply_limit": PLY_LIMIT,
+            "max_pieces": args.max_pieces}
 
     print("%d setups, %d cells, %d game pairs to play (%d already done), "
           "%d workers" % (n, n * n, len(tasks), len(cells), workers))
@@ -250,12 +259,19 @@ def main():
 
     start = time.time()
     done = errors = unplayable = 0
+    reasons = {}
     with mp.Pool(workers, initializer=worker_init,
-                 initargs=(args.engine,)) as p:
+                 initargs=(args.engine, args.max_pieces)) as p:
         for i, j, g, score, info in p.imap_unordered(play_cell, tasks):
             done += 1
             if score == "unplayable":
                 unplayable += 1
+                # keep the real reason: "too many pieces" and "the non-mover
+                # is already in check" are different problems and only the
+                # first one is fixed by a different engine
+                tag = "piece count" if "pieces exceeds" in (info or "") \
+                    else (info or "unknown")
+                reasons[tag] = reasons.get(tag, 0) + 1
                 cells[(i, j, g)] = None
             elif score is None:
                 errors += 1
@@ -282,8 +298,9 @@ def main():
         print("P[i][j]+P[j][i] mean %.4f (want 1.00), min %.3f max %.3f"
               % (sum(sym) / len(sym), min(sym), max(sym)))
     if unplayable:
-        print("%d game pairs skipped: too many pieces for this engine "
-              "(rules.ENGINE_MAX_PIECES)" % unplayable)
+        print("%d game pairs skipped:" % unplayable)
+        for tag, n_ in sorted(reasons.items(), key=lambda kv: -kv[1]):
+            print("   %5d  %s" % (n_, tag))
     if errors:
         print("%d game pairs failed and were not recorded; re-run to fill them"
               % errors)

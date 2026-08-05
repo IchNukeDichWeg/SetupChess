@@ -133,20 +133,26 @@ def validate_fen(fen):
 ENGINE_MAX_PIECES = 32
 
 
-def engine_safe(fen):
-    """Can a standard chess engine be trusted with this position?
+def engine_safe(fen, max_pieces=None):
+    """Can THIS engine be trusted with this position?
 
     Separate from validate_fen: these positions are perfectly legal Setup
-    Chess, they just exceed what an ordinary engine's data structures
-    expect. Returns (ok, reason).
+    Chess, they just exceed what an ordinary engine's data structures expect.
+    The ceiling is a property of the engine, not of the variant, so callers
+    running our own core pass a higher one (or 0 for none) -- otherwise the
+    high-piece-count cells stay unmeasured even by the engine built to
+    measure them. Returns (ok, reason).
     """
     ok, why = validate_fen(fen)
     if not ok:
         return False, why
+    cap = ENGINE_MAX_PIECES if max_pieces is None else max_pieces
+    if cap <= 0:
+        return True, ""
     n = len(chess.Board(fen).piece_map())
-    if n > ENGINE_MAX_PIECES:
-        return False, "%d pieces exceeds the %d an engine can be trusted with" % (
-            n, ENGINE_MAX_PIECES)
+    if n > cap:
+        return False, "%d pieces exceeds the %d this engine can be trusted with" % (
+            n, cap)
     return True, ""
 
 

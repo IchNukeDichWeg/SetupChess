@@ -78,7 +78,7 @@ def _pair(task):
     fen = rules.setup_fen(ai, aj)
     if not rules.validate_fen(fen)[0]:
         return k, None, "invalid"
-    if both_safe and not rules.engine_safe(fen)[0]:
+    if both_safe and not rules.engine_safe(fen)[0]:  # the reference's ceiling
         return k, None, "unsafe for the reference engine"
     try:
         a, b = _engines()
