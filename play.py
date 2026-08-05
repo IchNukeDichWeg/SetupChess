@@ -332,17 +332,33 @@ def draft(white, black, log=None):
     return state
 
 
-def play_out(state, engine, nodes, log=None):
+def pick_engine(fen, primary, fallback):
+    """Stockfish unless the position would break it, then our own core.
+
+    This is the whole handoff story. The drafting layer picks the army and
+    emits a FEN; a real engine plays it from there. Stockfish plays it better
+    than anything in this repo, right up to the point where the piece count
+    segfaults it (42 pieces at 20,000 nodes, measured). Our core is 327 Elo
+    weaker and is only ever asked the questions Stockfish cannot be asked at
+    all. Returns (engine, why).
+    """
+    if fallback is None or rules.engine_safe(fen)[0]:
+        return primary, ""
+    return fallback, "fallback core: %s" % rules.engine_safe(fen)[1]
+
+
+def play_out(state, engine, nodes, log=None, fallback=None):
     """Play the handed-off position to a result. Returns a result string."""
     fen = state.handoff_fen()
     ok, why = rules.validate_fen(fen)
     if not ok:
         raise ValueError("refusing to hand over an invalid position: %s" % why)
-    ok, why = rules.engine_safe(fen)
-    if not ok:
-        # legal Setup Chess, but this engine would crash on it; say so rather
-        # than starting a game that dies halfway
-        return "*", fen, why
+    engine, note = pick_engine(fen, engine, fallback)
+    if not note and not rules.engine_safe(fen)[0]:
+        # exceeds the primary and no fallback was given: say so rather than
+        # starting a game that dies halfway
+        return "*", fen, rules.engine_safe(fen)[1]
+    why = note
     board = chess.Board(fen)
     limit = chess.engine.Limit(nodes=nodes)
     while not board.is_game_over(claim_draw=True) and board.ply() < 400:
@@ -353,7 +369,7 @@ def play_out(state, engine, nodes, log=None):
             log.append(board.san(move))
         board.push(move)
     outcome = board.outcome(claim_draw=True)
-    return (outcome.result() if outcome else "1/2-1/2"), fen, ""
+    return (outcome.result() if outcome else "1/2-1/2"), fen, why
 
 
 def load_army(path_or_name):
@@ -374,6 +390,9 @@ def main():
     ap.add_argument("--opponent", default="classic",
                     help="their army: path, archetype name, or 'stdin'")
     ap.add_argument("--engine", default="stockfish")
+    ap.add_argument("--fallback-engine", default="./cuci.py",
+                    help="used only for positions the primary engine cannot "
+                         "take; '' disables it (default: %(default)s)")
     ap.add_argument("--nodes", type=int, default=20000)
     ap.add_argument("--color", choices=("white", "black", "both"),
                     default="both", help="'both' plays one game each way")
@@ -402,6 +421,8 @@ def main():
     colors = ({"white": [chess.WHITE], "black": [chess.BLACK],
                "both": [chess.WHITE, chess.BLACK]})[args.color]
     engine = chess.engine.SimpleEngine.popen_uci(args.engine)
+    fallback = (chess.engine.SimpleEngine.popen_uci(args.fallback_engine)
+                if args.fallback_engine else None)
     games = []
     try:
         for color in colors:
@@ -417,7 +438,8 @@ def main():
             if state.result:
                 result, fen, note = state.result, "", "setup checkmate"
             else:
-                result, fen, note = play_out(state, engine, args.nodes, log)
+                result, fen, note = play_out(state, engine, args.nodes, log,
+                                             fallback)
             side = chess.COLOR_NAMES[color]
             print("we are %-5s -> %s%s" % (side, result,
                                            note and "  (%s)" % note or ""))
@@ -429,6 +451,8 @@ def main():
                           "note": note, "log": log, "retargets": us.retargets})
     finally:
         engine.quit()
+        if fallback is not None:
+            fallback.quit()
 
     if args.out:
         with open(args.out, "w") as f:

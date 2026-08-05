@@ -87,6 +87,14 @@ def _on_sigint(*_args):
     blocks inside Pool teardown before the except body runs, leaving one
     Stockfish per core alive at 100% CPU (measured). An explicit handler
     plus os._exit avoids Pool.__exit__ entirely.
+
+    os._exit skips multiprocessing's own cleanup, so the resource tracker
+    prints a "leaked semaphore objects" warning on the way out. That is
+    cosmetic: the semaphores belong to the dying process and the kernel
+    reclaims them. Exit 130 is deliberate and correct here -- an interrupted
+    run SHOULD stop a chained command. To end the loop early and still have
+    the chain continue, use --stop-at-max or --max-minutes, which leave
+    through the gate match and exit 0.
     """
     if _CHECKPOINT:
         try:
@@ -205,6 +213,15 @@ def main():
     ap.add_argument("--seed", type=int, default=2026)
     ap.add_argument("--final-games", type=int, default=200,
                     help="pairs in the gate match against the archetypes")
+    ap.add_argument("--max-minutes", type=float, default=0,
+                    help="leave the round loop after this long and go to the "
+                         "gate match; 0 for no limit")
+    ap.add_argument("--stop-at-max", action="store_true",
+                    help="leave the round loop once the pool reaches "
+                         "--max-pool. Past that point every round prunes and "
+                         "re-admits at a cost that grows with the pool, while "
+                         "exploitability has been pinned at 0 the whole time, "
+                         "so there is no signal left to buy")
     args = ap.parse_args()
 
     signal.signal(signal.SIGINT, _on_sigint)
@@ -235,7 +252,20 @@ def main():
 
         run_pairs(todo, args.engine, workers, cells_of(state), "seed", persist)
 
+    loop_start = time.time()
     for rnd in range(len(state["rounds"]), args.rounds):
+        # Leaving the loop is not failure: the gate match still runs and the
+        # process still exits 0, so a chained command carries on.
+        if args.max_minutes and (time.time() - loop_start) / 60.0 >= args.max_minutes:
+            print("\nreached the %g minute budget after %d rounds; going to "
+                  "the gate match" % (args.max_minutes,
+                                      rnd - len(state["rounds"])))
+            break
+        if args.stop_at_max and len(state["armies"]) >= args.max_pool:
+            print("\npool is full at %d setups; further rounds only prune and "
+                  "re-admit at rising cost, going to the gate match"
+                  % len(state["armies"]))
+            break
         armies = [poolmod.from_json(a) for a in state["armies"]]
         weights, rep = solve_pool(state, args.max_holes)
         print("\nround %d: pool %d, support %d, value %.4f, exploitability "
@@ -376,32 +406,83 @@ def main():
     mix = sorted(weights)
     mix_w = [weights[i] for i in mix]
     frng = random.Random(args.seed + 99991)
+
+    # Resumable, keyed by game index: a 1,000-pair match is an hour of work
+    # and losing it to one dead worker is not acceptable. Game k is fully
+    # determined by (k, seed, mix), so a re-run replays nothing.
+    gate_path = args.state + ".gate"
+    gate = {}
+    if os.path.exists(gate_path):
+        with open(gate_path) as f:
+            prev = json.load(f)
+        gate = {int(k): v for k, v in prev.get("by_index", {}).items()}
+        if gate:
+            print("\nresuming the gate match: %d pairs already recorded (%d "
+                  "playable)" % (len(gate), sum(1 for v in gate.values() if v)))
+
     tasks = []
     for k in range(args.final_games):
         ours = armies[frng.choices(mix, weights=mix_w, k=1)[0]]
         theirs = base[frng.randrange(len(base))]
+        if k in gate:
+            continue
         tasks.append(("g%d" % k, ours, theirs, args.nodes, args.jitter, k))
     print("\n=== gate match: solved mix vs the %d hand-written archetypes ==="
           % len(base))
-    print("%d pairs, colours swapped inside each pair" % len(tasks))
-    per_game, skipped = [], 0
-    with mp.Pool(workers, initializer=arena.worker_init,
-                 initargs=(args.engine,)) as p:
-        for tag, scores, info in p.imap_unordered(arena.play_match, tasks):
-            if scores is None:
-                skipped += 1
-            else:
-                per_game.extend(scores)
+    print("%d pairs to play, colours swapped inside each pair" % len(tasks))
+
+    def save_gate():
+        with open(gate_path + ".tmp", "w") as f:
+            json.dump({"by_index": {str(k): v for k, v in gate.items()},
+                       "support": {str(k): v for k, v in weights.items()},
+                       "meta": state["meta"]}, f)
+        os.replace(gate_path + ".tmp", gate_path)
+
+    skipped = 0
+    if tasks:
+        start = time.time()
+        done = 0
+        with mp.Pool(workers, initializer=arena.worker_init,
+                     initargs=(args.engine,)) as p:
+            it = p.imap_unordered(arena.play_match, tasks)
+            while done < len(tasks):
+                try:
+                    # a worker that dies takes its result with it and the
+                    # iterator would otherwise block forever: 8 of 10 workers
+                    # died once and the run sat silent for 23 minutes. A
+                    # timeout turns that hang into a reported failure.
+                    tag, scores, info = it.next(timeout=600)
+                except mp.TimeoutError:
+                    print("  no result for 10 minutes -- workers have died; "
+                          "%d/%d pairs are saved, re-run to finish"
+                          % (done, len(tasks)), flush=True)
+                    arena.stop_pool()
+                    break
+                done += 1
+                if scores is None:
+                    # record the skip too, or an unplayable pair is retried on
+                    # every resume forever
+                    skipped += 1
+                    gate[int(tag[1:])] = None
+                else:
+                    gate[int(tag[1:])] = list(scores)
+                if done % 20 == 0 or done == len(tasks):
+                    save_gate()
+                    rate = done / max(1e-9, time.time() - start)
+                    print("    gate %d/%d, %.2f pairs/s, eta %.1f min, "
+                          "%d skipped" % (done, len(tasks), rate,
+                                          (len(tasks) - done) / max(rate, 1e-9)
+                                          / 60, skipped), flush=True)
+        save_gate()
+
+    per_game = [s for k in sorted(gate) if gate[k] for s in gate[k]]
     if per_game:
         print(stats.report(per_game, elo0=0.0, elo1=4.0))
     else:
         print("no playable pairs; nothing measured")
     if skipped:
         print("%d pairs skipped: too many pieces for this engine" % skipped)
-    with open(args.state + ".gate", "w") as f:
-        json.dump({"scores": per_game, "skipped": skipped,
-                   "support": {str(k): v for k, v in weights.items()},
-                   "meta": state["meta"]}, f)
+    save_gate()
     print("\nstate: %s" % args.state)
 
 
