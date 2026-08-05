@@ -146,11 +146,13 @@ Both are resumable; Ctrl-C checkpoints and exits cleanly.
 * **Everything is at 20,000 nodes.** Whether nine bishops still dominate at a
   longer time control is untested, and Stockfish may simply be mishandling
   unusual material.
-* **Best-response re-targeting is off by default and measured negative.** It
-  drops from 3/4 to 2/4 setup-phase wins, giving up a forced mate, because
+* **Best-response re-targeting still gives up a forced setup mate**, because
   the payoff matrix is measured by playing the *chess* phase from finished
-  armies and cannot see setup tactics. Enable with `--pool`; judging it
-  properly needs a full-game match.
+  armies and cannot see setup tactics. It is on anyway: a paired full-game
+  A/B put it at **+17.13 Elo [+12.36, +21.91]** over 1522 pairs, SPRT LLR
+  +10.237, so it wins more afterwards than it loses to that. `--no-pool`
+  disables it. Teaching the matrix about the placement phase is the open
+  work here.
 * **One rule is assumed, not verified**: that a king may not be placed onto
   an attacked square. The lockout tactic depends on it. It needs one
   placement on chess.com's analysis board to settle.

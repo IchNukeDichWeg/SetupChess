@@ -57,6 +57,12 @@ HUNT_WHEN = 6
 # remaining points are this low.
 HUNT_THEIR_POINTS = 12
 
+# Best-response re-targeting is ON, against this pool, because a paired
+# full-game A/B confirmed it: +17.13 Elo [+12.36, +21.91] over 1522 pairs at
+# 20,000 nodes, SPRT [0,4] LLR +10.237 -> ACCEPT H1, run to a fixed 1,600-game
+# budget rather than stopped at the bound. Pass --no-pool to turn it off.
+DEFAULT_POOL = "campaigns/expand_v2.json"
+
 
 def load_pool(path):
     """Armies and the antisymmetrised payoff matrix from a campaign state."""
@@ -86,15 +92,16 @@ class Drafter:
     so the option set narrows with each placement. That is why the opening
     placements matter more than the closing ones.
 
-    Re-targeting is OPT-IN (pass a pool) and measured negative on the only
-    screen that exists so far: it drops from 3/4 to 2/4 setup-phase wins
-    against the four opponent styles below, giving up a forced mate against
-    queen spam. The cause is that the payoff matrix is measured by playing
-    the CHESS phase from two finished armies -- arena.py never simulates the
-    placement game -- so the matrix cannot see a setup mate or a lockout and
-    happily trades one away for a slightly better middlegame. That screen
-    cannot see re-targeting's upside either, since it only scores the setup
-    phase. Judging it needs a full-game match; until then the default is off.
+    Re-targeting is CONFIRMED and on by default: +17.13 Elo [+12.36, +21.91]
+    over 1522 paired full games, SPRT LLR +10.237 -> ACCEPT H1.
+
+    The setup-only screen had scored it negative, and both readings are
+    correct about what they measured. Re-targeting does give up a forced
+    setup mate against queen spam, because the payoff matrix is built by
+    playing the CHESS phase from two finished armies -- arena.py never
+    simulates the placement game -- so the matrix cannot see a setup mate or
+    a lockout. It simply wins more chess afterwards than it loses to that,
+    and only a full-game match could see both halves at once.
     """
 
     def __init__(self, target, color, pool=None, matrix=None,
@@ -370,8 +377,11 @@ def main():
     ap.add_argument("--nodes", type=int, default=20000)
     ap.add_argument("--color", choices=("white", "black", "both"),
                     default="both", help="'both' plays one game each way")
-    ap.add_argument("--pool", help="campaign state JSON; enables best-response "
-                    "re-targeting against the opponent's revealed army")
+    ap.add_argument("--pool", default=DEFAULT_POOL,
+                    help="campaign state JSON driving best-response "
+                    "re-targeting (default: %(default)s)")
+    ap.add_argument("--no-pool", action="store_true",
+                    help="disable best-response re-targeting")
     ap.add_argument("--hunt-when", type=int, default=HUNT_WHEN,
                     help="hunt an unplaced enemy king at this many safe squares")
     ap.add_argument("--out", help="write the game log here (no default)")
@@ -383,6 +393,8 @@ def main():
         sys.exit("our army is illegal: %s" % why)
 
     armies = matrix = None
+    if args.no_pool:
+        args.pool = None
     if args.pool:
         armies, matrix = load_pool(args.pool)
         print("best-response enabled over %d pool armies" % len(armies))
