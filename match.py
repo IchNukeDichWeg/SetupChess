@@ -13,6 +13,12 @@ and the colour and leaves only the thing being tested. An unpaired comparison
 of two independent means would need several times the games for the same
 resolution.
 
+Resumable: --out doubles as the state file. Game k is fully determined by
+(k, field, seed), so raising --games replays nothing and only plays the new
+indices. That matters here because most pairs come out identical -- the
+drafter only re-targets in some games -- so the effective sample grows much
+more slowly than the game count and a run usually needs extending.
+
 Writes only to --out, which has no default.
 """
 
@@ -96,6 +102,17 @@ def main():
     ap.add_argument("--seed", type=int, default=2026)
     args = ap.parse_args()
 
+    done = {}
+    if os.path.exists(args.out):
+        with open(args.out) as f:
+            prev = json.load(f)
+        if (prev.get("nodes"), prev.get("jitter"), prev.get("target"),
+                prev.get("pool")) != (args.nodes, args.jitter, args.target,
+                                      args.pool):
+            sys.exit("existing %s was made with different settings" % args.out)
+        done = {int(k): v for k, v in prev.get("by_index", {}).items()}
+        print("resuming: %d games already played" % len(done))
+
     ours = play.load_army(args.target)
     pool_armies, matrix = play.load_pool(args.pool)
     # the opponent field is every archetype plus every pool army, so the test
@@ -105,6 +122,8 @@ def main():
     rng = random.Random(args.seed)
     tasks = []
     for k in range(args.games):
+        if k in done:
+            continue
         theirs = field[k % len(field)]
         color = chess.WHITE if k % 2 == 0 else chess.BLACK
         tasks.append((k, ours, theirs, color, args.nodes, args.jitter,
@@ -115,22 +134,35 @@ def main():
     print("%d paired games over a field of %d opponents, %d workers"
           % (len(tasks), len(field), workers))
 
-    plain, retarget, skipped = [], [], 0
+    skipped = 0
     signal.signal(signal.SIGINT, lambda *_: (arena.stop_pool(),
                                              print("\ninterrupted", flush=True),
                                              os._exit(130)))
-    with mp.Pool(workers, initializer=arena.worker_init,
-                 initargs=(args.engine,)) as p:
-        for i, (k, scores, info) in enumerate(
-                p.imap_unordered(_game, tasks), 1):
-            if scores is None:
-                skipped += 1
-            else:
-                plain.append(scores[0])
-                retarget.append(scores[1])
-            if i % 25 == 0 or i == len(tasks):
-                print("  %d/%d, %d skipped" % (i, len(tasks), skipped))
+    def save():
+        with open(args.out + ".tmp", "w") as f:
+            json.dump({"by_index": {str(k): v for k, v in done.items()},
+                       "nodes": args.nodes, "jitter": args.jitter,
+                       "field": len(field), "skipped": skipped,
+                       "target": args.target, "pool": args.pool}, f)
+        os.replace(args.out + ".tmp", args.out)
 
+    if tasks:
+        with mp.Pool(workers, initializer=arena.worker_init,
+                     initargs=(args.engine,)) as p:
+            for i, (k, scores, info) in enumerate(
+                    p.imap_unordered(_game, tasks), 1):
+                if scores is None:
+                    skipped += 1
+                else:
+                    done[k] = list(scores)
+                if i % 25 == 0 or i == len(tasks):
+                    save()
+                    print("  %d/%d, %d skipped" % (i, len(tasks), skipped))
+        save()
+
+    order = sorted(done)
+    plain = [done[k][0] for k in order]
+    retarget = [done[k][1] for k in order]
     if not plain:
         sys.exit("no games completed")
     diffs = [b - a for a, b in zip(plain, retarget)]
@@ -158,11 +190,7 @@ def main():
     if skipped:
         print("%d games skipped (engine could not take the position)" % skipped)
 
-    with open(args.out, "w") as f:
-        json.dump({"plain": plain, "retarget": retarget, "diffs": diffs,
-                   "nodes": args.nodes, "jitter": args.jitter,
-                   "field": len(field), "skipped": skipped,
-                   "target": args.target, "pool": args.pool}, f)
+    save()
     print("\nwrote %s" % args.out)
 
 

@@ -782,16 +782,33 @@ def test_match_smoke(engine_path, tmpdir):
             fail("match.py report is missing %r:\n%s" % (needed, r.stdout))
     with open(out) as f:
         d = json.load(f)
-    if len(d["plain"]) != len(d["retarget"]) != len(d["diffs"]):
-        fail("paired arrays are ragged: %d/%d/%d"
-             % (len(d["plain"]), len(d["retarget"]), len(d["diffs"])))
-    for a, b, diff in zip(d["plain"], d["retarget"], d["diffs"]):
-        if abs((b - a) - diff) > 1e-12:
-            fail("recorded diff %r does not match %r - %r" % (diff, b, a))
-        for s_ in (a, b):
+    by_index = d["by_index"]
+    if not by_index:
+        fail("match.py recorded no games")
+    for k, pair in by_index.items():
+        if len(pair) != 2:
+            fail("game %s is not a pair: %r" % (k, pair))
+        for s_ in pair:
             if s_ not in (0.0, 0.5, 1.0):
                 fail("score %r is not a game result" % s_)
-    print("PASS: match.py paired A/B harness runs and its pairing is consistent")
+
+    # resume: asking for the same games again must replay nothing, and the
+    # recorded results must be identical
+    r2 = subprocess.run([sys.executable, "match.py",
+                         "--target", "campaigns/champion_v2.json",
+                         "--pool", "campaigns/expand_v2.json", "--out", out,
+                         "--games", "4", "--nodes", "300", "--workers", "1",
+                         "--engine", engine_path],
+                        capture_output=True, text=True)
+    if r2.returncode != 0:
+        fail("match resume exited %d:\n%s" % (r2.returncode, r2.stderr))
+    if "resuming: %d games" % len(by_index) not in r2.stdout:
+        fail("match.py did not resume:\n%s" % r2.stdout)
+    with open(out) as f:
+        if json.load(f)["by_index"] != by_index:
+            fail("resume changed recorded games")
+    print("PASS: match.py paired A/B harness runs, pairs are well formed, "
+          "and a resume replays nothing")
 
 
 def main():
