@@ -14,9 +14,11 @@ endif
 
 all: $(LIB)
 
-$(LIB): movegen.c Constants.h
+SRC = movegen.c eval.c search.c
+
+$(LIB): $(SRC) Constants.h
 	@mkdir -p $(LIBDIR)
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ movegen.c
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(SRC)
 
 clean:
 	rm -f $(LIBDIR)/libsetupcore.dylib $(LIBDIR)/libsetupcore.so

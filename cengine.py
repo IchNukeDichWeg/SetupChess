@@ -54,6 +54,12 @@ def lib():
     l.perft_entry.restype = ctypes.c_uint64
     l.in_check.argtypes = [ctypes.POINTER(Position), ctypes.c_int]
     l.in_check.restype = ctypes.c_int
+    l.search.argtypes = [ctypes.POINTER(Position), ctypes.c_int,
+                         ctypes.c_uint64, ctypes.POINTER(ctypes.c_uint32),
+                         ctypes.POINTER(ctypes.c_uint64)]
+    l.search.restype = ctypes.c_int
+    l.eval_entry.argtypes = [ctypes.POINTER(Position)]
+    l.eval_entry.restype = ctypes.c_int
     l.position_size.restype = ctypes.c_int
     if l.position_size() != ctypes.sizeof(Position):
         raise RuntimeError(
@@ -96,6 +102,25 @@ def perft(board, depth):
     l = lib()
     p = from_board(board)
     return int(l.perft_entry(ctypes.byref(p), depth))
+
+
+def evaluate(board):
+    """Static eval in centipawns, from the side to move's point of view."""
+    l = lib()
+    p = from_board(board)
+    return int(l.eval_entry(ctypes.byref(p)))
+
+
+def search(board, depth=64, nodes=0):
+    """Returns (move, score_cp, nodes_searched). nodes=0 means no limit."""
+    l = lib()
+    p = from_board(board)
+    best = ctypes.c_uint32(0)
+    used = ctypes.c_uint64(0)
+    score = l.search(ctypes.byref(p), depth, nodes,
+                     ctypes.byref(best), ctypes.byref(used))
+    return (_decode(best.value) if best.value else None,
+            int(score), int(used.value))
 
 
 def in_check(board, color=None):

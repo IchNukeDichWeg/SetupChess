@@ -29,6 +29,8 @@ echo "OK: python deps (python-chess, numpy, scipy)"
 make
 python3 -c "import cengine, chess; b=chess.Board(); b.set_castling_fen('-'); \
 assert cengine.perft(b, 4) == 197281; print('OK: C core, startpos perft(4) = 197281')"
+printf 'uci\nquit\n' | ./cuci.py | grep -q '^uciok' \
+    && echo "OK: ./cuci.py answers uci" || { echo "ERROR: cuci.py" >&2; exit 1; }
 
 SF="${1:-$(command -v stockfish || true)}"
 if [ -z "$SF" ]; then

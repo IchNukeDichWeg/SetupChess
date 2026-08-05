@@ -30,6 +30,11 @@ import solve
 import stats
 
 
+# a node limit is checked between nodes, so a search overshoots by at most
+# the work already in flight when it trips
+MAX_OVERSHOOT = 4096
+
+
 def fail(msg):
     print("FAIL:", msg)
     sys.exit(1)
@@ -811,6 +816,109 @@ def test_match_smoke(engine_path, tmpdir):
           "and a resume replays nothing")
 
 
+# The bench is a signature, not a benchmark: it must change when the search
+# or the eval changes and must not otherwise. Update it in the SAME commit as
+# any deliberate change, and treat a surprise move as a bug.
+BENCH_DEPTH = 5
+BENCH_NODES = 404905
+
+
+def test_search(rng):
+    """Eval symmetry, mate finding, the node budget, and the bench oracle."""
+    # a mirrored position must evaluate identically from the new side to
+    # move: this catches almost every sign and rank-flip bug in one line
+    armies = pool.seed_pool(rng, size=20)
+    checked = 0
+    for _ in range(200):
+        fen = rules.setup_fen(rng.choice(armies), rng.choice(armies))
+        if not rules.validate_fen(fen)[0]:
+            continue
+        board = chess.Board(fen)
+        checked += 1
+        if cengine.evaluate(board) != cengine.evaluate(board.mirror()):
+            fail("eval is not mirror-symmetric on %s" % fen)
+    if checked < 50:
+        fail("only %d positions were eval-checked" % checked)
+    start = chess.Board()
+    start.set_castling_fen("-")
+    if cengine.evaluate(start) != 0:
+        fail("startpos evaluates to %d, want 0" % cengine.evaluate(start))
+
+    # mates, both directions, and the score sign
+    mates = [("6k1/5ppp/8/8/8/8/8/R5K1 w - - 0 1", "a1a8"),
+             ("r5k1/8/8/8/8/8/5PPP/6K1 b - - 0 1", "a8a1")]
+    for fen, want in mates:
+        mv, score, _ = cengine.search(chess.Board(fen), depth=4)
+        if mv.uci() != want:
+            fail("mate in one on %s played %s, want %s" % (fen, mv, want))
+        if score < 29000:
+            fail("mate scored %d, expected a mate score" % score)
+
+    # the node budget must be respected, and a move must always come back
+    for limit in (100, 1000, 20000):
+        mv, _, used = cengine.search(start, nodes=limit)
+        if used > limit + MAX_OVERSHOOT:
+            fail("node limit %d overshot to %d" % (limit, used))
+        if mv is None or mv not in start.legal_moves:
+            fail("search returned %r at limit %d" % (mv, limit))
+
+    # every move the search returns must be legal, on dense boards too
+    for _ in range(40):
+        fen = rules.setup_fen(rng.choice(armies), rng.choice(armies))
+        if not rules.validate_fen(fen)[0]:
+            continue
+        board = chess.Board(fen)
+        mv, _, _ = cengine.search(board, nodes=2000)
+        if mv is not None and mv not in board.legal_moves:
+            fail("illegal move %s on %s" % (mv, fen))
+
+    # the 42-piece wall: the whole reason this core exists
+    wall = chess.Board(
+        "rn1qk2r/pppppppp/pppppppp/8/8/PPPPPPPP/PPPPPPPP/RN1QK2R w - - 0 1")
+    mv, _, _ = cengine.search(wall, nodes=20000)
+    if mv is None or mv not in wall.legal_moves:
+        fail("search failed on the 42-piece position Stockfish crashes on")
+
+    # bench signature
+    champ = play.load_army("campaigns/champion_v2.json")
+    bench_pos = chess.Board(rules.setup_fen(champ, champ))
+    runs = {cengine.search(bench_pos, depth=BENCH_DEPTH)[2] for _ in range(2)}
+    if len(runs) != 1:
+        fail("bench is not reproducible: %r" % runs)
+    got = runs.pop()
+    if got != BENCH_NODES:
+        fail("bench is %d, expected %d -- if the search or eval changed on "
+             "purpose, update BENCH_NODES in this commit" % (got, BENCH_NODES))
+    print("PASS: eval mirror-symmetric over %d positions, mates found, node "
+          "budget honoured, 42-piece position searched, bench %d" %
+          (checked, got))
+
+
+def test_uci(tmpdir):
+    """The core answers UCI and plays a legal game through the front end."""
+    eng = chess.engine.SimpleEngine.popen_uci("./cuci.py")
+    try:
+        board = chess.Board()
+        board.set_castling_fen("-")
+        for _ in range(12):
+            if board.is_game_over(claim_draw=True):
+                break
+            mv = eng.play(board, chess.engine.Limit(nodes=2000)).move
+            if mv is None or mv not in board.legal_moves:
+                fail("cuci.py returned %r, illegal in %s" % (mv, board.fen()))
+            board.push(mv)
+        # and on the position Stockfish cannot take
+        wall = chess.Board(
+            "rn1qk2r/pppppppp/pppppppp/8/8/PPPPPPPP/PPPPPPPP/RN1QK2R w - - 0 1")
+        mv = eng.play(wall, chess.engine.Limit(nodes=5000)).move
+        if mv is None or mv not in wall.legal_moves:
+            fail("cuci.py failed on the 42-piece position")
+    finally:
+        eng.quit()
+    print("PASS: cuci.py speaks UCI, plays 12 legal plies and the 42-piece "
+          "position")
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--engine", default="stockfish",
@@ -833,6 +941,8 @@ def main():
     test_expand_units(args.scratch or tempfile.gettempdir())
     test_drafter()
     test_c_core(rng)
+    test_search(rng)
+    test_uci(args.scratch or tempfile.gettempdir())
     test_engine(args.fens, args.engine, rng)
     test_arena_smoke(args.engine, args.scratch or tempfile.gettempdir())
     test_expand_smoke(args.engine, args.scratch or tempfile.gettempdir())
