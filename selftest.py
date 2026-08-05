@@ -919,6 +919,34 @@ def test_uci(tmpdir):
           "position")
 
 
+def test_duel_smoke(engine_path, tmpdir):
+    """Engine-vs-engine harness runs, pairs are colour-balanced, resume works."""
+    out = os.path.join(tmpdir, "selftest_duel_%d.json" % os.getpid())
+    cmd = [sys.executable, "duel.py", "--engine-a", "./cuci.py",
+           "--engine-b", engine_path, "--out", out, "--games", "2",
+           "--nodes", "400", "--workers", "1"]
+    r = subprocess.run(cmd, capture_output=True, text=True)
+    if r.returncode != 0:
+        fail("duel.py exited %d:\n%s\n%s" % (r.returncode, r.stdout, r.stderr))
+    if "Elo:" not in r.stdout:
+        fail("duel.py reported no Elo:\n%s" % r.stdout)
+    if "SPRT" in r.stdout:
+        fail("duel.py printed an SPRT verdict, which is not meaningful for a "
+             "magnitude comparison against a stronger reference")
+    with open(out) as f:
+        d = json.load(f)
+    for k, pair in d["by_index"].items():
+        if len(pair) != 2:
+            fail("pair %s is not two games: %r" % (k, pair))
+        for s_ in pair:
+            if s_ not in (0.0, 0.5, 1.0):
+                fail("score %r is not a game result" % s_)
+    r2 = subprocess.run(cmd, capture_output=True, text=True)
+    if r2.returncode != 0 or "resuming" not in r2.stdout:
+        fail("duel.py did not resume:\n%s" % r2.stdout)
+    print("PASS: duel.py engine-vs-engine harness runs and resumes")
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--engine", default="stockfish",
@@ -948,6 +976,7 @@ def main():
     test_expand_smoke(args.engine, args.scratch or tempfile.gettempdir())
     test_play_smoke(args.engine, args.scratch or tempfile.gettempdir())
     test_match_smoke(args.engine, args.scratch or tempfile.gettempdir())
+    test_duel_smoke(args.engine, args.scratch or tempfile.gettempdir())
     print("OK: all selftests passed")
 
 
