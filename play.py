@@ -57,11 +57,19 @@ HUNT_WHEN = 6
 # remaining points are this low.
 HUNT_THEIR_POINTS = 12
 
-# Best-response re-targeting is ON, against this pool, because a paired
-# full-game A/B confirmed it: +17.13 Elo [+12.36, +21.91] over 1522 pairs at
-# 20,000 nodes, SPRT [0,4] LLR +10.237 -> ACCEPT H1, run to a fixed 1,600-game
-# budget rather than stopped at the bound. Pass --no-pool to turn it off.
-DEFAULT_POOL = "campaigns/expand_v2.json"
+# Best-response re-targeting is ON, because a paired full-game A/B confirmed
+# it: +17.13 Elo [+12.36, +21.91] over 1522 pairs at 20,000 nodes, SPRT [0,4]
+# LLR +10.237 -> ACCEPT H1, run to a fixed budget rather than stopped at the
+# bound. Pass --no-pool to turn it off.
+#
+# The pool and the target move TOGETHER and must stay consistent: re-targeting
+# only considers armies inside the pool, so a target that is not a member gets
+# abandoned on the first placement. The 87-setup pool's champion beat the old
+# 19-setup one by +120.09 Elo [+110.17, +130.20] over 400 pairs (SPRT LLR
+# +22.009), so both defaults point at that campaign. The +17.13 above was
+# measured on the older pool and has not been re-measured on this one.
+DEFAULT_POOL = "campaigns/expand_own.json"
+DEFAULT_TARGET = "campaigns/champion_own.json"
 
 
 def load_pool(path):
@@ -385,8 +393,9 @@ def load_army(path_or_name):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--target", required=True,
-                    help="our army: champion JSON path or archetype name")
+    ap.add_argument("--target", default=DEFAULT_TARGET,
+                    help="our army: champion JSON path or archetype name "
+                         "(default: %(default)s)")
     ap.add_argument("--opponent", default="classic",
                     help="their army: path, archetype name, or 'stdin'")
     ap.add_argument("--engine", default="stockfish")
