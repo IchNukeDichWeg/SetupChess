@@ -57,17 +57,19 @@ HUNT_WHEN = 6
 # remaining points are this low.
 HUNT_THEIR_POINTS = 12
 
-# Best-response re-targeting is ON, because a paired full-game A/B confirmed
-# it: +17.13 Elo [+12.36, +21.91] over 1522 pairs at 20,000 nodes, SPRT [0,4]
-# LLR +10.237 -> ACCEPT H1, run to a fixed budget rather than stopped at the
-# bound. Pass --no-pool to turn it off.
+# Best-response re-targeting is ON, confirmed twice by paired full-game A/B,
+# once per pool. On the 19-setup pool: +17.13 Elo [+12.36, +21.91] over 1522
+# pairs. On the 87-setup pool it is worth NEARLY DOUBLE: +29.63 Elo
+# [+23.46, +35.83] over 1187 pairs, SPRT [0,4] LLR +11.238 -> ACCEPT H1, both
+# run to a fixed budget rather than stopped at the bound. A bigger pool gives
+# the best response more to choose from, which is the effect you would hope
+# for and now the one that is measured. Pass --no-pool to turn it off.
 #
 # The pool and the target move TOGETHER and must stay consistent: re-targeting
 # only considers armies inside the pool, so a target that is not a member gets
-# abandoned on the first placement. The 87-setup pool's champion beat the old
-# 19-setup one by +120.09 Elo [+110.17, +130.20] over 400 pairs (SPRT LLR
-# +22.009), so both defaults point at that campaign. The +17.13 above was
-# measured on the older pool and has not been re-measured on this one.
+# abandoned on the first placement. The 87-setup pool's champion also beat the
+# old 19-setup one head to head by +120.09 Elo [+110.17, +130.20] over 400
+# pairs, so both defaults point at that campaign.
 DEFAULT_POOL = "campaigns/expand_own.json"
 DEFAULT_TARGET = "campaigns/champion_own.json"
 
@@ -100,8 +102,10 @@ class Drafter:
     so the option set narrows with each placement. That is why the opening
     placements matter more than the closing ones.
 
-    Re-targeting is CONFIRMED and on by default: +17.13 Elo [+12.36, +21.91]
-    over 1522 paired full games, SPRT LLR +10.237 -> ACCEPT H1.
+    Re-targeting is CONFIRMED and on by default, on both pools it has been
+    measured against: +17.13 Elo [+12.36, +21.91] over 1522 paired full games
+    on the 19-setup pool, and +29.63 Elo [+23.46, +35.83] over 1187 pairs on
+    the 87-setup one. It grows with the pool, as it should.
 
     The setup-only screen had scored it negative, and both readings are
     correct about what they measured. Re-targeting does give up a forced

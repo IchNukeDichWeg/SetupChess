@@ -154,11 +154,12 @@ Both are resumable; Ctrl-C checkpoints and exits cleanly.
   unusual material.
 * **Best-response re-targeting still gives up a forced setup mate**, because
   the payoff matrix is measured by playing the *chess* phase from finished
-  armies and cannot see setup tactics. It is on anyway: a paired full-game
-  A/B put it at **+17.13 Elo [+12.36, +21.91]** over 1522 pairs, SPRT LLR
-  +10.237, so it wins more afterwards than it loses to that. `--no-pool`
-  disables it. Teaching the matrix about the placement phase is the open
-  work here.
+  armies and cannot see setup tactics. It is on anyway, and confirmed once per
+  pool: **+17.13 Elo [+12.36, +21.91]** on the 19-setup pool, and **+29.63 Elo
+  [+23.46, +35.83]** over 1187 pairs on the 87-setup one (SPRT LLR +11.238).
+  A bigger pool gives the best response more to choose from. `--no-pool`
+  disables it. Teaching the matrix about the placement phase is the open work
+  here, and would probably recover that forced mate on top.
 * ~~One rule is assumed~~ **Verified on the live board 2026-08-05**: a king
   may not be placed onto an attacked square, and non-king pieces may. The
   lockout tactic rests on real rules, not an assumption.
