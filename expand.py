@@ -201,6 +201,27 @@ def cell_tasks(armies, pairs, cells, indices_a, indices_b, nodes, jitter):
 # not lose to the bot", which is what breeding against it should mean.
 
 
+def our_strategies(weights, pinned):
+    """Equilibrium weights with pinned opponents removed and renormalised.
+
+    A pinned setup (--seed-bot) is an OPPONENT MODEL that lives in the matrix so
+    challengers get played against it. It is not one of our candidate armies,
+    but the solver cannot tell the difference: a wall that draws everything is a
+    perfectly good equilibrium strategy in a symmetric zero-sum game, so it can
+    take weight. Left in, two things break silently -- it becomes a breeding
+    parent, so the pool drifts toward copying the bot, and the gate match
+    samples it as OUR army and scores chess.com's own draft as ours.
+
+    Not observed in the two rounds measured before this was added, but nothing
+    prevented it over thirty. Returns {} if the pin held all the weight.
+    """
+    kept = {i: w for i, w in weights.items() if i not in set(pinned)}
+    total = sum(kept.values())
+    if total <= 0:
+        return {}
+    return {i: w / total for i, w in kept.items()}
+
+
 def admit(scored, pin_scored, challenger_idx, margin, pinned):
     """Conjunctive admission. Returns (admitted, blocked_by_pin).
 
@@ -348,8 +369,12 @@ def main():
               "%.4f" % (rnd, len(armies), len(weights), rep["value"],
                         rep["exploitability"]))
 
-        # challengers are mutations of what the equilibrium actually plays
+        # challengers are mutations of what the equilibrium actually plays.
+        # `support` is the screen's opponent set AND the parent set, so pinned
+        # members are stripped for parents but kept as opponents below.
         support = sorted(weights, key=lambda i: -weights[i])
+        ours = our_strategies(weights, state.get("pinned", []))
+        parents_idx = sorted(ours, key=lambda i: -ours[i])
         # breeding only from the support collapses to one parent whenever the
         # equilibrium is pure, and single edits of one champion cannot leave a
         # local optimum. --breadth adds the next-best setups by mean score as
@@ -368,9 +393,13 @@ def main():
         # "become the bot".
         pinned = [i for i in state.get("pinned", []) if i < len(armies)]
         extra = sorted((i for i in range(len(armies))
-                        if i not in weights and i not in pinned),
+                        if i not in ours and i not in pinned),
                        key=mean_score, reverse=True)[:args.breadth]
-        parent_pool = [armies[i] for i in support + extra]
+        parent_pool = [armies[i] for i in parents_idx + extra]
+        if not parent_pool:
+            print("  the equilibrium is entirely pinned opponents; nothing of "
+                  "ours to breed from")
+            break
         seen = {poolmod.army_key(a) for a in armies}
         fresh = []
         for _ in range(args.challengers):
@@ -507,8 +536,15 @@ def main():
         return
     armies = [poolmod.from_json(a) for a in state["armies"]]
     base = poolmod.seed_pool(random.Random(state["seed"]))
-    mix = sorted(weights)
-    mix_w = [weights[i] for i in mix]
+    gate_w = our_strategies(weights, state.get("pinned", []))
+    if not gate_w:
+        sys.exit("the equilibrium is entirely pinned opponents; there is no "
+                 "mix of ours to gate")
+    if len(gate_w) != len(weights):
+        print("gate mix excludes %d pinned opponent(s)"
+              % (len(weights) - len(gate_w)))
+    mix = sorted(gate_w)
+    mix_w = [gate_w[i] for i in mix]
     frng = random.Random(args.seed + 99991)
 
     # Resumable, keyed by game index: a 1,000-pair match is an hour of work

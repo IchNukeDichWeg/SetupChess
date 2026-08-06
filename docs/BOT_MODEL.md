@@ -106,6 +106,12 @@ plausible part of why the solved mix scores 0.93 against hand-written armies.
   Averaging the two requirements instead of conjoining them is worse than
   nothing: it makes the screen admit almost everything, measured at 28 of 31 in
   one round with the pool tripling in three.
+* **The pin is an opponent, never a candidate of ours.** It sits in the matrix
+  so challengers get played against it, but it is stripped from the breeding
+  parents and from the gate mix. The solver cannot make that distinction on its
+  own: a wall that draws everything is a valid equilibrium strategy, so it can
+  take weight, and then the pool breeds copies of the bot and the gate scores
+  chess.com's own draft as ours.
 * **Unverified here**: whether the live opponents in the pool are this bot or
   humans. Everything above is the bot's behaviour, read from its code and
   confirmed against its own debug output. It is not a claim about the human

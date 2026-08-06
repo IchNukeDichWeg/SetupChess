@@ -230,6 +230,22 @@ def test_bot_policy():
     if got:
         fail("a pin-beater with a 0.10 support score was admitted")
 
+    # a pinned opponent may take equilibrium weight -- a wall that draws
+    # everything is a valid strategy -- and must still be kept out of the
+    # breeding parents and out of the gate mix, or the pool copies the bot and
+    # the gate scores chess.com's own draft as ours
+    w = expand.our_strategies({4: 0.45, 11: 0.05, 12: 0.5}, [12])
+    if 12 in w:
+        fail("the pinned opponent survived into our strategy set: %r" % w)
+    if abs(sum(w.values()) - 1.0) > 1e-9:
+        fail("our strategies were not renormalised: %r" % w)
+    if abs(w[4] / w[11] - 9.0) > 1e-9:
+        fail("renormalising changed the proportions: %r" % w)
+    if expand.our_strategies({4: 0.9, 11: 0.1}, []) != {4: 0.9, 11: 0.1}:
+        fail("our_strategies changed anything with nothing pinned")
+    if expand.our_strategies({12: 1.0}, [12]) != {}:
+        fail("an all-pinned equilibrium must come back empty, not renormalise")
+
     print("PASS: bot policy matches its 7 measured king-bonus values, opens "
           "with the king in a corner both colours, and drafts %d pawns and "
           "%d knights with nothing expensive, matching pool.BOT_WALL; "
