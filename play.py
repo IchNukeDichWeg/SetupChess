@@ -469,7 +469,7 @@ def _read_move(board):
 
 
 def live(ours, color, engine, nodes, fallback=None, pool=None, matrix=None,
-         hunt_when=HUNT_WHEN):
+         hunt_when=HUNT_WHEN, max_pieces=None):
     """Drive one real game against a human-relayed opponent.
 
     Prints what to place or play as soon as it is decided, and asks for theirs.
@@ -527,7 +527,7 @@ def live(ours, color, engine, nodes, fallback=None, pool=None, matrix=None,
         raise SystemExit("refusing to play an invalid position: %s" % why)
     print("FEN   %s" % fen, flush=True)
     board = chess.Board(fen)
-    picked, note = pick_engine(fen, engine, fallback)
+    picked, note = pick_engine(fen, engine, fallback, max_pieces)
     if note:
         print("using the %s" % note, flush=True)
 
@@ -565,32 +565,38 @@ def draft(white, black, log=None):
     return state
 
 
-def pick_engine(fen, primary, fallback):
-    """Stockfish unless the position would break it, then our own core.
+def pick_engine(fen, primary, fallback, max_pieces=None):
+    """The primary engine unless the position would break it, then our core.
 
     This is the whole handoff story. The drafting layer picks the army and
     emits a FEN; a real engine plays it from there. Stockfish plays it better
     than anything in this repo, right up to the point where the piece count
-    segfaults it (42 pieces at 20,000 nodes, measured). Our core is 327 Elo
-    weaker and is only ever asked the questions Stockfish cannot be asked at
-    all. Returns (engine, why).
+    segfaults it (42 pieces at 20,000 nodes, measured; the 40-piece champion
+    versus bot-wall matchup dies with SIGSEGV too). Our core is 327 Elo weaker
+    and is only ever asked the questions Stockfish cannot be asked at all.
+
+    `max_pieces` is the PRIMARY engine's ceiling, 0 for none. Pass 0 when the
+    primary has no limit -- fairy-stockfish plays 48 pieces, the variant's
+    theoretical maximum -- otherwise a perfectly capable engine gets replaced
+    by our weak one on exactly the positions it was chosen for. Returns
+    (engine, why).
     """
-    if fallback is None or rules.engine_safe(fen)[0]:
+    if fallback is None or rules.engine_safe(fen, max_pieces)[0]:
         return primary, ""
-    return fallback, "fallback core: %s" % rules.engine_safe(fen)[1]
+    return fallback, "fallback core: %s" % rules.engine_safe(fen, max_pieces)[1]
 
 
-def play_out(state, engine, nodes, log=None, fallback=None):
+def play_out(state, engine, nodes, log=None, fallback=None, max_pieces=None):
     """Play the handed-off position to a result. Returns a result string."""
     fen = state.handoff_fen()
     ok, why = rules.validate_fen(fen)
     if not ok:
         raise ValueError("refusing to hand over an invalid position: %s" % why)
-    engine, note = pick_engine(fen, engine, fallback)
-    if not note and not rules.engine_safe(fen)[0]:
+    engine, note = pick_engine(fen, engine, fallback, max_pieces)
+    if not note and not rules.engine_safe(fen, max_pieces)[0]:
         # exceeds the primary and no fallback was given: say so rather than
         # starting a game that dies halfway
-        return "*", fen, rules.engine_safe(fen)[1]
+        return "*", fen, rules.engine_safe(fen, max_pieces)[1]
     why = note
     board = chess.Board(fen)
     limit = chess.engine.Limit(nodes=nodes)
@@ -642,6 +648,11 @@ def main():
     ap.add_argument("--live", action="store_true",
                     help="drive one real game: prints PLACE/MOVE lines as they "
                          "are decided and reads the opponent's from stdin")
+    ap.add_argument("--max-pieces", type=int, default=32,
+                    help="the PRIMARY engine's piece ceiling; 0 for none, "
+                         "which is correct for fairy-stockfish and ./cuci.py. "
+                         "Above it the fallback engine takes over "
+                         "(default: %(default)s)")
     ap.add_argument("--games", type=int, default=1,
                     help="chess-phase games per colour. Both drafters are "
                          "deterministic, so the placement phase runs ONCE per "
@@ -673,7 +684,7 @@ def main():
         try:
             live(ours, chess.WHITE if args.color == "white" else chess.BLACK,
                  engine, args.nodes, fallback=fb, pool=armies, matrix=matrix,
-                 hunt_when=args.hunt_when)
+                 hunt_when=args.hunt_when, max_pieces=args.max_pieces)
         finally:
             engine.quit()
             if fb is not None:
@@ -704,10 +715,10 @@ def main():
             elif args.games > 1:
                 result, fen, note = _repeat(state, engine, args.nodes,
                                             args.jitter, args.games, color,
-                                            fallback)
+                                            fallback, args.max_pieces)
             else:
                 result, fen, note = play_out(state, engine, args.nodes, log,
-                                             fallback)
+                                             fallback, args.max_pieces)
             side = chess.COLOR_NAMES[color]
             print("we are %-5s -> %s%s" % (side, result,
                                            note and "  (%s)" % note or ""))
@@ -729,7 +740,8 @@ def main():
         print("wrote %s" % args.out)
 
 
-def _repeat(state, engine, nodes, jitter, games, color, fallback):
+def _repeat(state, engine, nodes, jitter, games, color, fallback,
+            max_pieces=None):
     """N jittered chess games from one settled setup. Returns (line, fen, note).
 
     The placement phase is NOT replayed: both drafters here are deterministic,
@@ -741,7 +753,8 @@ def _repeat(state, engine, nodes, jitter, games, color, fallback):
     note = ""
     for g in range(games):
         n = arena.game_nodes(nodes, jitter, 0, 1, g, 0)
-        result, fen, note = play_out(state, engine, n, None, fallback)
+        result, fen, note = play_out(state, engine, n, None, fallback,
+                                     max_pieces)
         if result == "*":
             return "unplayable (%s)" % note, fen, note
         if result == "1/2-1/2":
