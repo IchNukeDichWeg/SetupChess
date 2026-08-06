@@ -237,11 +237,14 @@ class Drafter:
 
     def _mate_in_one(self, state, legal):
         """A placement the opponent cannot answer ends the game immediately."""
-        opp = not self.color
         for pt, sq in legal:
+            # SetupState.mates() reads our post-placement resources, so the
+            # probe has to spend the points as well as put the piece down --
+            # a placement that finishes us off does not mate.
             state.board.set_piece_at(sq, chess.Piece(pt, self.color))
-            mates = (state.in_check(opp) and not state._placements(opp)
-                     and not (opp == chess.WHITE and state.points[opp] == 0))
+            state.points[self.color] -= rules.PIECE_COST[pt]
+            mates = state.mates(self.color)
+            state.points[self.color] += rules.PIECE_COST[pt]
             state.board.remove_piece_at(sq)
             if mates:
                 return (pt, sq)

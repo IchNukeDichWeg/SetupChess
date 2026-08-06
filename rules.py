@@ -173,9 +173,8 @@ class SetupState:
 
     Terminal states (see docs/RULES.md "setup-phase tactics"): a checked
     side that cannot answer with a placement loses immediately (observed
-    live: @Qe1+#) - except a resource-finished White, who survives because
-    White makes the first move of the chess game after handoff.
-    `result` is None while the setup runs, else "1-0"/"0-1".
+    live: @Qe1+#) - unless the checker was finished too, in which case see
+    mates(). `result` is None while the setup runs, else "1-0"/"0-1".
     """
 
     def __init__(self):
@@ -189,9 +188,7 @@ class SetupState:
 
         Unspent points are forfeited when no affordable square is left
         (engine-code confirmed, docs/RULES.md). Check pressure is routed
-        explicitly in place(), not here: a checked side either gets the
-        forced turn, is mated, or (resource-finished White) survives into
-        the game where it has the first move.
+        explicitly in place() and mates(), not here.
         """
         if self.board.king(color) is None:
             return False
@@ -227,6 +224,30 @@ class SetupState:
     def legal_placements(self):
         return self._placements(self.turn)
 
+    def mates(self, placer):
+        """Has placer's placement just ended the setup? Piece already down.
+
+        Assumes the piece is on the board AND its cost already deducted --
+        both callers arrange that, play.py's probe by deducting and restoring
+        around the call.
+
+        A check the opponent cannot answer with a placement is mate, EXCEPT
+        when the placer is finished too: the setup ends here, so the chess
+        phase starts with the checked side to move (the turn rule verified
+        [LIVE], see place()) and it simply walks the king out.
+
+        ASSUMPTION, and unobserved either way. The live setup mate [AB:
+        @Qe1+#] was against a side whose opponent still had points to spend,
+        so it does not settle this. The previous form of the exception was
+        White-specific, on the belief that White always has the first move
+        after handoff; that turned out to be false, so the condition is now
+        the reason itself, and it applies to both colours.
+        """
+        opp = not placer
+        if not self.in_check(opp) or self._placements(opp):
+            return False
+        return not self.done(placer)
+
     def place(self, pt, sq):
         if self.result is not None:
             raise ValueError("setup already decided %s" % self.result)
@@ -242,10 +263,7 @@ class SetupState:
             if self._placements(opp):
                 self.turn = opp  # forced to answer the check
                 return
-            # no placement answers the check: mate, unless the victim is a
-            # resource-finished White, who gets the game's first move
-            # (ASSUMPTION for the White corner, docs/RULES.md)
-            if not (opp == chess.WHITE and self.points[opp] == 0):
+            if self.mates(placer):
                 self.result = "1-0" if placer == chess.WHITE else "0-1"
                 return
         # Strict alternation, always. A side with nothing left to place PASSES

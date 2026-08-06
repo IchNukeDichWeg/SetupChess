@@ -53,7 +53,7 @@ announcement, shipped engine code, and behaviour observed directly);
 * Consequence, and the reason the above matters: an opponent who holds the king back can be **locked out entirely**. Cover every empty square in their zone and they can never legally place a king, which ends setup without one and loses outright -- no checkmate required. Their own pieces block rays and occupy squares, so this works against sparse armies and fails against dense ones.
 * Ending setup without a king is an immediate loss, so the king is not optional. [ENG22 `"failed to set up his king"`]
 * Consequence for the engine: the drafting layer is not purely combinatorial -- placement legality depends on check state, and the placement tree contains forced lines and mates. `rules.py` implements in-setup check/mate logic.
-* ASSUMPTION: a *White* player who is out of resources and left in check is not mated, because White has the first move of the chess game and can answer there. `rules.py` encodes this narrow case; it is unobserved and, being reachable only when White both forfeits and is checked, it is untested territory on the server too.
+* ASSUMPTION: an unanswerable setup check is *not* mate when the checker finishes on that very placement, because the setup ends there and the checked side has the first move of the chess game (see the turn rule above) and walks the king out. `rules.py` encodes this. Unobserved either way: the live mate [AB: `@Qe1+#`] was against a side whose opponent still had points to spend, so it does not settle the case. Earlier revisions made this exception White-only, on the belief that White always moves first after handoff; [LIVE] disproved that premise, and the condition is now the reason itself and applies to both colours.
 
 ## Post-setup rules
 

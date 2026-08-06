@@ -215,6 +215,47 @@ def test_setup_game():
     if s.turn != chess.BLACK:
         fail("turn left Black while only Black had points")
 
+    # A check the placer cannot be answered is mate ONLY while the placer
+    # still has resources. If the placer finishes on the checking placement,
+    # the setup ends and the checked side has the first move (see
+    # rules.SetupState.mates) -- and this cuts both ways by colour, which the
+    # old White-only form of the exception got wrong in both directions.
+    def unanswerable(white_left, black_left):
+        """Ka1 / Ke6 / Qe1: e2-e5 are outside Black's zone, so no block."""
+        s = rules.SetupState()
+        s.place(chess.KING, chess.A1)
+        s.place(chess.KING, chess.E6)
+        s.points[chess.WHITE] = white_left + rules.PIECE_COST[chess.QUEEN]
+        s.points[chess.BLACK] = black_left
+        s.place(chess.QUEEN, chess.E1)
+        return s
+
+    s = unanswerable(11, 39)
+    if s.result != "1-0":
+        fail("unanswerable setup check from a placer with points left is not "
+             "mate (result %r)" % s.result)
+    s = unanswerable(0, 39)
+    if s.result is not None:
+        fail("placer finished on the checking placement, so the checked side "
+             "moves first, but the setup was scored %r" % s.result)
+    if not s.complete or s.turn != chess.BLACK:
+        fail("checked survivor does not have the move")
+    board = chess.Board(s.handoff_fen())
+    if not board.is_check() or not any(board.legal_moves):
+        fail("checked survivor is not in check with an escape")
+
+    # the colour-swapped case the old code scored backwards: Black checks a
+    # finished White while still holding points, which IS mate.
+    s = rules.SetupState()
+    s.place(chess.KING, chess.E3)
+    s.points[chess.WHITE] = 0
+    s.place(chess.KING, chess.A8)
+    s.points[chess.BLACK] = 9 + 5
+    s.place(chess.QUEEN, chess.E8)
+    if s.result != "0-1":
+        fail("Black checking a finished White while still holding points "
+             "should be mate (result %r)" % s.result)
+
     # THE SIDE TO MOVE AFTER SETUP IS NOT ALWAYS WHITE. Replay of a real game
     # driven against chess.com's own bot on 2026-08-05: White placed 16th and
     # last, Black had been passing since move 11, and Black opened the chess
