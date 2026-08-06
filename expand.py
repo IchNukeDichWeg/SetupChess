@@ -107,7 +107,8 @@ def _on_sigint(*_args):
     os._exit(130)
 
 
-def run_pairs(tasks, engine_path, workers, cells, label, on_save=None):
+def run_pairs(tasks, engine_path, workers, cells, label, on_save=None,
+              max_pieces=None):
     """Play a list of arena tasks into `cells`, checkpointing as they land.
 
     `cells` is a plain dict rather than the state, because screening runs
@@ -121,7 +122,7 @@ def run_pairs(tasks, engine_path, workers, cells, label, on_save=None):
     done = errors = unplayable = 0
     start = time.time()
     with mp.Pool(workers, initializer=arena.worker_init,
-                 initargs=(engine_path,)) as p:
+                 initargs=(engine_path, max_pieces)) as p:
         for i, j, g, score, info in p.imap_unordered(arena.play_cell, tasks):
             done += 1
             if score == "unplayable":
@@ -216,6 +217,9 @@ def main():
     ap.add_argument("--max-minutes", type=float, default=0,
                     help="leave the round loop after this long and go to the "
                          "gate match; 0 for no limit")
+    ap.add_argument("--max-pieces", type=int, default=32,
+                    help="piece ceiling for the engine; 0 for none, which is "
+                         "correct for ./cuci.py (default: %(default)s)")
     ap.add_argument("--stop-at-max", action="store_true",
                     help="leave the round loop once the pool reaches "
                          "--max-pool. Past that point every round prunes and "
@@ -231,8 +235,12 @@ def main():
             "screen_margin": args.screen_margin,
             "breadth": args.breadth, "crossover_rate": args.crossover_rate,
             "engine": os.path.basename(args.engine),
-            "ply_limit": arena.PLY_LIMIT}
+            "ply_limit": arena.PLY_LIMIT,
+            "max_pieces": args.max_pieces}
     state = load_state(args.state, args.seed, meta)
+    # A campaign written before this key existed was built at its default, so
+    # fill it in rather than refusing to resume every state file in git.
+    state["meta"].setdefault("max_pieces", 32)
     if state["meta"] != meta:
         sys.exit("state was built with different settings:\n  file: %r\n  now:  %r"
                  % (state["meta"], meta))
@@ -250,7 +258,8 @@ def main():
             put_cells(state, cells)
             save_state(args.state, state)
 
-        run_pairs(todo, args.engine, workers, cells_of(state), "seed", persist)
+        run_pairs(todo, args.engine, workers, cells_of(state), "seed", persist,
+                  args.max_pieces)
 
     loop_start = time.time()
     for rnd in range(len(state["rounds"]), args.rounds):
@@ -311,7 +320,8 @@ def main():
         scratch = dict(cells_of(state))
         tasks = cell_tasks(ext, args.screen_pairs, scratch,
                            new_idx, support, args.nodes, args.jitter)
-        run_pairs(tasks, args.engine, workers, scratch, "screen")
+        run_pairs(tasks, args.engine, workers, scratch, "screen",
+                  max_pieces=args.max_pieces)
         scored = screen_scores(scratch, len(ext), new_idx, weights)
         admitted = [i for i in new_idx
                     if scored[i] is not None and scored[i] > args.screen_margin]
@@ -359,7 +369,8 @@ def main():
 
         tasks = cell_tasks(armies, args.pairs, cells_of(state), admitted,
                            list(range(len(armies))), args.nodes, args.jitter)
-        run_pairs(tasks, args.engine, workers, cells_of(state), "fill", persist)
+        run_pairs(tasks, args.engine, workers, cells_of(state), "fill", persist,
+                  args.max_pieces)
 
         # prune: keep the equilibrium support plus the best of the rest
         weights2, rep2 = solve_pool(state, args.max_holes)
@@ -443,7 +454,7 @@ def main():
         start = time.time()
         done = 0
         with mp.Pool(workers, initializer=arena.worker_init,
-                     initargs=(args.engine,)) as p:
+                     initargs=(args.engine, args.max_pieces)) as p:
             it = p.imap_unordered(arena.play_match, tasks)
             while done < len(tasks):
                 try:
