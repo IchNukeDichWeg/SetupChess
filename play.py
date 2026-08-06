@@ -371,12 +371,28 @@ def live(ours, color, engine, nodes, fallback=None, pool=None, matrix=None,
         if state.result or state.complete:
             break
         mover = state.turn
-        pt, sq = drafters[mover].choose(state)
-        state.place(pt, sq)
+        while True:
+            pt, sq = drafters[mover].choose(state)
+            try:
+                state.place(pt, sq)
+                break
+            except ValueError as e:
+                # Our own drafter only ever offers legal placements, so a
+                # rejection here is theirs: a mistyped token, or a square the
+                # rules deny them. Re-prompt instead of killing the session,
+                # which is what happened the first time this was tried live
+                # (their king on h8, denied by our bishop on a1).
+                if mover == color:
+                    raise
+                print("  rejected: %s" % e, flush=True)
         token = "@%s%s" % (chess.piece_symbol(pt).upper(), chess.square_name(sq))
         if mover == color:
             print("PLACE %s   (%d points left)"
                   % (token, state.points[color]), flush=True)
+        else:
+            print("  their @%s%s accepted"
+                  % (chess.piece_symbol(pt).upper(), chess.square_name(sq)),
+                  flush=True)
     if state.result:
         print("RESULT %s  (decided in the placement phase)" % state.result,
               flush=True)
