@@ -76,6 +76,48 @@ Both node counts put the entire equilibrium on the champion, exploitability
 the search buys the same verdict, so the remaining gap between +449.66 and
 +462.06 is the mix-versus-champion difference, not depth.
 
+## Against a model of the real opponent
+
+The archetypes are hand-written guesses. `play.py --opponent bot` is
+chess.com's own setup policy rebuilt from its shipped client
+(`docs/BOT_MODEL.md`): king to a corner on move one, then 16 pawns and 7
+knights, because material is absent from its setup eval entirely. The champion
+does not dominate it.
+
+```
+we are white | 0.6500 +/- 0.0318   +107.54 [+83.69, +132.41]   W/D/L  60/140/0
+we are black | 0.8475 +/- 0.0320   +297.95 [+258.19, +345.27]  W/D/L 139/ 61/0
+Games        | 200 per colour, 20,000 nodes, 15% jitter
+Referee      | ./cuci.py -- 40 pieces is over Stockfish's ceiling
+```
+
+No losses in 400 games, but **201 of them drawn**: the pawn-and-knight wall is
+genuinely hard to break, and at exactly 20,000 nodes with jitter off both
+colours drew by threefold repetition. Compare 0.93 against the archetypes and
+the gap is the point -- **the weak field, not the search depth, was what those
+numbers were resting on.**
+
+Three things about this measurement, because it is easy to over-read:
+
+* **The error bars are conditional on ONE setup per colour.** Both drafters are
+  deterministic, so the 200 games sample the chess phase and nothing else.
+  Those intervals contain no drafting variance at all.
+* **The referee is our own C core**, which measures -327 Elo weaker than
+  Stockfish, because 16 of our pieces plus 24 of theirs is 40 on the board.
+  Referee agreement is 0.888 Spearman over the archetypes, so it is usable, but
+  this number is on a different instrument from the +455.82 gate and the two
+  must not be pooled.
+* **We move first in both colours** (checked: both handoff FENs give us the
+  move), since the bot spends 24 placements to our 16 and so always places
+  last. The colour asymmetry is therefore not a tempo effect.
+
+That asymmetry is the interesting part. Re-targeting fired both times but
+landed somewhere different: as White it came back to the pure champion, twelve
+bishops and three pawns, and scored 0.65; as Black it swapped in a rook for two
+bishops -- ten bishops, a rook, four pawns -- and scored 0.85. One setup per
+colour is not enough to credit the rook for that, but it is the obvious thing
+to test next.
+
 ## The setup phase has real tactics
 
 Two ways the game ends before a single move is played, both verified against
