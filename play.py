@@ -31,6 +31,7 @@ import arena
 import pool as poolmod
 import rules
 import solve
+import stats
 
 # Placing the king first invites a rank-3 checkmate before move one (the live
 # @Qe1+# game in docs/RULES.md). Holding it to the very end is also wrong: the
@@ -538,6 +539,13 @@ def main():
     ap.add_argument("--live", action="store_true",
                     help="drive one real game: prints PLACE/MOVE lines as they "
                          "are decided and reads the opponent's from stdin")
+    ap.add_argument("--games", type=int, default=1,
+                    help="chess-phase games per colour. Both drafters are "
+                         "deterministic, so the placement phase runs ONCE per "
+                         "colour and only the node jitter varies; a decided "
+                         "setup is reported once, not sampled N times")
+    ap.add_argument("--jitter", type=float, default=0.15,
+                    help="node-count band for --games > 1")
     ap.add_argument("--out", help="write the game log here (no default)")
     args = ap.parse_args()
 
@@ -588,6 +596,10 @@ def main():
             state = draft(drafters[chess.WHITE], drafters[chess.BLACK], log)
             if state.result:
                 result, fen, note = state.result, "", "setup checkmate"
+            elif args.games > 1:
+                result, fen, note = _repeat(state, engine, args.nodes,
+                                            args.jitter, args.games, color,
+                                            fallback)
             else:
                 result, fen, note = play_out(state, engine, args.nodes, log,
                                              fallback)
@@ -610,6 +622,32 @@ def main():
             json.dump({"target": args.target, "opponent": args.opponent,
                        "nodes": args.nodes, "games": games}, f, indent=1)
         print("wrote %s" % args.out)
+
+
+def _repeat(state, engine, nodes, jitter, games, color, fallback):
+    """N jittered chess games from one settled setup. Returns (line, fen, note).
+
+    The placement phase is NOT replayed: both drafters here are deterministic,
+    so re-drafting would hand back the identical armies and "N games" would be
+    one game counted N times. All the variety is the per-game node count.
+    """
+    scores = []
+    fen = state.handoff_fen()
+    note = ""
+    for g in range(games):
+        n = arena.game_nodes(nodes, jitter, 0, 1, g, 0)
+        result, fen, note = play_out(state, engine, n, None, fallback)
+        if result == "*":
+            return "unplayable (%s)" % note, fen, note
+        if result == "1/2-1/2":
+            scores.append(0.5)
+        else:
+            won = (result == "1-0") == (color == chess.WHITE)
+            scores.append(1.0 if won else 0.0)
+    line = "\n" + "\n".join("     " + r for r in
+                             stats.report(scores).splitlines())
+    return line, fen, "%d games, %.0f%% jitter, %s" % (
+        games, jitter * 100, note or "primary engine")
 
 
 def _setup_len(state):
