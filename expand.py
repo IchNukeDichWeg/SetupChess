@@ -180,30 +180,44 @@ def cell_tasks(armies, pairs, cells, indices_a, indices_b, nodes, jitter):
 
 # The screen plays challengers against the equilibrium support. A pinned
 # opponent (--seed-bot) is normally NOT in the support: the bot's wall draws
-# rather than wins, so the solver gives it no weight, and a challenger that is
-# never played against it cannot possibly be selected for beating it. Seeding
-# the wall into the pool without this does nothing at all -- measured on a
-# 13-army smoke campaign, where the support came out {7, 9} and the pin at 12
-# was never once a screen opponent.
+# rather than wins, so the solver gives it no weight, and a challenger never
+# played against it cannot possibly be selected for beating it.
 #
-# So pinned members take a fixed share of the screen weight, independent of the
-# equilibrium. Half is a CHOICE, not a measurement: it says answering the real
-# opponent counts as much as beating our own pool. Lower it to weight the pool
-# more heavily.
-PINNED_SCREEN_WEIGHT = 0.5
+# The requirement is CONJUNCTIVE, and it has to be. Blending the pin into the
+# weighted average at 50% was measured to destroy the filter: beating the wall
+# at ~0.95 contributes 0.475 on its own, so a challenger needed only 0.10
+# against the support to clear a 0.5 margin. Observed admissions were 12 of 32,
+# then 16 of 25, then 28 of 31, the pool went 13 -> 69 in three rounds, and the
+# fill cost per round went 1,728 -> 4,032 -> 11,984 pairs because it grows with
+# pool times admitted. The screen is a kill filter; a weighted average let
+# everything through.
+#
+# So a challenger must clear --screen-margin against the support AND against
+# every pinned opponent separately. That is the original criterion plus "does
+# not lose to the bot", which is what breeding against it should mean.
 
 
-def screen_weights(weights, pinned):
-    """Equilibrium weights, renormalised to leave room for the pinned share."""
-    if not pinned:
-        return dict(weights)
-    total = sum(weights.values()) or 1.0
-    out = {i: (1.0 - PINNED_SCREEN_WEIGHT) * w / total
-           for i, w in weights.items()}
-    share = PINNED_SCREEN_WEIGHT / len(pinned)
-    for i in pinned:
-        out[i] = out.get(i, 0.0) + share
-    return out
+def admit(scored, pin_scored, challenger_idx, margin, pinned):
+    """Conjunctive admission. Returns (admitted, blocked_by_pin).
+
+    A challenger must clear `margin` against the support AND against the pinned
+    opponents, judged separately. See the note above: blending the two into one
+    weighted average lets anything that beats the pinned opponent through, which
+    is how a kill filter became a rubber stamp.
+
+    An unmeasured score (None) never admits. Failing only the pin is counted
+    separately so the log can distinguish it from an ordinary kill.
+    """
+    admitted, blocked = [], 0
+    for i in challenger_idx:
+        if scored.get(i) is None or scored[i] <= margin:
+            continue
+        if pinned:
+            if pin_scored.get(i) is None or pin_scored[i] <= margin:
+                blocked += 1
+                continue
+        admitted.append(i)
+    return admitted, blocked
 
 
 def screen_scores(cells, n, challenger_idx, weights):
@@ -375,19 +389,25 @@ def main():
         # screen against the support plus any pinned opponents: a kill filter,
         # never a measurement
         scratch = dict(cells_of(state))
-        screen_w = screen_weights(weights, pinned)
         opponents = sorted(set(support) | set(pinned))
         tasks = cell_tasks(ext, args.screen_pairs, scratch,
                            new_idx, opponents, args.nodes, args.jitter)
         run_pairs(tasks, args.engine, workers, scratch, "screen",
                   max_pieces=args.max_pieces)
-        scored = screen_scores(scratch, len(ext), new_idx, screen_w)
+        scored = screen_scores(scratch, len(ext), new_idx, weights)
+        # unweighted mean against the pinned opponents, judged separately
+        pin_scored = (screen_scores(scratch, len(ext), new_idx,
+                                    {i: 1.0 for i in pinned})
+                      if pinned else {})
         if pinned:
-            print("  screening against %d support + %d pinned (%.0f%% of the "
-                  "weight on pinned)" % (len(support), len(pinned),
-                                         PINNED_SCREEN_WEIGHT * 100))
-        admitted = [i for i in new_idx
-                    if scored[i] is not None and scored[i] > args.screen_margin]
+            print("  screening against %d support and %d pinned, both must "
+                  "clear %.2f" % (len(support), len(pinned),
+                                  args.screen_margin))
+        admitted, lost_to_pin = admit(scored, pin_scored, new_idx,
+                                      args.screen_margin, pinned)
+        if lost_to_pin:
+            print("  %d challengers beat the support but not the pinned "
+                  "opponent" % lost_to_pin)
         killed = [i for i in new_idx if i not in admitted]
         print("  screen: %d admitted, %d killed (best %.3f)"
               % (len(admitted), len(killed),

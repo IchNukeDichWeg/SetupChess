@@ -133,10 +133,18 @@ python3 play.py --opponent bot --engine fairy-stockfish --max-pieces 0 \
 
 `expand.py --seed-bot` breeds the pool against this army instead of only
 against itself. Three parts, all load-bearing: the wall joins the starting
-pool, it is **pinned** so the prune cannot drop it, and it takes half the
-screen weight. Without the last one the whole thing is a no-op, because the
-wall draws rather than wins, so the solver gives it no equilibrium weight and
-the screen only ever plays challengers against the support.
+pool, it is **pinned** so the prune cannot drop it, and a challenger must clear
+`--screen-margin` against it **as well as** against the equilibrium support.
+Without the third the whole thing is a no-op, because the wall draws rather
+than wins, so the solver gives it no weight and the screen only ever plays
+challengers against the support.
+
+The two requirements are deliberately separate rather than averaged. Blending
+them at 50/50 was measured to destroy the filter: beating the wall at ~0.95
+contributes 0.475 on its own, so a challenger needed only 0.10 against the
+support to clear a 0.5 margin. Admissions ran 12 of 32, then 16 of 25, then 28
+of 31; the pool went 13 to 69 in three rounds; and the fill cost per round went
+1,728 to 4,032 to 11,984 pairs, because it grows with pool times admitted.
 
 ```bash
 python3 expand.py --state campaigns/expand_bot_fsf.json --seed-bot \

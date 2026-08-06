@@ -97,12 +97,15 @@ plausible part of why the solved mix scores 0.93 against hand-written armies.
   Stockfish's ceiling, so the chess phase has to be refereed by our own C core.
 * **The pool can breed against it**: `expand.py --seed-bot` puts
   `pool.BOT_WALL` in the starting pool, PINS it so the prune cannot drop it,
-  and gives it half the screen weight. All three parts are needed. The wall
-  draws rather than wins, so the solver hands it no equilibrium weight, and the
-  screen only plays challengers against the support -- measured on a 13-army
-  smoke campaign where the support came out {7, 9} and the pinned wall at 12
-  was never once a screen opponent. Seeding it without the weight override
-  changes nothing whatsoever.
+  and requires challengers to clear --screen-margin against it separately from
+  the support. All three parts are needed. The wall draws rather than wins, so
+  the solver hands it no equilibrium weight, and the screen only plays
+  challengers against the support -- measured on a 13-army smoke campaign where
+  the support came out {7, 9} and the pinned wall at 12 was never once a screen
+  opponent. Seeding it without the extra requirement changes nothing.
+  Averaging the two requirements instead of conjoining them is worse than
+  nothing: it makes the screen admit almost everything, measured at 28 of 31 in
+  one round with the pool tripling in three.
 * **Unverified here**: whether the live opponents in the pool are this bot or
   humans. Everything above is the bot's behaviour, read from its code and
   confirmed against its own debug output. It is not a claim about the human

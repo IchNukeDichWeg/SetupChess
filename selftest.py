@@ -209,18 +209,26 @@ def test_bot_policy():
     if expand.new_state(2026, {})["pinned"]:
         fail("a campaign without --seed-bot pinned something")
 
-    # the screen weight: pinned takes its named share, the support keeps the
-    # rest in proportion, and with no pin nothing changes at all
-    w = expand.screen_weights({7: 0.667, 9: 0.333}, [12])
-    if abs(sum(w.values()) - 1.0) > 1e-9:
-        fail("screen weights do not sum to 1: %r" % w)
-    if abs(w[12] - expand.PINNED_SCREEN_WEIGHT) > 1e-9:
-        fail("pinned share is %.4f, expected %.4f"
-             % (w[12], expand.PINNED_SCREEN_WEIGHT))
-    if abs(w[7] / w[9] - 0.667 / 0.333) > 1e-6:
-        fail("the support lost its proportions: %r" % w)
-    if expand.screen_weights({7: 0.6}, []) != {7: 0.6}:
-        fail("screen weights changed with nothing pinned")
+    # the admission rule is CONJUNCTIVE. The previous version blended the
+    # pinned score into the weighted average at 50%, which let a challenger
+    # that merely beat the wall in on a 0.10 score against the support; the
+    # pool went 13 -> 69 in three rounds and the fill cost quadrupled.
+    idx = [0, 1, 2, 3]
+    support = {0: 0.9, 1: 0.9, 2: 0.2, 3: 0.9}
+    pin = {0: 0.9, 1: 0.2, 2: 0.9, 3: None}
+    got, blocked = expand.admit(support, pin, idx, 0.5, [12])
+    if got != [0]:
+        fail("conjunctive admission let through %r, expected only [0]" % got)
+    if blocked != 2:
+        fail("blocked-by-pin counted %d, expected 2 (index 1 and 3)" % blocked)
+    # with nothing pinned it is exactly the old support-only rule
+    got, blocked = expand.admit(support, {}, idx, 0.5, [])
+    if got != [0, 1, 3] or blocked:
+        fail("admission changed when nothing is pinned: %r, %d" % (got, blocked))
+    # a challenger that crushes the pin but loses the support stays out
+    got, _ = expand.admit({9: 0.10}, {9: 0.99}, [9], 0.5, [12])
+    if got:
+        fail("a pin-beater with a 0.10 support score was admitted")
 
     print("PASS: bot policy matches its 7 measured king-bonus values, opens "
           "with the king in a corner both colours, and drafts %d pawns and "
