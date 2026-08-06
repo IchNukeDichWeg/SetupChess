@@ -184,10 +184,49 @@ def test_bot_policy():
                (chess.BISHOP, chess.ROOK, chess.QUEEN))
     if dear or cheap < 20:
         fail("bot army is not pawns and knights: %r" % counts)
+    # pool.BOT_WALL is a hardcoded copy of what the policy above drafts. If the
+    # policy ever changes, this is what says so instead of the campaign quietly
+    # breeding against a stale army.
+    drafted = sorted((p.piece_type, sq)
+                     for sq, p in s.board.piece_map().items())
+    if sorted(pool.BOT_WALL) != drafted:
+        fail("pool.BOT_WALL no longer matches what BotDrafter drafts")
+    ok, why = rules.validate_army(pool.BOT_WALL)
+    if not ok:
+        fail("pool.BOT_WALL is not a legal army: %s" % why)
+    if pool.BOT_WALL in pool.ARCHETYPES.values():
+        fail("BOT_WALL leaked into ARCHETYPES, which would change the gate field")
+    if len(pool.seed_pool(random.Random(2026))) != 12:
+        fail("the archetype gate field is no longer 12 armies")
+
+    # --seed-bot pins it, and the pin points at the wall
+    import expand
+    st = expand.new_state(2026, {}, seed_bot=True)
+    if st["pinned"] != [12]:
+        fail("seed_bot pinned %r, expected [12]" % st["pinned"])
+    if pool.from_json(st["armies"][st["pinned"][0]]) != pool.BOT_WALL:
+        fail("the pinned index does not hold BOT_WALL")
+    if expand.new_state(2026, {})["pinned"]:
+        fail("a campaign without --seed-bot pinned something")
+
+    # the screen weight: pinned takes its named share, the support keeps the
+    # rest in proportion, and with no pin nothing changes at all
+    w = expand.screen_weights({7: 0.667, 9: 0.333}, [12])
+    if abs(sum(w.values()) - 1.0) > 1e-9:
+        fail("screen weights do not sum to 1: %r" % w)
+    if abs(w[12] - expand.PINNED_SCREEN_WEIGHT) > 1e-9:
+        fail("pinned share is %.4f, expected %.4f"
+             % (w[12], expand.PINNED_SCREEN_WEIGHT))
+    if abs(w[7] / w[9] - 0.667 / 0.333) > 1e-6:
+        fail("the support lost its proportions: %r" % w)
+    if expand.screen_weights({7: 0.6}, []) != {7: 0.6}:
+        fail("screen weights changed with nothing pinned")
+
     print("PASS: bot policy matches its 7 measured king-bonus values, opens "
           "with the king in a corner both colours, and drafts %d pawns and "
-          "%d knights with nothing expensive"
-          % (counts.get(chess.PAWN, 0), counts.get(chess.KNIGHT, 0)))
+          "%d knights with nothing expensive, matching pool.BOT_WALL; "
+          "--seed-bot pins it at index 12 and leaves the 12-army gate field "
+          "alone" % (counts.get(chess.PAWN, 0), counts.get(chess.KNIGHT, 0)))
 
 
 def test_setup_game():

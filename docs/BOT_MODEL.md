@@ -95,6 +95,14 @@ plausible part of why the solved mix scores 0.93 against hand-written armies.
 * **What it drafts**: king to a corner, then 16 pawns and 7 knights, 39 points
   spent, 24 pieces. Against our champion that is 40 pieces on the board, over
   Stockfish's ceiling, so the chess phase has to be refereed by our own C core.
+* **The pool can breed against it**: `expand.py --seed-bot` puts
+  `pool.BOT_WALL` in the starting pool, PINS it so the prune cannot drop it,
+  and gives it half the screen weight. All three parts are needed. The wall
+  draws rather than wins, so the solver hands it no equilibrium weight, and the
+  screen only plays challengers against the support -- measured on a 13-army
+  smoke campaign where the support came out {7, 9} and the pinned wall at 12
+  was never once a screen opponent. Seeding it without the weight override
+  changes nothing whatsoever.
 * **Unverified here**: whether the live opponents in the pool are this bot or
   humans. Everything above is the bot's behaviour, read from its code and
   confirmed against its own debug output. It is not a claim about the human

@@ -34,18 +34,31 @@ import solve
 import stats
 
 
-def new_state(seed, meta):
+def new_state(seed, meta, seed_bot=False):
+    """Fresh campaign. `seed_bot` adds the bot's wall and PINS it.
+
+    Pinning matters: the prune ranks by equilibrium support and mean score, so
+    a fixed opponent that is merely hard to beat rather than good at winning
+    can be dropped, and then the campaign quietly stops breeding against it
+    with nothing in the log to say so.
+    """
     rng = random.Random(seed)
     armies = poolmod.seed_pool(rng)
+    pinned = []
+    if seed_bot:
+        pinned = [len(armies)]
+        armies = armies + [poolmod.BOT_WALL]
     return {"meta": meta, "armies": [poolmod.to_json(a) for a in armies],
-            "cells": {}, "rounds": [], "seed": seed}
+            "cells": {}, "rounds": [], "seed": seed, "pinned": pinned}
 
 
-def load_state(path, seed, meta):
+def load_state(path, seed, meta, seed_bot=False):
     if not os.path.exists(path):
-        return new_state(seed, meta)
+        return new_state(seed, meta, seed_bot)
     with open(path) as f:
-        return json.load(f)
+        state = json.load(f)
+    state.setdefault("pinned", [])
+    return state
 
 
 def save_state(path, state):
@@ -165,6 +178,34 @@ def cell_tasks(armies, pairs, cells, indices_a, indices_b, nodes, jitter):
     return out
 
 
+# The screen plays challengers against the equilibrium support. A pinned
+# opponent (--seed-bot) is normally NOT in the support: the bot's wall draws
+# rather than wins, so the solver gives it no weight, and a challenger that is
+# never played against it cannot possibly be selected for beating it. Seeding
+# the wall into the pool without this does nothing at all -- measured on a
+# 13-army smoke campaign, where the support came out {7, 9} and the pin at 12
+# was never once a screen opponent.
+#
+# So pinned members take a fixed share of the screen weight, independent of the
+# equilibrium. Half is a CHOICE, not a measurement: it says answering the real
+# opponent counts as much as beating our own pool. Lower it to weight the pool
+# more heavily.
+PINNED_SCREEN_WEIGHT = 0.5
+
+
+def screen_weights(weights, pinned):
+    """Equilibrium weights, renormalised to leave room for the pinned share."""
+    if not pinned:
+        return dict(weights)
+    total = sum(weights.values()) or 1.0
+    out = {i: (1.0 - PINNED_SCREEN_WEIGHT) * w / total
+           for i, w in weights.items()}
+    share = PINNED_SCREEN_WEIGHT / len(pinned)
+    for i in pinned:
+        out[i] = out.get(i, 0.0) + share
+    return out
+
+
 def screen_scores(cells, n, challenger_idx, weights):
     """Weighted score of each challenger against the equilibrium mix."""
     full = arena.matrix_from_cells(cells, n)
@@ -217,6 +258,13 @@ def main():
     ap.add_argument("--max-minutes", type=float, default=0,
                     help="leave the round loop after this long and go to the "
                          "gate match; 0 for no limit")
+    ap.add_argument("--seed-bot", action="store_true",
+                    help="add chess.com's own drafted army (pool.BOT_WALL) to "
+                         "the starting pool and PIN it, so every challenger is "
+                         "screened against it and the prune cannot drop it. "
+                         "Its 24 pieces put most matchups over Stockfish's "
+                         "ceiling, so pair this with --engine ./cuci.py "
+                         "--max-pieces 0")
     ap.add_argument("--max-pieces", type=int, default=32,
                     help="piece ceiling for the engine; 0 for none, which is "
                          "correct for ./cuci.py (default: %(default)s)")
@@ -236,11 +284,12 @@ def main():
             "breadth": args.breadth, "crossover_rate": args.crossover_rate,
             "engine": os.path.basename(args.engine),
             "ply_limit": arena.PLY_LIMIT,
-            "max_pieces": args.max_pieces}
-    state = load_state(args.state, args.seed, meta)
-    # A campaign written before this key existed was built at its default, so
-    # fill it in rather than refusing to resume every state file in git.
-    state["meta"].setdefault("max_pieces", 32)
+            "max_pieces": args.max_pieces, "seed_bot": args.seed_bot}
+    state = load_state(args.state, args.seed, meta, args.seed_bot)
+    # A campaign written before these keys existed was built at their defaults,
+    # so fill them in rather than refusing to resume every state file in git.
+    for k, default in (("max_pieces", 32), ("seed_bot", False)):
+        state["meta"].setdefault(k, default)
     if state["meta"] != meta:
         sys.exit("state was built with different settings:\n  file: %r\n  now:  %r"
                  % (state["meta"], meta))
@@ -294,7 +343,14 @@ def main():
                     if j != i and full_now[i][j] is not None]
             return sum(vals) / len(vals) if vals else -1.0
 
-        extra = sorted((i for i in range(len(armies)) if i not in weights),
+        # A pinned setup is an OPPONENT MODEL, not one of our candidates, so it
+        # is excluded from the parents. Left in, it wins a breadth slot on mean
+        # score (a wall that draws everything scores ~0.5 against a field with
+        # bad armies in it) and the campaign drifts from "beat the bot" to
+        # "become the bot".
+        pinned = [i for i in state.get("pinned", []) if i < len(armies)]
+        extra = sorted((i for i in range(len(armies))
+                        if i not in weights and i not in pinned),
                        key=mean_score, reverse=True)[:args.breadth]
         parent_pool = [armies[i] for i in support + extra]
         seen = {poolmod.army_key(a) for a in armies}
@@ -316,13 +372,20 @@ def main():
         new_idx = list(range(first, len(ext)))
         print("  %d novel challengers" % len(fresh))
 
-        # screen against the support only: a kill filter, never a measurement
+        # screen against the support plus any pinned opponents: a kill filter,
+        # never a measurement
         scratch = dict(cells_of(state))
+        screen_w = screen_weights(weights, pinned)
+        opponents = sorted(set(support) | set(pinned))
         tasks = cell_tasks(ext, args.screen_pairs, scratch,
-                           new_idx, support, args.nodes, args.jitter)
+                           new_idx, opponents, args.nodes, args.jitter)
         run_pairs(tasks, args.engine, workers, scratch, "screen",
                   max_pieces=args.max_pieces)
-        scored = screen_scores(scratch, len(ext), new_idx, weights)
+        scored = screen_scores(scratch, len(ext), new_idx, screen_w)
+        if pinned:
+            print("  screening against %d support + %d pinned (%.0f%% of the "
+                  "weight on pinned)" % (len(support), len(pinned),
+                                         PINNED_SCREEN_WEIGHT * 100))
         admitted = [i for i in new_idx
                     if scored[i] is not None and scored[i] > args.screen_margin]
         killed = [i for i in new_idx if i not in admitted]
@@ -381,9 +444,14 @@ def main():
                         if j != i and full[i][j] is not None]
                 return sum(vals) / len(vals) if vals else -1.0
             ranked = sorted(range(len(armies)),
-                            key=lambda i: (i in weights2, mean_score(i)),
+                            key=lambda i: (i in set(pinned), i in weights2,
+                                           mean_score(i)),
                             reverse=True)
             survivors = sorted(ranked[:args.max_pool])
+            lost = set(pinned) - set(survivors)
+            if lost:
+                sys.exit("prune would drop pinned setups %s; raise --max-pool"
+                         % sorted(lost))
             remap = {old: new for new, old in enumerate(survivors)}
             state["armies"] = [state["armies"][i] for i in survivors]
             put_cells(state, {(remap[i], remap[j], g): v
@@ -391,6 +459,7 @@ def main():
                               if i in remap and j in remap})
             weights2 = {remap[i]: w for i, w in weights2.items()
                         if i in remap}
+            state["pinned"] = sorted(remap[i] for i in pinned)
             print("  pruned to %d setups" % len(survivors))
 
         state["rounds"].append({

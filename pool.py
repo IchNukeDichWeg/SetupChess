@@ -212,6 +212,30 @@ def army_key(army):
     return tuple(sorted(army))
 
 
+# What chess.com's own setup policy actually drafts (play.BotDrafter): king to
+# a corner, then every pawn square filled and the rest of rank 1 in knights.
+# 37 of 39 points, 24 pieces, the last 2 points forfeited because no affordable
+# square is left. Deliberately NOT in ARCHETYPES: seed_pool() iterates that
+# dict and it is the twelve-army gate field the +462 and +455.82 numbers were
+# measured against, so adding to it would silently change the baseline.
+#
+# Hardcoded rather than imported, because play.py imports this module. The copy
+# is pinned to the policy by a selftest that re-drafts it and compares, so the
+# two cannot drift apart.
+#
+# It is opponent-independent in practice: over eight drafts against four very
+# different archetypes in both colours, seven produced exactly this and the
+# eighth swapped one pawn for a knight. That is why it can be treated as a
+# fixed army at all.
+BOT_WALL = [(chess.PAWN, sq) for sq in
+            (chess.A2, chess.B2, chess.C2, chess.D2, chess.E2, chess.F2,
+             chess.G2, chess.H2, chess.A3, chess.B3, chess.C3, chess.D3,
+             chess.E3, chess.F3, chess.G3, chess.H3)] + \
+           [(chess.KNIGHT, sq) for sq in
+            (chess.B1, chess.C1, chess.D1, chess.E1, chess.F1, chess.G1,
+             chess.H1)] + [(chess.KING, chess.A1)]
+
+
 def seed_pool(rng, size=None):
     """Archetypes first, then mutations of them until size is reached."""
     pool, seen = [], set()

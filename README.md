@@ -111,6 +111,25 @@ Three things about this measurement, because it is easy to over-read:
   move), since the bot spends 24 placements to our 16 and so always places
   last. The colour asymmetry is therefore not a tempo effect.
 
+`expand.py --seed-bot` breeds the pool against this army instead of only
+against itself. Three parts, all load-bearing: the wall joins the starting
+pool, it is **pinned** so the prune cannot drop it, and it takes half the
+screen weight. Without the last one the whole thing is a no-op, because the
+wall draws rather than wins, so the solver gives it no equilibrium weight and
+the screen only ever plays challengers against the support.
+
+Its 24 pieces put most matchups over Stockfish's ceiling, so this campaign has
+to be refereed by our own core:
+
+```bash
+python3 expand.py --state campaigns/expand_bot.json --seed-bot \
+  --engine ./cuci.py --max-pieces 0 --rounds 30 --workers 0
+```
+
+That is a different referee from every other campaign in `campaigns/`, so it is
+a different instrument and a separate state file, and its results are not
+comparable with the Stockfish-refereed numbers above.
+
 That asymmetry is the interesting part. Re-targeting fired both times but
 landed somewhere different: as White it came back to the pure champion, twelve
 bishops and three pawns, and scored 0.65; as Black it swapped in a rook for two
@@ -174,7 +193,7 @@ so python-chess with the rights stripped is the reference.
 | `pool.py` | archetype seeds, mutation and crossover operators |
 | `arena.py` | fills the payoff matrix, engine vs engine, resumable |
 | `solve.py` | equilibrium mix, best response, exploitability |
-| `expand.py` | the double-oracle pool expansion loop |
+| `expand.py` | the double-oracle pool expansion loop; `--seed-bot` breeds against the modelled opponent |
 | `stats.py` | Elo, confidence intervals, SPRT |
 | `play.py` | drafts an army and plays the game out; `--opponent bot` is chess.com's own setup policy |
 | `match.py` | paired full-game A/B for a drafting change |
