@@ -65,14 +65,15 @@ HUNT_THEIR_POINTS = 12
 # the best response more to choose from, which is the effect you would hope
 # for and now the one that is measured. Pass --no-pool to turn it off.
 #
-# BOTH numbers predate the handoff turn-order fix: match.py drives its games
-# from handoff_fen(), which used to give White the move unconditionally, so
-# every pair was played a tempo out of step from the real game. The pairing is
-# unaffected (both arms had the identical wrong tempo, same opponent, colour
-# and jitter) so the sign and the ordering stand, but the magnitudes are
-# measured on a slightly different game than the one that now ships. Re-run
-# for the magnitude. The champion gate numbers do NOT share this problem:
-# arena.py goes through setup_fen(), which is unchanged.
+# RE-RUN after the handoff turn-order fix, and it mattered: match.py plays
+# from handoff_fen(), which used to hand White the move unconditionally, and
+# the fix changed the outcome of 494 of the 1,187 pairs. Post-fix on the
+# 87-setup pool: +24.63 Elo [+18.06, +31.22], LLR +8.101 -> ACCEPT H1 at full
+# budget. The ranges overlap the pre-fix +29.63 heavily, so the fix did not
+# measurably change the effect, but only the post-fix number describes what
+# this code does. The 19-setup pool's +17.13 is still a PRE-FIX number and has
+# not been re-run. The champion gate never shared the problem: arena.py goes
+# through setup_fen(), which did not change.
 #
 # The pool and the target move TOGETHER and must stay consistent: re-targeting
 # only considers armies inside the pool, so a target that is not a member gets
@@ -114,8 +115,9 @@ class Drafter:
     Re-targeting is CONFIRMED and on by default, on both pools it has been
     measured against: +17.13 Elo [+12.36, +21.91] over 1522 paired full games
     on the 19-setup pool, and +29.63 Elo [+23.46, +35.83] over 1187 pairs on
-    the 87-setup one. It grows with the pool, as it should. Both magnitudes
-    predate the handoff turn-order fix; see the note above DEFAULT_POOL.
+    the 87-setup one. It grows with the pool, as it should. Both of those are
+    PRE-FIX readings; the 87-setup pool has since been re-measured through the
+    corrected handoff at +24.63 Elo [+18.06, +31.22]. See DEFAULT_POOL.
 
     The setup-only screen had scored it negative, and both readings are
     correct about what they measured. Re-targeting does give up a forced
