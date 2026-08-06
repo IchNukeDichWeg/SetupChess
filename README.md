@@ -160,6 +160,13 @@ Both are resumable; Ctrl-C checkpoints and exits cleanly.
   A bigger pool gives the best response more to choose from. `--no-pool`
   disables it. Teaching the matrix about the placement phase is the open work
   here, and would probably recover that forced mate on top.
+* **Both re-targeting numbers predate the handoff turn-order fix below.**
+  `match.py` plays from `handoff_fen()`, which used to hand White the move
+  unconditionally, so every pair ran a tempo out of step with a real game.
+  The pairing is untouched (both arms had the identical wrong tempo) so the
+  sign and the pool ordering stand, but the magnitudes need a re-run to be
+  quoted against the shipping code. The champion gate does not share this:
+  `arena.py` goes through `setup_fen()`, which did not change.
 * ~~One rule is assumed~~ **Verified on the live board 2026-08-05**: a king
   may not be placed onto an attacked square, and non-king pieces may. The
   lockout tactic rests on real rules, not an assumption.
