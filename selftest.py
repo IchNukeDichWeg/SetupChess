@@ -140,6 +140,56 @@ def test_validate_fen():
           "%d-piece wall" % (len(cases), len(legal), 42))
 
 
+def test_bot_policy():
+    """The two behaviours docs/BOT_MODEL.md actually measures."""
+    # the +100*Y king clause, against every value read off their console
+    for names, want in ((("a1", "h1"), 450.0), (("a2", "b1", "g1"), 400.0),
+                        (("d1", "e1"), 300.0)):
+        for n in names:
+            got = play.bot_king_bonus(chess.parse_square(n))
+            if got != want:
+                fail("bot king bonus on %s is %.2f, their console said %.2f"
+                     % (n, got, want))
+
+    # king FIRST and in a corner, both colours. Observed live: the bot answered
+    # our Ba1 with @Ka8, taking the corner the bishop had not denied.
+    for color in (chess.WHITE, chess.BLACK):
+        s = rules.SetupState()
+        if color == chess.BLACK:
+            s.place(chess.BISHOP, chess.A1)
+        pt, sq = play.BotDrafter(color).choose(s)
+        if pt != chess.KING:
+            fail("bot did not place its king first as %s (played %s)"
+                 % (chess.COLOR_NAMES[color], chess.piece_name(pt)))
+        corners = ((chess.A1, chess.H1) if color == chess.WHITE
+                   else (chess.A8, chess.H8))
+        if sq not in corners:
+            fail("bot king went to %s, not a corner" % chess.square_name(sq))
+
+    # material is absent from their setup sum and the bias favours cheap
+    # pieces, so the army must drift to pawns and knights. This is the oracle
+    # that caught an unnormalised mobility term spending all 39 on queens.
+    s = rules.SetupState()
+    bot = play.BotDrafter(chess.WHITE)
+    for _ in range(200):
+        if s.result or s.done(chess.WHITE):
+            break
+        s.place(*bot.choose(s))
+        s.turn = chess.WHITE          # solo drafting; no opponent to alternate
+    counts = {}
+    for sq, piece in s.board.piece_map().items():
+        counts[piece.piece_type] = counts.get(piece.piece_type, 0) + 1
+    cheap = counts.get(chess.PAWN, 0) + counts.get(chess.KNIGHT, 0)
+    dear = sum(counts.get(pt, 0) for pt in
+               (chess.BISHOP, chess.ROOK, chess.QUEEN))
+    if dear or cheap < 20:
+        fail("bot army is not pawns and knights: %r" % counts)
+    print("PASS: bot policy matches its 7 measured king-bonus values, opens "
+          "with the king in a corner both colours, and drafts %d pawns and "
+          "%d knights with nothing expensive"
+          % (counts.get(chess.PAWN, 0), counts.get(chess.KNIGHT, 0)))
+
+
 def test_setup_game():
     # Replay of the checkmate-during-setup observed on the live analysis
     # board (docs/RULES.md): 1.@Qd1 @Qd8 2.@Pa2 @Ke6 3.@Qe1 is mate - the
@@ -1031,6 +1081,7 @@ def main():
     rng = random.Random(args.seed)
     test_armies(args.armies, rng)
     test_validate_fen()
+    test_bot_policy()
     test_setup_game()
     test_pool(rng)
     test_arena_units()

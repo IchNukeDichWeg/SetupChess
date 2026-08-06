@@ -134,7 +134,7 @@ so python-chess with the rights stripped is the reference.
 | `solve.py` | equilibrium mix, best response, exploitability |
 | `expand.py` | the double-oracle pool expansion loop |
 | `stats.py` | Elo, confidence intervals, SPRT |
-| `play.py` | drafts an army and plays the game out |
+| `play.py` | drafts an army and plays the game out; `--opponent bot` is chess.com's own setup policy |
 | `match.py` | paired full-game A/B for a drafting change |
 | `duel.py` | engine versus engine over setup positions |
 | `Constants.h`, `movegen.c`, `eval.c`, `search.c` | the C core |

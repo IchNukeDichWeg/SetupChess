@@ -83,6 +83,18 @@ plausible part of why the solved mix scores 0.93 against hand-written armies.
 * **Their king square is known from move one**, and it is a corner. Setup
   check and mate pressure has a fixed target from the start rather than
   needing to wait for the king to appear.
+* **It is implemented**, as `play.BotDrafter`, reachable with
+  `play.py --opponent bot`. Only the king clause and the piece bias above are
+  measured; the coord, pinned, discovs, checkable, exposed and hill terms are
+  ABSENT, and mobility and king safety are generic counts carrying the halving
+  and doubling this file records. Both positional terms are normalised first,
+  because the residual above puts their whole non-king sum inside roughly
+  +/-2: feeding raw counts in made a queen worth +10 of mobility, which
+  swamped the measured bias and had the policy spending all 39 points on
+  queens -- the exact opposite of the drift this file predicts.
+* **What it drafts**: king to a corner, then 16 pawns and 7 knights, 39 points
+  spent, 24 pieces. Against our champion that is 40 pieces on the board, over
+  Stockfish's ceiling, so the chess phase has to be refereed by our own C core.
 * **Unverified here**: whether the live opponents in the pool are this bot or
   humans. Everything above is the bot's behaviour, read from its code and
   confirmed against its own debug output. It is not a claim about the human

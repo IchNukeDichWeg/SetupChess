@@ -331,6 +331,107 @@ class Drafter:
         return max(legal, key=lambda t: rules.PIECE_COST[t[0]])
 
 
+# chess.com's own setup policy, from docs/BOT_MODEL.md. Only the king clause
+# and the piece-type bias are measured from the shipped client; the weights
+# below reproduce the SHAPE the model pins down (mobility halved, king safety
+# doubled during setup, material absent entirely) and nothing more.
+BOT_PIECE_BIAS = {chess.PAWN: 0.2, chess.KNIGHT: 0.0, chess.BISHOP: -0.2,
+                  chess.QUEEN: -0.3, chess.ROOK: -0.4}
+BOT_KING_WEIGHT = 100.0
+BOT_MOBILITY_WEIGHT = 0.5
+BOT_KING_SAFETY_WEIGHT = 2.0
+
+# Both positional terms are NORMALISED before their weights, and the reason is
+# a measurement: docs/BOT_MODEL.md reads a residual of -2.31 between the
+# predicted 450.00 king bonus and the observed 447.69, so the entire rest of
+# their setup sum lives inside roughly +/-2. Feeding raw counts in breaks that
+# badly -- 0.5 * a queen's 20-odd attacked squares is +10, which swamps the
+# measured piece bias (span 0.6) and inverts the model's headline behaviour.
+# Unnormalised, this policy spent all 39 points on queens; the model says it
+# should drift toward pawns and knights, and that behaviour is the oracle here.
+BOT_MOBILITY_MAX = 27   # a queen's maximum attacked squares
+BOT_EXPOSURE_MAX = 9    # the king's square plus its eight neighbours
+
+# The four squares their king clause measures distance FROM: engine 14x14
+# g7 g8 h7 h8, which is the 8x8 board embedded at offset +3, so d4 d5 e4 e5.
+BOT_CENTRE = (chess.D4, chess.D5, chess.E4, chess.E5)
+
+
+def bot_king_bonus(sq):
+    """+100*Y, Y = (dx+dy)/2 + max(dx,dy)/2 to the nearest centre square.
+
+    Rewards being FAR from the centre, so it is maximised in a corner. Checked
+    against the observed console values in docs/BOT_MODEL.md: a1/h1 -> 450.00,
+    a2/b1/g1 -> 400.00, d1/e1 -> 300.00.
+    """
+    best = None
+    for target in BOT_CENTRE:
+        dx = abs(chess.square_file(sq) - chess.square_file(target))
+        dy = abs(chess.square_rank(sq) - chess.square_rank(target))
+        y = (dx + dy) / 2.0 + max(dx, dy) / 2.0
+        best = y if best is None else min(best, y)
+    return BOT_KING_WEIGHT * best
+
+
+class BotDrafter:
+    """chess.com's own setup policy, rebuilt from docs/BOT_MODEL.md.
+
+    MEASURED from the shipped client, and one of the two confirmed live: the
+    king clause is +100*Y (see bot_king_bonus), which at roughly +450 dwarfs
+    every other term and so places the king in a corner on the very first
+    placement -- observed live, where the bot answered our Ba1 with @Ka8,
+    taking the corner our bishop had not denied. And the piece-type bias runs
+    Pawn +0.2, Knight 0, Bishop -0.2, Queen -0.3, Rook -0.4, with material
+    absent from the setup sum entirely, so it has no reason to buy expensive
+    pieces and drifts toward pawns and knights.
+
+    APPROXIMATION, named because it changes what a gate against this means:
+    their setup eval also carries coord, pinned, discovs, checkable, exposed
+    and hill terms whose formulas docs/BOT_MODEL.md does not pin down, and
+    those are simply ABSENT here. What is reproduced is the shape the model
+    does pin down -- mobility halved, king safety doubled -- computed from
+    generic attack counts rather than from their code. A faithful skeleton,
+    not a clone.
+
+    Deliberately DETERMINISTIC: given the same position it makes the same
+    placement, which is what their eval does too. That means a gate against it
+    draws one setup per colour and all the variety has to come from the chess
+    phase. Seeded tie-breaking is the upgrade path if that ever matters.
+    """
+
+    def __init__(self, color):
+        self.color = color
+
+    def _score(self, state, pt, sq):
+        board = state.board
+        board.set_piece_at(sq, chess.Piece(pt, self.color))
+        try:
+            mobility = len(board.attacks(sq))
+            king = board.king(self.color)
+            exposure = 0
+            if king is not None:
+                for around in chess.SquareSet(
+                        chess.BB_KING_ATTACKS[king] | (1 << king)):
+                    exposure += len(board.attackers(not self.color, around))
+        finally:
+            board.remove_piece_at(sq)
+        return (BOT_MOBILITY_WEIGHT * (mobility / BOT_MOBILITY_MAX)
+                - BOT_KING_SAFETY_WEIGHT * (exposure / BOT_EXPOSURE_MAX)
+                + BOT_PIECE_BIAS[pt])
+
+    def choose(self, state):
+        legal = state.legal_placements()
+        if not legal:
+            raise ValueError("no legal placement for %s"
+                             % chess.COLOR_NAMES[self.color])
+        kings = [(pt, sq) for pt, sq in legal if pt == chess.KING]
+        if kings:
+            # the king clause is ~+450 against +/-2 for everything else, so
+            # while a king placement is available nothing else can win
+            return max(kings, key=lambda t: bot_king_bonus(t[1]))
+        return max(legal, key=lambda t: self._score(state, *t))
+
+
 class StdinDrafter:
     """Reads the opponent's placements as `@Qd1` tokens, one per line."""
 
@@ -521,7 +622,9 @@ def main():
                     help="our army: champion JSON path or archetype name "
                          "(default: %(default)s)")
     ap.add_argument("--opponent", default="classic",
-                    help="their army: path, archetype name, or 'stdin'")
+                    help="their army: path, archetype name, 'stdin', or "
+                         "'bot' for chess.com's own setup policy "
+                         "(docs/BOT_MODEL.md)")
     ap.add_argument("--engine", default="stockfish")
     ap.add_argument("--fallback-engine", default="./cuci.py",
                     help="used only for positions the primary engine cannot "
@@ -589,6 +692,8 @@ def main():
                          hunt_when=args.hunt_when)
             if args.opponent == "stdin":
                 them = StdinDrafter(not color)
+            elif args.opponent == "bot":
+                them = BotDrafter(not color)
             else:
                 them = Drafter(load_army(args.opponent), not color)
             drafters = {color: us, not color: them}
