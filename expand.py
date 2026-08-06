@@ -116,7 +116,11 @@ def _on_sigint(*_args):
             pass
     arena.stop_pool()
     print("\ninterrupted -- progress saved to the last checkpoint; re-run the "
-          "same command to resume", flush=True)
+          "same command to resume.\nA \"leaked semaphore objects\" warning "
+          "may follow: it is EXPECTED, not an error, and nothing was lost. "
+          "Leaving\nvia os._exit is what stops one engine per core surviving "
+          "the interrupt; the cost is that\nmultiprocessing never unlinks its "
+          "own locks and the resource tracker says so.", flush=True)
     os._exit(130)
 
 
