@@ -75,9 +75,16 @@ def validate_army(army, color=chess.WHITE):
 def setup_fen(white_army, black_army):
     """Handoff FEN for two completed armies, each in its own perspective.
 
-    White to move, no castling, no en passant - per docs/RULES.md this is an
-    ordinary chess position (rank-3 pawns lose their double-step in normal
-    chess anyway). Run the result through validate_fen before any engine.
+    No castling, no en passant - per docs/RULES.md this is an ordinary chess
+    position (rank-3 pawns lose their double-step in normal chess anyway).
+    Run the result through validate_fen before any engine.
+
+    White to move BY CONVENTION, which is a modelling choice, not the rule:
+    in a real game whoever follows the final placement moves first (see
+    SetupState.handoff_fen). Two finished armies carry no placement order, so
+    there is nothing to derive it from. Every caller here is a pairwise
+    matchup that plays both colours, so the free tempo goes to each side once
+    and cancels in the pair. Use handoff_fen for anything driving a real game.
     """
     board = chess.Board(None)
     for pt, sq in white_army:
@@ -241,14 +248,28 @@ class SetupState:
             if not (opp == chess.WHITE and self.points[opp] == 0):
                 self.result = "1-0" if placer == chess.WHITE else "0-1"
                 return
-        for nxt in (opp, placer):
-            if not self.done(nxt):
-                self.turn = nxt
-                return
-        # both done -> setup complete, handoff_fen() is now valid
+        # Strict alternation, always. A side with nothing left to place PASSES
+        # rather than being skipped, which is exactly what the server records:
+        # a live game showed "11. @Bf3 P / 12. @Bg2 P / ..." with White
+        # placing alone and Black passing on every one of its turns.
+        #
+        # The parity this produces is load-bearing. When both sides are done
+        # the turn still advances, so the CHESS PHASE STARTS WITH THE SIDE
+        # AFTER THE LAST PLACEMENT -- not with White. Observed live: White
+        # placed 16th and last, and Black opened the game with Qh3+.
+        self.turn = opp
+        if not self.complete and self.done(opp):
+            self.turn = placer          # they pass, we place again
 
     def handoff_fen(self):
+        """The position to hand an engine, with the correct side to move.
+
+        NOT always White. See place(): the placement turns keep alternating
+        through the passes, so whoever follows the final placement moves
+        first. Getting this wrong hands the engine a position a tempo out of
+        step, which is how a real game was lost before this was measured.
+        """
         if not self.complete:
             raise ValueError("setup not complete")
-        self.board.turn = chess.WHITE
+        self.board.turn = self.turn
         return self.board.fen()

@@ -215,6 +215,34 @@ def test_setup_game():
     if s.turn != chess.BLACK:
         fail("turn left Black while only Black had points")
 
+    # THE SIDE TO MOVE AFTER SETUP IS NOT ALWAYS WHITE. Replay of a real game
+    # driven against chess.com's own bot on 2026-08-05: White placed 16th and
+    # last, Black had been passing since move 11, and Black opened the chess
+    # phase with Qh3+. handoff_fen() used to hardcode White, which hands an
+    # engine a position a tempo out of step.
+    live = [("B", "a1"), ("K", "a8"), ("B", "c1"), ("P", "a6"),
+            ("B", "d1"), ("B", "c6"), ("B", "g1"), ("P", "b6"),
+            ("B", "e2"), ("Q", "c8"), ("B", "b3"), ("Q", "a7"),
+            ("B", "c3"), ("Q", "b7"), ("B", "d2"), ("P", "g7"),
+            ("B", "c2"), ("P", "h7"), ("K", "h2"), ("R", "b8"),
+            ("B", "f3"), ("B", "g2"), ("B", "b2"), ("P", "f2"),
+            ("P", "g3"), ("P", "a2")]
+    s = rules.SetupState()
+    for sym, name in live:
+        s.place(chess.PIECE_SYMBOLS.index(sym.lower()), chess.parse_square(name))
+    if not s.complete:
+        fail("the live game did not complete")
+    if s.turn != chess.BLACK:
+        fail("side to move after the live setup is %s, the server had black"
+             % chess.COLOR_NAMES[s.turn])
+    want = "krq5/qq4pp/ppb5/8/8/1BB2BP1/PBBBBPBK/B1BB2B1 b - - 0 1"
+    if s.handoff_fen() != want:
+        fail("handoff FEN is\n  %s\nthe server had\n  %s"
+             % (s.handoff_fen(), want))
+    board = chess.Board(s.handoff_fen())
+    if not any(board.san(m) == "Qh3+" for m in board.legal_moves):
+        fail("Qh3+, the move the bot actually played, is not legal in our FEN")
+
     # many random games terminate in either a handoff or a setup mate
     mates = handoffs = 0
     for seed in range(60):

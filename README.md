@@ -163,6 +163,19 @@ Both are resumable; Ctrl-C checkpoints and exits cleanly.
 * ~~One rule is assumed~~ **Verified on the live board 2026-08-05**: a king
   may not be placed onto an attacked square, and non-king pieces may. The
   lockout tactic rests on real rules, not an assumption.
+* **The chess phase does not always start with White**, which cost a live game
+  before it was measured. A finished side *passes* rather than being skipped
+  (the server writes `P` in the move list), so the turns keep alternating and
+  whoever follows the final placement moves first. Verified over a full
+  26-placement game against chess.com's own bot: White placed last, Black
+  opened with `Qh3+`, and our FEN matched the server's byte for byte.
+  `handoff_fen()` is the only correct source for this; `setup_fen()` gives
+  White the move by convention because two finished armies carry no placement
+  order.
+* **The payoff matrix therefore always hands White the tempo**, while a real
+  game hands it to whichever side the placement count lands on. Both colours
+  are played in every pair so it cancels in aggregate, but the armies were
+  never selected for the parity they will actually get. Unmeasured.
 * **The pool is finite.** 87 armies after 21 expansion rounds, and it stopped
   because it filled rather than because it converged: at `--max-pool` every
   further round only prunes and re-admits at rising cost while exploitability

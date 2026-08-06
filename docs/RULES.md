@@ -10,6 +10,7 @@ explicit `ASSUMPTION:` line.
 | [DLG] | Official variant dialog at <https://www.chess.com/variants/setup-chess> (game-start popup, read 2026-08-04) |
 | [AB] | Empirical tests performed on the official analysis board <https://www.chess.com/variants/setup-chess/analysis> (2026-08-04; each claim names the test) |
 | [HDR] | PGN4 / `StartFen4` header emitted by that analysis board: `{'setupPoints':(39,0,39,0),'pawnBaseRank':5,'dim':'8x8','bank':('rP,rB,rN,rR,rQ,rK',...)}`, `[RuleVariants "EnPassant Play4Mate Setup=39"]` |
+| [LIVE] | A full setup phase played out against chess.com's own bot on the analysis board (2026-08-05), 26 placements, relayed move by move through `play.py --live`; the resulting FEN matched the server's byte for byte |
 | [NEWS] | Official launch announcement <https://www.chess.com/news/view/chesscom-launches-duck-seirawan-setup-chess> |
 | [ENG] | Live variants client engine <https://www.chess.com/r2/client-packages/variants/2026.8.1/variants.js> (minified; quotes are the relevant expressions) |
 | [ENG22] | Archived 2022 build of the same client, <https://web.archive.org/web/20221012141324js_/https://www.chess.com/bundles/app/js/variants-beta.client.ad2146db.js> -- used only where [ENG] agrees |
@@ -41,8 +42,8 @@ announcement, shipped engine code, and behaviour observed directly);
 
 * Players place **one piece per turn, alternating, White first**: W, B, W, B… [NEWS] "They take turns setting up the initial position of their pieces, spending their material points in any way they want."; [DLG] "players set up their pieces and pawns, one by one"; [AB: after each White placement the turn indicator switched to Black and back]
 * Placements are **recorded as moves in the shared move list** (notation `@Qd1`, `@Ke8` …) and are therefore **visible to the opponent as they happen**. This is a perfect-information placement game, not hidden/simultaneous. [AB: move list `1. @Qd1 @Qd8 2. @Pa2 @Ke6 3. @Qe1+#`; NEWS; BLOG describes reacting to the opponent's placements]
-* No normal move may be played until both players have finished spending. [AB: mid-setup move rejected] Then play proceeds as ordinary chess with **White to move**. [NEWS "After both players have spent their points, they play the game normally."; AB]
-* ASSUMPTION: if one player finishes (or forfeits) their points before the other, the other continues placing consecutively. Untested directly (both test armies finished together), but it is the only behaviour consistent with per-player forfeiture [ENG22]. `play.py` will follow the server's turn signal rather than assume.
+* No normal move may be played until both players have finished spending. [AB: mid-setup move rejected] Then play proceeds as ordinary chess **with the side after the last placement to move -- NOT always White**. [LIVE, 2026-08-05: White placed 16th and last (`16. @Pa2`) and Black immediately answered `Qh3+`, a chess move. The alternation below runs through the passes, so the parity of the total placement count decides who opens.] Sources say only "they play the game normally" [NEWS], which is where the White-to-move guess came from.
+* **A finished player passes; the other does not get consecutive turns.** [LIVE, 2026-08-05: the server move list reads `11. @Bf3 P  12. @Bg2 P  13. @Bb2 P  14. @Pf2 P  15. @Pg3 P  16. @Pa2 Qh3+` -- White places alone and Black is recorded as `P` on every one of its turns.] This was previously an ASSUMPTION of consecutive placement; the board state is identical either way, but the turn parity at handoff is not, which is why it mattered.
 
 ## Setup-phase tactics (load-bearing and easy to miss)
 
