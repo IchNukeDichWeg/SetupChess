@@ -43,6 +43,28 @@ Four losses in 1,820 games. Read that as "much better than hand-written
 guesses", not "strong": the archetype field includes deliberately bad armies
 and one of them scores 0.016. See [Known limits](#known-limits).
 
+**It holds at ten times the depth.** Re-gated at 200,000 nodes, the champion
+army alone against the same archetype field:
+
+```
+Pairs   | 440 of 480 (archetype 3 unplayable, all 40 pairs)
+Score   | 0.9324 +/- 0.0126
+Pairs   | 341 swept / 79 at 0.75 / 20 drawn / 0 lost
+Elo     | +455.82 +/- 35.0   [+423.88, +493.83]
+SPRT    | [0,4] LLR +60.252 -> ACCEPT H1
+TC      | 200,000 nodes fixed, 15% per-game jitter
+Machine | Mac14,9 arm64, macOS, Stockfish 17, 10 workers
+```
+
+Not one pair lost in 880 games. Solving the 13-army matrix at this depth puts
+**all the equilibrium weight on the champion**, exploitability 0.0000, so it is
+a best response to the whole archetype field and not merely a good average.
+
+This is not a clean difference against the +462 above, and the two must not be
+subtracted: that gate sampled the *solved mix*, this one plays the *champion
+army alone*, so the army and the depth both changed. The depth-only comparison
+needs the same pool re-run at 20,000 nodes, which has not been done.
+
 ## The setup phase has real tactics
 
 Two ways the game ends before a single move is played, both verified against
@@ -149,11 +171,18 @@ Both are resumable; Ctrl-C checkpoints and exits cleanly.
 * **9% of gate pairs are unmeasured**, and more games will not fix it. Those
   are the highest-piece-count matchups that Stockfish cannot survive. It is a
   coverage gap, not noise.
-* **The champion gate is 20,000 nodes only.** Whether twelve bishops still
-  dominate at a longer time control is untested, and Stockfish may simply be
-  mishandling unusual material. Re-targeting is the one thing that HAS been
-  measured deeper -- see below -- and it held, but that says nothing about the
-  armies themselves.
+* ~~The champion gate is 20,000 nodes only~~ **now also measured at 200,000**:
+  the champion scores 0.9324, +455.82 [+423.88, +493.83], and the 13-army
+  equilibrium is pure on it. Twelve bishops are not a shallow-search artifact.
+  Two caveats stand. The 200k run plays the champion alone while the +462 gate
+  sampled the solved mix, so the numbers are not differenceable and the
+  depth-only question needs the same pool at 20,000 nodes. And the field is
+  still the same twelve hand-written archetypes, so a deeper search has only
+  confirmed dominance over weak opposition, not over strong.
+* **One whole archetype is missing from the depth gate.** Archetype 3 lost all
+  40 of its pairs to Stockfish's piece ceiling, so 11 of 12 opponents are
+  measured rather than a scattered 9%. Only one archetype offers real
+  resistance at depth (0.6312); the rest sit above 0.87.
 * **Best-response re-targeting still gives up a forced setup mate**, because
   the payoff matrix is measured by playing the *chess* phase from finished
   armies and cannot see setup tactics. It is on anyway, and CONFIRMED on the
