@@ -60,10 +60,21 @@ Not one pair lost in 880 games. Solving the 13-army matrix at this depth puts
 **all the equilibrium weight on the champion**, exploitability 0.0000, so it is
 a best response to the whole archetype field and not merely a good average.
 
-This is not a clean difference against the +462 above, and the two must not be
-subtracted: that gate sampled the *solved mix*, this one plays the *champion
-army alone*, so the army and the depth both changed. The depth-only comparison
-needs the same pool re-run at 20,000 nodes, which has not been done.
+Still not differenceable against the +462 above -- that gate sampled the
+*solved mix*, this one plays the *champion army alone* -- so the same pool was
+re-run at 20,000 nodes to isolate depth. **Depth changes nothing:**
+
+```
+20k    | 0.9301   +449.66 [+418.62, +486.36]
+200k   | 0.9324   +455.82 [+423.88, +493.83]
+Paired | +0.0023 +/- 0.0129 over 440 identically-indexed pairs
+Games  | 122 of 440 pairs came out differently
+```
+
+Both node counts put the entire equilibrium on the champion, exploitability
+0.0000, and both drop archetype 3 for the same piece-count reason. A tenth of
+the search buys the same verdict, so the remaining gap between +449.66 and
++462.06 is the mix-versus-champion difference, not depth.
 
 ## The setup phase has real tactics
 
@@ -174,11 +185,11 @@ Both are resumable; Ctrl-C checkpoints and exits cleanly.
 * ~~The champion gate is 20,000 nodes only~~ **now also measured at 200,000**:
   the champion scores 0.9324, +455.82 [+423.88, +493.83], and the 13-army
   equilibrium is pure on it. Twelve bishops are not a shallow-search artifact.
-  Two caveats stand. The 200k run plays the champion alone while the +462 gate
-  sampled the solved mix, so the numbers are not differenceable and the
-  depth-only question needs the same pool at 20,000 nodes. And the field is
-  still the same twelve hand-written archetypes, so a deeper search has only
-  confirmed dominance over weak opposition, not over strong.
+  The depth-only comparison is now done on a matched pool and comes out flat:
+  +0.0023 +/- 0.0129 over 440 identically-indexed pairs. One caveat stands,
+  and it is the important one: the field is still the same twelve hand-written
+  archetypes, so a deeper search has only confirmed dominance over weak
+  opposition. Depth was never the weak link in that claim -- the field is.
 * **One whole archetype is missing from the depth gate.** Archetype 3 lost all
   40 of its pairs to Stockfish's piece ceiling, so 11 of 12 opponents are
   measured rather than a scattered 9%. Only one archetype offers real
