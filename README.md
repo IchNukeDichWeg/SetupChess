@@ -149,9 +149,11 @@ Both are resumable; Ctrl-C checkpoints and exits cleanly.
 * **9% of gate pairs are unmeasured**, and more games will not fix it. Those
   are the highest-piece-count matchups that Stockfish cannot survive. It is a
   coverage gap, not noise.
-* **Everything is at 20,000 nodes.** Whether nine bishops still dominate at a
-  longer time control is untested, and Stockfish may simply be mishandling
-  unusual material.
+* **The champion gate is 20,000 nodes only.** Whether twelve bishops still
+  dominate at a longer time control is untested, and Stockfish may simply be
+  mishandling unusual material. Re-targeting is the one thing that HAS been
+  measured deeper -- see below -- and it held, but that says nothing about the
+  armies themselves.
 * **Best-response re-targeting still gives up a forced setup mate**, because
   the payoff matrix is measured by playing the *chess* phase from finished
   armies and cannot see setup tactics. It is on anyway, and CONFIRMED on the
@@ -168,6 +170,13 @@ Both are resumable; Ctrl-C checkpoints and exits cleanly.
   +17.13 [+12.36, +21.91] has NOT been re-run** and is still a pre-fix number.
   The champion gate never shared the problem: `arena.py` goes through
   `setup_fen()`, which did not change.
+* **Re-targeting survives a 10x deeper search**, which is the only longer-TC
+  result in the repo. At 200,000 nodes on the same 1,187 pairs it measures
+  **+29.93 Elo [+23.66, +36.21]**, LLR +11.037 -> ACCEPT H1, against +24.63
+  [+18.06, +31.22] at 20,000. The ranges overlap, so the honest reading is
+  "no measured decay with depth", not "it gets better". 409 of the 1,187 pairs
+  came out differently at the deeper search, so the two are genuinely separate
+  instruments and are not pooled.
 * ~~One rule is assumed~~ **Verified on the live board 2026-08-05**: a king
   may not be placed onto an attacked square, and non-king pieces may. The
   lockout tactic rests on real rules, not an assumption.

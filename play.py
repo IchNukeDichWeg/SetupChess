@@ -75,6 +75,12 @@ HUNT_THEIR_POINTS = 12
 # not been re-run. The champion gate never shared the problem: arena.py goes
 # through setup_fen(), which did not change.
 #
+# Also measured at 10x the depth, the only longer-TC result in the repo: at
+# 200,000 nodes over the same 1,187 pairs it is +29.93 Elo [+23.66, +36.21],
+# LLR +11.037 -> ACCEPT H1, with 409 pairs coming out differently. Overlapping
+# ranges, so read it as "no decay with depth" rather than as an improvement.
+# Separate instrument, separate state file, never pooled with the 20k run.
+#
 # The pool and the target move TOGETHER and must stay consistent: re-targeting
 # only considers armies inside the pool, so a target that is not a member gets
 # abandoned on the first placement. The 87-setup pool's champion also beat the
