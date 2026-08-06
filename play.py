@@ -316,6 +316,7 @@ class StdinDrafter:
         self.color = color
 
     def choose(self, state):
+        print("their placement? ", end="", flush=True)
         line = sys.stdin.readline()
         if not line:
             raise SystemExit("opponent stream closed mid-setup")
@@ -324,6 +325,87 @@ class StdinDrafter:
             return self.choose(state)
         pt = chess.PIECE_SYMBOLS.index(tok[0].lower())
         return pt, chess.parse_square(tok[1:3].lower())
+
+
+def _read_move(board):
+    """One opponent move from stdin, in UCI or SAN. Rejects illegal input."""
+    while True:
+        print("their move? ", end="", flush=True)
+        line = sys.stdin.readline()
+        if not line:
+            raise SystemExit("opponent stream closed mid-game")
+        tok = line.strip()
+        if not tok:
+            continue
+        for parse in (board.parse_uci, board.parse_san):
+            try:
+                return parse(tok)
+            except ValueError:
+                continue
+        print("  not a legal move here: %r" % tok, flush=True)
+
+
+def live(ours, color, engine, nodes, fallback=None, pool=None, matrix=None,
+         hunt_when=HUNT_WHEN):
+    """Drive one real game against a human-relayed opponent.
+
+    Prints what to place or play as soon as it is decided, and asks for theirs.
+    Without this, --opponent stdin was unusable for an actual game: it read
+    their placements but never announced ours, and the chess phase had the
+    engine moving BOTH sides so it never read their moves at all.
+
+    Output lines are prefixed so a relay can be scripted later:
+      PLACE @Bd1     put this on the board
+      MOVE  e2e4     play this
+      FEN   ...      the handoff position
+      RESULT ...     how it ended
+    """
+    us = Drafter(ours, color, pool=pool, matrix=matrix, hunt_when=hunt_when)
+    them = StdinDrafter(not color)
+    state = rules.SetupState()
+    drafters = {color: us, not color: them}
+
+    print("we are %s. placements first, one per line, like @Qd1"
+          % chess.COLOR_NAMES[color], flush=True)
+    for _ in range(200):
+        if state.result or state.complete:
+            break
+        mover = state.turn
+        pt, sq = drafters[mover].choose(state)
+        state.place(pt, sq)
+        token = "@%s%s" % (chess.piece_symbol(pt).upper(), chess.square_name(sq))
+        if mover == color:
+            print("PLACE %s   (%d points left)"
+                  % (token, state.points[color]), flush=True)
+    if state.result:
+        print("RESULT %s  (decided in the placement phase)" % state.result,
+              flush=True)
+        return state.result
+
+    fen = state.handoff_fen()
+    ok, why = rules.validate_fen(fen)
+    if not ok:
+        raise SystemExit("refusing to play an invalid position: %s" % why)
+    print("FEN   %s" % fen, flush=True)
+    board = chess.Board(fen)
+    picked, note = pick_engine(fen, engine, fallback)
+    if note:
+        print("using the %s" % note, flush=True)
+
+    limit = chess.engine.Limit(nodes=nodes)
+    while not board.is_game_over(claim_draw=True) and board.ply() < 400:
+        if board.turn == color:
+            mv = picked.play(board, limit).move
+            if mv is None:
+                break
+            print("MOVE  %s   (%s)" % (mv.uci(), board.san(mv)), flush=True)
+            board.push(mv)
+        else:
+            board.push(_read_move(board))
+    outcome = board.outcome(claim_draw=True)
+    result = outcome.result() if outcome else "unfinished"
+    print("RESULT %s" % result, flush=True)
+    return result
 
 
 def draft(white, black, log=None):
@@ -416,6 +498,9 @@ def main():
                     help="disable best-response re-targeting")
     ap.add_argument("--hunt-when", type=int, default=HUNT_WHEN,
                     help="hunt an unplaced enemy king at this many safe squares")
+    ap.add_argument("--live", action="store_true",
+                    help="drive one real game: prints PLACE/MOVE lines as they "
+                         "are decided and reads the opponent's from stdin")
     ap.add_argument("--out", help="write the game log here (no default)")
     args = ap.parse_args()
 
@@ -430,6 +515,22 @@ def main():
     if args.pool:
         armies, matrix = load_pool(args.pool)
         print("best-response enabled over %d pool armies" % len(armies))
+
+    if args.live:
+        if args.color == "both":
+            sys.exit("--live needs --color white or --color black")
+        engine = chess.engine.SimpleEngine.popen_uci(args.engine)
+        fb = (chess.engine.SimpleEngine.popen_uci(args.fallback_engine)
+              if args.fallback_engine else None)
+        try:
+            live(ours, chess.WHITE if args.color == "white" else chess.BLACK,
+                 engine, args.nodes, fallback=fb, pool=armies, matrix=matrix,
+                 hunt_when=args.hunt_when)
+        finally:
+            engine.quit()
+            if fb is not None:
+                fb.quit()
+        return
 
     colors = ({"white": [chess.WHITE], "black": [chess.BLACK],
                "both": [chess.WHITE, chess.BLACK]})[args.color]
