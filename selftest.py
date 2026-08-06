@@ -192,9 +192,11 @@ def test_setup_game():
     if any(sq != chess.E6 for _, sq in replies):
         fail("reply to a setup check that does not block it")
 
-    # a finished side is skipped: White spends all 39 points on queens and
-    # pawns while Black buys one cheap pawn per turn, so White runs out
-    # first and Black must keep placing alone.
+    # a finished side passes and the other keeps placing: White spends all 39
+    # points on queens and pawns while Black buys one cheap pawn per turn, so
+    # White runs out first and Black places alone from there. The board state
+    # is what a "skip" would produce; the difference is only visible in the
+    # turn parity once BOTH sides finish (see the live regression below).
     s = rules.SetupState()
     s.place(chess.KING, chess.E1)
     s.place(chess.KING, chess.E8)
@@ -208,12 +210,12 @@ def test_setup_game():
     if s.points[chess.WHITE] != 0:
         fail("White did not spend its budget (%d left)" % s.points[chess.WHITE])
     if not s.done(chess.WHITE) or s.turn != chess.BLACK:
-        fail("finished White was not skipped")
+        fail("the turn did not pass through a finished White")
     if s.complete:
         fail("setup reported complete while Black still has points")
     s.place(chess.PAWN, chess.square(7, 6))
     if s.turn != chess.BLACK:
-        fail("turn left Black while only Black had points")
+        fail("turn left Black while only Black could still place")
 
     # A check the placer cannot be answered is mate ONLY while the placer
     # still has resources. If the placer finishes on the checking placement,
