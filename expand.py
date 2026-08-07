@@ -124,8 +124,7 @@ def _on_sigint(*_args):
     os._exit(130)
 
 
-def run_pairs(tasks, engine_path, workers, cells, label, on_save=None,
-              max_pieces=None):
+def run_pairs(tasks, pool, cells, label, on_save=None):
     """Play a list of arena tasks into `cells`, checkpointing as they land.
 
     `cells` is a plain dict rather than the state, because screening runs
@@ -138,24 +137,22 @@ def run_pairs(tasks, engine_path, workers, cells, label, on_save=None,
     _CHECKPOINT = (lambda: on_save(cells)) if on_save else None
     done = errors = unplayable = 0
     start = time.time()
-    with mp.Pool(workers, initializer=arena.worker_init,
-                 initargs=(engine_path, max_pieces)) as p:
-        for i, j, g, score, info in p.imap_unordered(arena.play_cell, tasks):
-            done += 1
-            if score == "unplayable":
-                unplayable += 1
-                cells[(i, j, g)] = None
-            elif score is None:
-                errors += 1
-            else:
-                cells[(i, j, g)] = score
-            if done % 25 == 0 or done == len(tasks):
-                if on_save:
-                    on_save(cells)
-                rate = done / max(1e-9, time.time() - start)
-                print("    %s %d/%d, %.2f pairs/s, eta %.1f min"
-                      % (label, done, len(tasks), rate,
-                         (len(tasks) - done) / max(rate, 1e-9) / 60))
+    for i, j, g, score, info in pool.imap_unordered(arena.play_cell, tasks):
+        done += 1
+        if score == "unplayable":
+            unplayable += 1
+            cells[(i, j, g)] = None
+        elif score is None:
+            errors += 1
+        else:
+            cells[(i, j, g)] = score
+        if done % 25 == 0 or done == len(tasks):
+            if on_save:
+                on_save(cells)
+            rate = done / max(1e-9, time.time() - start)
+            print("    %s %d/%d, %.2f pairs/s, eta %.1f min"
+                  % (label, done, len(tasks), rate,
+                     (len(tasks) - done) / max(rate, 1e-9) / 60))
     if on_save:
         on_save(cells)
     return unplayable, errors
@@ -337,6 +334,16 @@ def main():
                  % (state["meta"], meta))
     rng = random.Random(args.seed + 1000 * len(state["rounds"]))
 
+    # ONE pool for the whole campaign. A pool per run_pairs call meant a
+    # teardown per seed, per screen and per fill, and Pool.__exit__ joins
+    # handler threads that can block forever: on a live run that stalled at 30
+    # restarts to reach round 7, with the parent at 0% CPU and every worker and
+    # engine already gone. arena.py has always built one pool per run and has
+    # never stalled. This makes expand.py the same shape -- one teardown, at
+    # the very end, after everything is checkpointed.
+    pool = mp.Pool(workers, initializer=arena.worker_init,
+                   initargs=(args.engine, args.max_pieces))
+
     # the seed pool needs a full matrix before the first solve
     armies = [poolmod.from_json(a) for a in state["armies"]]
     idx = list(range(len(armies)))
@@ -349,8 +356,7 @@ def main():
             put_cells(state, cells)
             save_state(args.state, state)
 
-        run_pairs(todo, args.engine, workers, cells_of(state), "seed", persist,
-                  args.max_pieces)
+        run_pairs(todo, pool, cells_of(state), "seed", persist)
 
     loop_start = time.time()
     for rnd in range(len(state["rounds"]), args.rounds):
@@ -428,8 +434,7 @@ def main():
         opponents = sorted(set(support) | set(pinned))
         tasks = cell_tasks(ext, args.screen_pairs, scratch,
                            new_idx, opponents, args.nodes, args.jitter)
-        run_pairs(tasks, args.engine, workers, scratch, "screen",
-                  max_pieces=args.max_pieces)
+        run_pairs(tasks, pool, scratch, "screen")
         scored = screen_scores(scratch, len(ext), new_idx, weights)
         # unweighted mean against the pinned opponents, judged separately
         pin_scored = (screen_scores(scratch, len(ext), new_idx,
@@ -488,8 +493,7 @@ def main():
 
         tasks = cell_tasks(armies, args.pairs, cells_of(state), admitted,
                            list(range(len(armies))), args.nodes, args.jitter)
-        run_pairs(tasks, args.engine, workers, cells_of(state), "fill", persist,
-                  args.max_pieces)
+        run_pairs(tasks, pool, cells_of(state), "fill", persist)
 
         # prune: keep the equilibrium support plus the best of the rest
         weights2, rep2 = solve_pool(state, args.max_holes)
@@ -585,37 +589,35 @@ def main():
     if tasks:
         start = time.time()
         done = 0
-        with mp.Pool(workers, initializer=arena.worker_init,
-                     initargs=(args.engine, args.max_pieces)) as p:
-            it = p.imap_unordered(arena.play_match, tasks)
-            while done < len(tasks):
-                try:
-                    # a worker that dies takes its result with it and the
-                    # iterator would otherwise block forever: 8 of 10 workers
-                    # died once and the run sat silent for 23 minutes. A
-                    # timeout turns that hang into a reported failure.
-                    tag, scores, info = it.next(timeout=600)
-                except mp.TimeoutError:
-                    print("  no result for 10 minutes -- workers have died; "
-                          "%d/%d pairs are saved, re-run to finish"
-                          % (done, len(tasks)), flush=True)
-                    arena.stop_pool()
-                    break
-                done += 1
-                if scores is None:
-                    # record the skip too, or an unplayable pair is retried on
-                    # every resume forever
-                    skipped += 1
-                    gate[int(tag[1:])] = None
-                else:
-                    gate[int(tag[1:])] = list(scores)
-                if done % 20 == 0 or done == len(tasks):
-                    save_gate()
-                    rate = done / max(1e-9, time.time() - start)
-                    print("    gate %d/%d, %.2f pairs/s, eta %.1f min, "
-                          "%d skipped" % (done, len(tasks), rate,
-                                          (len(tasks) - done) / max(rate, 1e-9)
-                                          / 60, skipped), flush=True)
+        it = pool.imap_unordered(arena.play_match, tasks)
+        while done < len(tasks):
+            try:
+                # a worker that dies takes its result with it and the
+                # iterator would otherwise block forever: 8 of 10 workers
+                # died once and the run sat silent for 23 minutes. A
+                # timeout turns that hang into a reported failure.
+                tag, scores, info = it.next(timeout=600)
+            except mp.TimeoutError:
+                print("  no result for 10 minutes -- workers have died; "
+                      "%d/%d pairs are saved, re-run to finish"
+                      % (done, len(tasks)), flush=True)
+                arena.stop_pool()
+                break
+            done += 1
+            if scores is None:
+                # record the skip too, or an unplayable pair is retried on
+                # every resume forever
+                skipped += 1
+                gate[int(tag[1:])] = None
+            else:
+                gate[int(tag[1:])] = list(scores)
+            if done % 20 == 0 or done == len(tasks):
+                save_gate()
+                rate = done / max(1e-9, time.time() - start)
+                print("    gate %d/%d, %.2f pairs/s, eta %.1f min, "
+                      "%d skipped" % (done, len(tasks), rate,
+                                      (len(tasks) - done) / max(rate, 1e-9)
+                                      / 60, skipped), flush=True)
         save_gate()
 
     per_game = [s for k in sorted(gate) if gate[k] for s in gate[k]]
@@ -629,9 +631,30 @@ def main():
     print("\nstate: %s" % args.state)
 
 
+def _leave(code):
+    """Exit without letting multiprocessing tear the pool down.
+
+    Pool.__exit__ / terminate() joins handler threads that can block forever;
+    that is the stall this file exists around. Everything is checkpointed and
+    printed by the time we get here, so the workers are signalled directly and
+    the process leaves via os._exit. The "leaked semaphore objects" warning
+    that follows is the cost of that, and is not an error.
+    """
+    sys.stdout.flush()
+    sys.stderr.flush()
+    arena.stop_pool()
+    os._exit(code)
+
+
 if __name__ == "__main__":
     try:
         main()
+        _leave(0)
+    except SystemExit as e:
+        if isinstance(e.code, str):     # sys.exit("message")
+            print(e.code, file=sys.stderr, flush=True)
+            _leave(1)
+        _leave(e.code or 0)
     except KeyboardInterrupt:   # before the handler is installed
         # the state is written every 25 pairs, so the run resumes from the
         # last checkpoint; say so instead of dumping a multiprocessing stack
@@ -639,4 +662,4 @@ if __name__ == "__main__":
         # before buffered stdout reaches a redirected log
         print("\ninterrupted -- progress up to the last checkpoint is saved; "
               "re-run the same command to resume", flush=True)
-        sys.exit(130)
+        _leave(130)
