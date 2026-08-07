@@ -315,7 +315,10 @@ def main():
                          "so there is no signal left to buy")
     args = ap.parse_args()
 
-    signal.signal(signal.SIGINT, _on_sigint)
+    # SIGTERM too: `kill <pid>` sends it, and unhandled it kills the parent
+    # outright, checkpointing nothing and orphaning every engine.
+    for _sig in (signal.SIGINT, signal.SIGTERM):
+        signal.signal(_sig, _on_sigint)
     workers = args.workers or os.cpu_count()
     meta = {"nodes": args.nodes, "jitter": args.jitter, "pairs": args.pairs,
             "screen_pairs": args.screen_pairs,

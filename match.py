@@ -135,9 +135,15 @@ def main():
           % (len(tasks), len(field), workers))
 
     skipped = 0
-    signal.signal(signal.SIGINT, lambda *_: (arena.stop_pool(),
-                                             print("\ninterrupted", flush=True),
-                                             os._exit(130)))
+    # SIGTERM as well as SIGINT: `kill <pid>` sends SIGTERM, and unhandled it
+    # orphans every engine instead of shutting them down.
+    def _leave(*_args):
+        arena.stop_pool()
+        print("\ninterrupted", flush=True)
+        os._exit(130)
+
+    for _sig in (signal.SIGINT, signal.SIGTERM):
+        signal.signal(_sig, _leave)
     def save():
         with open(args.out + ".tmp", "w") as f:
             json.dump({"by_index": {str(k): v for k, v in done.items()},

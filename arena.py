@@ -84,6 +84,38 @@ def _worker_engine():
     return _ENGINE
 
 
+# Set by main() once the results dict exists, so the signal handler can save.
+_CHECKPOINT = None
+
+
+def _on_signal(*_args):
+    """Checkpoint, take the engines down, and leave immediately.
+
+    Registered for SIGTERM as well as SIGINT, and the SIGTERM half is the point.
+    `kill <pid>` sends SIGTERM, and with no handler the default action kills the
+    parent instantly: nothing is checkpointed and every worker plus its engine
+    is orphaned onto init. That is exactly how two fairy-stockfish processes
+    were left running on this machine after a stalled campaign was killed --
+    the leak was never in stop_pool(), which was measured leaving zero orphans
+    when it actually got to run.
+
+    os._exit skips multiprocessing's cleanup, which is deliberate: Pool
+    teardown can block forever on a worker stuck in engine I/O. The
+    "leaked semaphore objects" warning that follows is the cost of that and is
+    not an error.
+    """
+    if _CHECKPOINT:
+        try:
+            _CHECKPOINT()
+        except Exception:
+            pass
+    stop_pool()
+    print("\ninterrupted -- progress saved to the last checkpoint; re-run the "
+          "same command to resume.\nA \"leaked semaphore objects\" warning may "
+          "follow: it is expected and nothing was lost.", flush=True)
+    os._exit(130)
+
+
 def stop_pool():
     """Bring workers down so their engines go with them.
 
@@ -250,6 +282,11 @@ def main():
             "pairs": args.pairs, "engine": os.path.basename(args.engine),
             "seed": args.seed, "ply_limit": PLY_LIMIT,
             "max_pieces": args.max_pieces}
+
+    global _CHECKPOINT
+    _CHECKPOINT = lambda: save_state(args.out, cells, meta)
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        signal.signal(sig, _on_signal)
 
     print("%d setups, %d cells, %d game pairs to play (%d already done), "
           "%d workers" % (n, n * n, len(tasks), len(cells), workers))
