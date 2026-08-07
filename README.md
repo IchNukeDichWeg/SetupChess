@@ -60,6 +60,32 @@ Not one pair lost in 880 games. Solving the 13-army matrix at this depth puts
 **all the equilibrium weight on the champion**, exploitability 0.0000, so it is
 a best response to the whole archetype field and not merely a good average.
 
+**Measured again with no blind spot.** Every gate above is refereed by vanilla
+Stockfish, which segfaults on high piece counts, so all of them silently drop
+580 of 3,380 pairs and archetype 3 entirely. Re-run on `fairy-stockfish` at no
+piece ceiling, the champion against all **twelve** archetypes:
+
+```
+20k    | 0.9094 +/- 0.0144   +400.60 [+372.18, +433.42]   349 swept / 41 drawn
+200k   | 0.9297 +/- 0.0125   +448.52 [+417.80, +484.77]   371 swept / 26 drawn
+Pairs  | 480 of 480, ZERO piece-count skips (was 420)
+Solve  | pure on the champion at both depths, exploitability 0.0000, nothing dropped
+```
+
+Archetype 3, unmeasurable for the entire project until now, turns out to be
+mid-pack at 0.8938. The hardest opponent is still archetype 5 at 0.6375. The
+champion loses exactly one game across 960, at 20,000 nodes.
+
+The 160 remaining skips are `opposite_check` positions, which are unplayable by
+rule rather than by engine, so this is full coverage.
+
+**Depth behaves differently on this referee.** Paired over the identical 480
+pairs, 200k minus 20k is **+0.0203 +/- 0.0136**, which excludes zero;
++0.0170 +/- 0.0135 with archetype 3 removed, so it is not the new opponent
+driving it. On Stockfish the same comparison was flat (+0.0023 +/- 0.0129).
+Two different referees disagreeing about whether depth helps is a reason to
+trust neither number far, and the effect is small either way.
+
 Still not differenceable against the +462 above -- that gate sampled the
 *solved mix*, this one plays the *champion army alone* -- so the same pool was
 re-run at 20,000 nodes to isolate depth. **Depth changes nothing:**
@@ -268,11 +294,12 @@ Both are resumable; Ctrl-C checkpoints and exits cleanly.
 * **The baseline is weak.** +462 Elo is against hand-written archetypes, one
   of which scores 0.016 against the field. It is not a measurement against
   strong opposition.
-* ~~9% of gate pairs are unmeasured~~ **fixable, not fixed**: those are the
-  highest-piece-count matchups vanilla Stockfish cannot survive, and every
-  Stockfish-refereed campaign in `campaigns/` still has the holes. It is a
-  coverage gap, not noise, and `--engine fairy-stockfish --max-pieces 0` closes
-  it for future runs. Nothing already measured has been re-run.
+* ~~9% of gate pairs are unmeasured~~ **CLOSED for the champion gate**: rerun on
+  fairy-stockfish at no ceiling it is 480 of 480 pairs, zero piece-count skips,
+  and archetype 3 measured for the first time. Every OTHER campaign in
+  `campaigns/` is still Stockfish-refereed and still has the holes, including
+  the 87-setup pool the champion was bred from, which is the one that matters
+  and has not been re-run.
 * ~~The champion gate is 20,000 nodes only~~ **now also measured at 200,000**:
   the champion scores 0.9324, +455.82 [+423.88, +493.83], and the 13-army
   equilibrium is pure on it. Twelve bishops are not a shallow-search artifact.
