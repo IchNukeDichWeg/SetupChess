@@ -14,34 +14,69 @@ Python is the harness; the move generator is C.
 
 ## What it found
 
-**Bishops dominate.** The solved army is twelve bishops and three pawns, bred
-by the expansion loop rather than hand-written. It beat the earlier
-nine-bishop-plus-queen champion head to head by **+120.09 Elo
-[+110.17, +130.20]** over 400 pairs:
+**Bishops dominate, and it is not an artifact.** The solved army is eleven
+bishops and six pawns, bred by the expansion loop rather than hand-written:
 
 ```
-  3 | . B B . . B P .
-  2 | . B B P B P B .
-  1 | B . B B K . B B
+  3 | B B B B B P . .
+  2 | B B . P P P P P
+  1 | B B B B K . . .
       a b c d e f g h
 ```
+
+Every earlier campaign was refereed by Stockfish, which **segfaults above 32
+pieces**, so every high-piece-count matchup was an unmeasured hole and dense
+armies were harder to keep. Dense is exactly what beats a pawn wall, so the
+bishop result could have been survivorship. It is not. Rebuilt from scratch
+with `fairy-stockfish`, which has no piece ceiling and left **zero** cells
+unmeasured, the equilibrium is bishop-heavy in all thirteen of its members:
+
+```
+  31.8%  11 bishops + 6 pawns      8.4%  10 bishops + 9 pawns
+  18.9%  11 bishops + 6 pawns      3.8%  10 bishops + 4 pawns + 1 rook
+  12.8%  11 bishops + 6 pawns      1.9%  12 bishops + 3 pawns
+  ...seven more, all 11 bishops + 6 pawns
+```
+
+The censoring did change **which** bishop army wins. The previous champion's
+twelve-bishops-and-three-pawns survives at 1.9% of the mix, and head to head
+under one referee the new army beats it:
+
+```
+Games   | 800 pairs, 0 lost outright
+Score   | 0.6559 +/- 0.0111
+Split   | 30 swept / 478 at 0.75 / 253 drawn / 39 at 0.25
+Elo     | +112.09  [+103.64, +120.67]
+SPRT    | [0,4] LLR +27.661 -> ACCEPT H1
+TC      | 20,000 nodes, 15% jitter, fairy-stockfish, no piece ceiling
+```
+
+That result is **harder** than it looks: the new pool was capped at 60 setups
+while the old champion came from 87, so the handicap ran against the winner.
 
 Against the twelve hand-written archetypes, sampled uniformly:
 
 ```
-Games   | 1,820 of 2,000 (90 pairs unplayable)
-Score   | 0.9346 +/- 0.0079
-W/D/L   | 1,586 / 230 / 4
-Elo     | +462.06 +/- 22.5   [+440.79, +485.88]
-SPRT    | [0,4] LLR +153.155 -> ACCEPT H1
-Pool    | 87 setups after 21 expansion rounds
+Games   | 800 (400 pairs), 0 unplayable
+Score   | 0.9425 +/- 0.0116
+W/D/L   | 712 / 84 / 4
+Elo     | +485.85  [+451.79, +527.08]
+SPRT    | [0,4] LLR +72.357 -> ACCEPT H1
+Pool    | 60 setups, exploitability 0 in every round
 TC      | 20,000 nodes fixed, 15% per-game jitter
-Machine | Mac14,9 arm64, macOS, Stockfish 17
+Machine | Mac14,9 arm64, macOS, fairy-stockfish 14.0.1
 ```
 
-Four losses in 1,820 games. Read that as "much better than hand-written
+Four losses in 800 games. Read that as "much better than hand-written
 guesses", not "strong": the archetype field includes deliberately bad armies
 and one of them scores 0.016. See [Known limits](#known-limits).
+
+### The superseded Stockfish numbers
+
+Kept because they are what the earlier commits measured, and because the two
+sets are **different instruments and cannot be differenced**. The old champion
+scored 0.9346, +462.06 [+440.79, +485.88] over 1,820 of 2,000 games, with 90
+pairs unplayable, on an 87-setup pool after 21 rounds.
 
 **It holds at ten times the depth.** Re-gated at 200,000 nodes, the champion
 army alone against the same archetype field:
