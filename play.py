@@ -85,11 +85,21 @@ HUNT_THEIR_POINTS = 12
 #
 # The pool and the target move TOGETHER and must stay consistent: re-targeting
 # only considers armies inside the pool, so a target that is not a member gets
-# abandoned on the first placement. The 87-setup pool's champion also beat the
-# old 19-setup one head to head by +120.09 Elo [+110.17, +130.20] over 400
-# pairs, so both defaults point at that campaign.
-DEFAULT_POOL = "campaigns/expand_own.json"
-DEFAULT_TARGET = "campaigns/champion_own.json"
+# abandoned on the first placement.
+#
+# Both now point at the fairy-stockfish campaign. Every earlier pool was built
+# with Stockfish at a 32-piece ceiling, so high-piece-count cells were holes and
+# dense armies were harder to keep; expand_fsf.json has no such blind spot and
+# zero unmeasured cells. Its champion, 11 bishops and 6 pawns, beat the old
+# 12-bishop one head to head by +112.09 Elo [+103.64, +120.67] over 800 pairs.
+#
+# CONSEQUENCE, stated because it is easy to miss: every re-targeting number
+# above was measured on the OLD pool. Re-targeting is still on by default, but
+# its effect size on THIS pool is unmeasured. The mechanism is unchanged and
+# the new pool is larger in support (13 setups carry weight against the old
+# pool's 11), so the direction is expected to hold -- expected, not measured.
+DEFAULT_POOL = "campaigns/expand_fsf.json"
+DEFAULT_TARGET = "campaigns/champion_fsf.json"
 
 
 def load_pool(path):
@@ -120,12 +130,15 @@ class Drafter:
     so the option set narrows with each placement. That is why the opening
     placements matter more than the closing ones.
 
-    Re-targeting is CONFIRMED and on by default, on both pools it has been
-    measured against: +17.13 Elo [+12.36, +21.91] over 1522 paired full games
-    on the 19-setup pool, and +29.63 Elo [+23.46, +35.83] over 1187 pairs on
-    the 87-setup one. It grows with the pool, as it should. Both of those are
-    PRE-FIX readings; the 87-setup pool has since been re-measured through the
-    corrected handoff at +24.63 Elo [+18.06, +31.22]. See DEFAULT_POOL.
+    Re-targeting is on by default and CONFIRMED on every pool it has been
+    measured against: +17.13 Elo [+12.36, +21.91] on the 19-setup pool,
+    +29.63 [+23.46, +35.83] on the 87-setup one, and +24.63 [+18.06, +31.22]
+    when the latter was re-run through the corrected handoff. It grows with the
+    pool, as it should.
+
+    None of those is the pool the defaults now use. The 60-setup
+    fairy-stockfish pool has NOT been A/B tested, so the toggle stays on for
+    the mechanism rather than for a number. See DEFAULT_POOL.
 
     The setup-only screen had scored it negative, and both readings are
     correct about what they measured. Re-targeting does give up a forced
