@@ -83,51 +83,42 @@ chess.com's own setup policy rebuilt from its shipped client
 (`docs/BOT_MODEL.md`): king to a corner on move one, then 16 pawns and 7
 knights, because material is absent from its setup eval entirely.
 
-> **SUPERSEDED.** The numbers below measure our C core, not the champion. See
-> the retraction under them. A proper re-gate is owed.
-
 ```
-we are white | 0.6500 +/- 0.0318   +107.54 [+83.69, +132.41]   W/D/L  60/140/0
-we are black | 0.8475 +/- 0.0320   +297.95 [+258.19, +345.27]  W/D/L 139/ 61/0
+we are white | 0.9200 +/- 0.0255   +424.28 [+371.39, +495.60]  W/D/L 168/32/0
+we are black | 0.9400 +/- 0.0236   +477.99 [+415.91, +569.22]  W/D/L 177/22/1
 Games        | 200 per colour, 20,000 nodes, 15% jitter
-Referee      | ./cuci.py, our C core (-327 Elo vs Stockfish)
+Referee      | fairy-stockfish, no piece ceiling
 ```
 
-### Retraction: that was the referee, not the position
+345 wins, 54 draws, **one loss** in 400 games.
 
-The 40-piece matchup is over vanilla Stockfish's ceiling, so the referee was
-our own core, and **201 of the 400 games drew**. Reading those draws as "the
-pawn-and-knight wall is hard to break" was wrong. Refereed by
-`fairy-stockfish`, which plays the same position without a fallback, the
-identical two setups went **4/4 in both colours**. The draws were our core
-failing to convert a won position.
+### What the referee was hiding
 
-Two conclusions drawn from those numbers are therefore withdrawn:
+The first version of this gate was refereed by our C core, because 40 pieces is
+over vanilla Stockfish's ceiling. It reported 0.6500 as White and 0.8475 as
+Black with **201 of 400 games drawn**, and two conclusions were drawn from it.
+Both were wrong, and both are withdrawn:
 
-* that the wall is genuinely hard to break, and
-* that the champion's archetype numbers were resting on a weak field.
+* *"The pawn-and-knight wall is genuinely hard to break."* It is not. The draws
+  were our core failing to convert a won position; 0.65 becomes 0.92 with a
+  referee that can finish.
+* *"The colour asymmetry is the interesting part."* The 0.65/0.85 gap was also
+  the referee. It is 0.92/0.94 here, with overlapping intervals, so the story
+  about re-targeting swapping in a rook as Black has no measurement behind it.
 
-Four games per colour is a smoke test, not a measurement, so the opposite claim
-is not being made either. What is established is only that the C core's numbers
-describe the C core. The replacement measurement is:
+The archetype gate scores 0.9346. This one scores 0.92 to 0.94. Those are
+**different referees and cannot be differenced**, but there is no sign the
+modelled opponent is a harder field than the twelve hand-written armies.
 
-```bash
-python3 play.py --opponent bot --engine fairy-stockfish --max-pieces 0 \
-  --nodes 20000 --games 200 --out campaigns/gate_bot_fsf_200.json
-```
+### What still limits it
 
-### What still stands from that run
-
-* **The error bars were conditional on ONE setup per colour.** Both drafters
-  are deterministic, so the 200 games sampled the chess phase and nothing else.
-  Any re-gate has the same limitation.
+* **The intervals carry chess-phase variance only.** Both drafters are
+  deterministic, so this is ONE setup per colour and 200 games of node jitter
+  on top. Drafting variance is unmeasured.
 * **We move first in both colours** (checked: both handoff FENs give us the
-  move), since the bot spends 24 placements to our 16 and so always places
-  last. Any colour asymmetry is not a tempo effect.
-* **The two realised armies differ.** Re-targeting fired both times: as White
-  it came back to the pure champion, twelve bishops and three pawns; as Black
-  it swapped a rook in for two bishops. That is worth testing on its own, but
-  the scores that made it look important came from the weak referee.
+  move), since the bot spends 24 placements to our 16 and always places last.
+* **Different instrument from every Stockfish number above.** Separate
+  campaign, separate file, never pooled.
 
 ### Breeding against it
 
@@ -294,10 +285,11 @@ Both are resumable; Ctrl-C checkpoints and exits cleanly.
   40 of its pairs to Stockfish's piece ceiling, so 11 of 12 opponents are
   measured rather than a scattered 9%. Only one archetype offers real
   resistance at depth (0.6312); the rest sit above 0.87.
-* **The bot gate is withdrawn, not replaced.** `campaigns/gate_bot_200.json`
-  measures our C core rather than the champion; see the retraction above. Until
-  the fairy-stockfish re-gate runs, the repo has NO valid measurement against
-  the modelled opponent.
+* ~~The bot gate is withdrawn~~ **replaced**: `campaigns/gate_bot_fsf_200.json`
+  measures 0.92 as White and 0.94 as Black on fairy-stockfish. The superseded
+  `campaigns/gate_bot_200.json` is kept only as the record of what a weak
+  referee does to a number. What the replacement does NOT fix: one setup per
+  colour, so drafting variance is still unmeasured.
 * **Best-response re-targeting still gives up a forced setup mate**, because
   the payoff matrix is measured by playing the *chess* phase from finished
   armies and cannot see setup tactics. It is on anyway, and CONFIRMED on the
