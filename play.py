@@ -23,6 +23,7 @@ stdin, one `@Qd1` token per line, for driving a real game elsewhere.
 import argparse
 import json
 import sys
+import time
 
 import chess
 import chess.engine
@@ -751,6 +752,7 @@ def _repeat(state, engine, nodes, jitter, games, color, fallback,
     scores = []
     fen = state.handoff_fen()
     note = ""
+    start = time.time()
     for g in range(games):
         n = arena.game_nodes(nodes, jitter, 0, 1, g, 0)
         result, fen, note = play_out(state, engine, n, None, fallback,
@@ -762,6 +764,15 @@ def _repeat(state, engine, nodes, jitter, games, color, fallback,
         else:
             won = (result == "1-0") == (color == chess.WHITE)
             scores.append(1.0 if won else 0.0)
+        # Without this the whole colour runs silent. 200 games at 40 pieces is
+        # twenty-odd minutes of nothing, which reads as a hang and got reported
+        # as one.
+        if (g + 1) % 10 == 0 or g + 1 == games:
+            done = g + 1
+            rate = done / max(1e-9, time.time() - start)
+            print("     %d/%d games, score %.4f, %.1f min left"
+                  % (done, games, sum(scores) / len(scores),
+                     (games - done) / max(rate, 1e-9) / 60), flush=True)
     line = "\n" + "\n".join("     " + r for r in
                              stats.report(scores).splitlines())
     return line, fen, "%d games, %.0f%% jitter, %s" % (
