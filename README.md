@@ -78,8 +78,11 @@ sets are **different instruments and cannot be differenced**. The old champion
 scored 0.9346, +462.06 [+440.79, +485.88] over 1,820 of 2,000 games, with 90
 pairs unplayable, on an 87-setup pool after 21 rounds.
 
-**It holds at ten times the depth.** Re-gated at 200,000 nodes, the champion
-army alone against the same archetype field:
+**It holds at ten times the depth.** Every number in this section and the two
+after it describes the **PREVIOUS** champion, 12 bishops and 3 pawns, because
+that is what `campaigns/gate_depth_pool.json` holds at index 0. They have not
+been re-run for the current champion. Re-gated at 200,000 nodes, that army
+alone against the archetype field:
 
 ```
 Pairs   | 440 of 480 (archetype 3 unplayable, all 40 pairs)
@@ -98,7 +101,7 @@ a best response to the whole archetype field and not merely a good average.
 **Measured again with no blind spot.** Every gate above is refereed by vanilla
 Stockfish, which segfaults on high piece counts, so all of them silently drop
 580 of 3,380 pairs and archetype 3 entirely. Re-run on `fairy-stockfish` at no
-piece ceiling, the champion against all **twelve** archetypes:
+piece ceiling, the PREVIOUS champion against all **twelve** archetypes:
 
 ```
 20k    | 0.9094 +/- 0.0144   +400.60 [+372.18, +433.42]   349 swept / 41 drawn
@@ -143,6 +146,10 @@ The archetypes are hand-written guesses. `play.py --opponent bot` is
 chess.com's own setup policy rebuilt from its shipped client
 (`docs/BOT_MODEL.md`): king to a corner on move one, then 16 pawns and 7
 knights, because material is absent from its setup eval entirely.
+
+> These numbers are the **PREVIOUS** champion's: they were measured when
+> `DEFAULT_TARGET` still pointed at `champion_own.json`. The current champion
+> has not been gated against the bot.
 
 ```
 we are white | 0.9200 +/- 0.0255   +424.28 [+371.39, +495.60]  W/D/L 168/32/0
@@ -347,6 +354,11 @@ Both are resumable; Ctrl-C checkpoints and exits cleanly.
   40 of its pairs to Stockfish's piece ceiling, so 11 of 12 opponents are
   measured rather than a scattered 9%. Only one archetype offers real
   resistance at depth (0.6312); the rest sit above 0.87.
+* **Only the headline has been measured for the CURRENT champion.** The depth
+  gates, the no-blind-spot gate and the bot gate all describe the previous
+  12-bishop army, because they predate it. They remain valid measurements of
+  what they measured; they are simply not about the army that now ships.
+  `campaigns/gate_depth_pool_fsf.json` is the pool for redoing them.
 * ~~The bot gate is withdrawn~~ **replaced**: `campaigns/gate_bot_fsf_200.json`
   measures 0.92 as White and 0.94 as Black on fairy-stockfish. The superseded
   `campaigns/gate_bot_200.json` is kept only as the record of what a weak
