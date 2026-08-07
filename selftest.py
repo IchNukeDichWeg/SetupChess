@@ -14,6 +14,7 @@ import json
 import os
 import random
 import shutil
+import signal
 import subprocess
 import sys
 import tempfile
@@ -138,6 +139,62 @@ def test_validate_fen():
     print("PASS: validate_fen rejected %d illegal FENs, accepted %d legal ones "
           "including setup-only piece counts; engine_safe caught the "
           "%d-piece wall" % (len(cases), len(legal), 42))
+
+
+def test_watchdog():
+    """A stalled job is killed, its children swept, and it is restarted.
+
+    expand.py hangs intermittently in Pool teardown -- parent at 0% CPU with
+    every worker and engine already gone -- which cost two hours of wall clock
+    on a live campaign. The watchdog cannot fix the hang; it makes one cost a
+    restart instead of a night. Silence on stdout is the only signal, because
+    the process is healthy by every other measure.
+    """
+    import watchdog
+    d = tempfile.mkdtemp(prefix="selftest_wd_")
+    job = os.path.join(os.path.dirname(os.path.abspath(__file__)), "selftest.py")
+    src = os.path.join(d, "job.py")
+    with open(src, "w") as f:
+        f.write("import os, subprocess, sys, time\n"
+                "c = sys.argv[1]\n"
+                "n = int(open(c).read()) if os.path.exists(c) else 0\n"
+                "open(c, 'w').write(str(n + 1))\n"
+                "print('run %d' % n, flush=True)\n"
+                "if n == 0:\n"
+                "    k = subprocess.Popen(['sleep', '600'])\n"
+                "    open(c + '.kid', 'w').write(str(k.pid))\n"
+                "    time.sleep(9999)\n"
+                "print('done', flush=True)\n")
+    ctr = os.path.join(d, "ctr")
+    code = watchdog.main_for_test([sys.executable, src, ctr], silence=3)
+    if code != 0:
+        fail("watchdog returned %r for a job that stalls once then succeeds"
+             % code)
+    if int(open(ctr).read()) != 2:
+        fail("the job ran %s times, expected 2 (one stall, one success)"
+             % open(ctr).read())
+    kid = int(open(ctr + ".kid").read())
+    try:
+        os.kill(kid, 0)
+        os.kill(kid, signal.SIGKILL)
+        fail("the stalled job's child survived; the sweep did not work")
+    except ProcessLookupError:
+        pass
+
+    # a job that never prints anything is broken, not stalled: give up rather
+    # than restarting forever. GRACE is dropped so this costs seconds.
+    grace = watchdog.GRACE
+    watchdog.GRACE = 0.5
+    try:
+        code = watchdog.main_for_test(
+            [sys.executable, "-c", "import time; time.sleep(9999)"], silence=1)
+    finally:
+        watchdog.GRACE = grace
+    if code == 0:
+        fail("watchdog reported success for a job that never produced output")
+    shutil.rmtree(d, ignore_errors=True)
+    print("PASS: watchdog restarted a stalled job, swept its orphaned child, "
+          "and gave up on one that never printed")
 
 
 def test_bot_policy():
@@ -1144,6 +1201,7 @@ def main():
     rng = random.Random(args.seed)
     test_armies(args.armies, rng)
     test_validate_fen()
+    test_watchdog()
     test_bot_policy()
     test_setup_game()
     test_pool(rng)
