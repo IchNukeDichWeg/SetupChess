@@ -147,9 +147,21 @@ chess.com's own setup policy rebuilt from its shipped client
 (`docs/BOT_MODEL.md`): king to a corner on move one, then 16 pawns and 7
 knights, because material is absent from its setup eval entirely.
 
-> These numbers are the **PREVIOUS** champion's: they were measured when
-> `DEFAULT_TARGET` still pointed at `champion_own.json`. The current champion
-> has not been gated against the bot.
+The **current** champion (11 bishops + 6 pawns):
+
+```
+we are white | 0.9400 +/- 0.0246   +477.99 [+413.65, +574.24]  W/D/L 178/20/2
+we are black | 0.9425 +/- 0.0242   +485.85 [+420.21, +585.37]  W/D/L 179/19/2
+Games        | 200 per colour, 20,000 nodes, 15% jitter
+Referee      | fairy-stockfish, no piece ceiling
+```
+
+357 wins, 39 draws, 4 losses in 400 games. The **previous** champion scored
+0.9200 and 0.9400 on the identical instrument, so the intervals overlap almost
+entirely and **there is no measured difference between the two against this
+opponent** -- even though the new army beats the old one by +112 Elo head to
+head. Two armies can be far apart against each other and indistinguishable
+against a third.
 
 ```
 we are white | 0.9200 +/- 0.0255   +424.28 [+371.39, +495.60]  W/D/L 168/32/0
