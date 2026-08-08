@@ -94,9 +94,11 @@ HUNT_THEIR_POINTS = 12
 # 12-bishop one head to head by +112.09 Elo [+103.64, +120.67] over 800 pairs.
 #
 # RE-TARGETING IS NOW MEASURED ON THIS POOL, AND IT IS NOT CONFIRMED HERE:
-# +7.53 Elo [-2.06, +17.12] over 1,200 pairs, 0 unplayable, SPRT LLR +0.925 ->
-# CONTINUE. The interval includes zero. Against +24.63 on the old pool, so the
-# effect has largely evaporated once the matrix has no 32-piece blind spot.
+# +5.91 Elo [-0.18, +12.00] over 3,000 pairs, 0 unplayable, SPRT LLR +1.619 ->
+# CONTINUE. The interval still includes zero, barely. At 1,200 pairs it read
+# +7.53 [-2.06, +17.12], so extending moved the point estimate DOWN and only
+# narrowed the interval. Against +24.63 on the old pool, so the effect has
+# largely evaporated once the matrix has no 32-piece blind spot.
 #
 # That is not a fair before-and-after: the old pool was itself built under the
 # censored matrix, so the +24.63 describes re-targeting over a field that was

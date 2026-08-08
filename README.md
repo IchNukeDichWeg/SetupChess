@@ -338,9 +338,10 @@ Both are resumable; Ctrl-C checkpoints and exits cleanly.
   measured rather than a scattered 9%. Only one archetype offers real
   resistance at depth (0.6312); the rest sit above 0.87.
 * **Re-targeting is NOT confirmed on the pool that ships.** On the clean
-  fairy-stockfish pool it measures **+7.53 Elo [-2.06, +17.12]** over 1,200
-  pairs with nothing unplayable, SPRT LLR +0.925 -> CONTINUE. The interval
-  includes zero. It was +24.63 on the old pool, but that pool was itself built
+  fairy-stockfish pool it measures **+5.91 Elo [-0.18, +12.00]** over 3,000
+  pairs with nothing unplayable, SPRT LLR +1.619 -> CONTINUE. The interval
+  still includes zero; extending from 1,200 pairs moved the estimate down from
+  +7.53 rather than up. It was +24.63 on the old pool, but that pool was itself built
   under the censored matrix, so the two are not a fair before-and-after. The
   toggle stays on only because the test is still trending rather than flat;
   if it settles NULL the default should become `--no-pool`.
