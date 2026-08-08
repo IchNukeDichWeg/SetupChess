@@ -78,67 +78,38 @@ sets are **different instruments and cannot be differenced**. The old champion
 scored 0.9346, +462.06 [+440.79, +485.88] over 1,820 of 2,000 games, with 90
 pairs unplayable, on an 87-setup pool after 21 rounds.
 
-**It holds at ten times the depth.** Every number in this section and the two
-after it describes the **PREVIOUS** champion, 12 bishops and 3 pawns, because
-that is what `campaigns/gate_depth_pool.json` holds at index 0. They have not
-been re-run for the current champion. Re-gated at 200,000 nodes, that army
-alone against the archetype field:
+**It holds at ten times the depth, and the head-to-head gain transfers.**
+The current champion against the twelve archetypes, `fairy-stockfish`, no
+piece ceiling, so nothing is dropped:
 
 ```
-Pairs   | 440 of 480 (archetype 3 unplayable, all 40 pairs)
-Score   | 0.9324 +/- 0.0126
-Pairs   | 341 swept / 79 at 0.75 / 20 drawn / 0 lost
-Elo     | +455.82 +/- 35.0   [+423.88, +493.83]
-SPRT    | [0,4] LLR +60.252 -> ACCEPT H1
-TC      | 200,000 nodes fixed, 15% per-game jitter
-Machine | Mac14,9 arm64, macOS, Stockfish 17, 10 workers
+20k    | 0.9349 +/- 0.0127   +462.86 [+429.53, +502.90]   385 swept / 28 drawn
+200k   | 0.9500 +/- 0.0107   +511.50 [+475.97, +555.09]   400 swept / 16 drawn
+Pairs  | 480 of 480 both times, 0 lost outright
 ```
 
-Not one pair lost in 880 games. Solving the 13-army matrix at this depth puts
-**all the equilibrium weight on the champion**, exploitability 0.0000, so it is
-a best response to the whole archetype field and not merely a good average.
+At 200,000 nodes **no pair scores below 0.5 at all**. Both node counts solve to
+an equilibrium that is pure on the champion with exploitability 0.0000, and
+neither drops an archetype.
 
-**Measured again with no blind spot.** Every gate above is refereed by vanilla
-Stockfish, which segfaults on high piece counts, so all of them silently drop
-580 of 3,380 pairs and archetype 3 entirely. Re-run on `fairy-stockfish` at no
-piece ceiling, the PREVIOUS champion against all **twelve** archetypes:
+The previous champion ran the identical gate, so the cells pair up exactly --
+same opponent, same game index, same node jitter, only our army differs:
 
 ```
-20k    | 0.9094 +/- 0.0144   +400.60 [+372.18, +433.42]   349 swept / 41 drawn
-200k   | 0.9297 +/- 0.0125   +448.52 [+417.80, +484.77]   371 swept / 26 drawn
-Pairs  | 480 of 480, ZERO piece-count skips (was 420)
-Solve  | pure on the champion at both depths, exploitability 0.0000, nothing dropped
+                              paired difference (new minus previous)
+20k    480 pairs   +0.0255 +/- 0.0156   144 cells changed
+200k   480 pairs   +0.0203 +/- 0.0122   118 cells changed
 ```
 
-Archetype 3, unmeasurable for the entire project until now, turns out to be
-mid-pack at 0.8938. The hardest opponent is still archetype 5 at 0.6375. The
-champion loses exactly one game across 960, at 20,000 nodes.
+Both exclude zero, so the +112 Elo head-to-head advantage **does** show up
+against the archetype field. It does **not** show up against the modelled
+opponent, where the two champions are indistinguishable. Same two armies, two
+opponents, two different answers -- which is why a single headline number is
+not enough.
 
-The 160 remaining skips are `opposite_check` positions, which are unplayable by
-rule rather than by engine, so this is full coverage.
-
-**Depth behaves differently on this referee.** Paired over the identical 480
-pairs, 200k minus 20k is **+0.0203 +/- 0.0136**, which excludes zero;
-+0.0170 +/- 0.0135 with archetype 3 removed, so it is not the new opponent
-driving it. On Stockfish the same comparison was flat (+0.0023 +/- 0.0129).
-Two different referees disagreeing about whether depth helps is a reason to
-trust neither number far, and the effect is small either way.
-
-Still not differenceable against the +462 above -- that gate sampled the
-*solved mix*, this one plays the *champion army alone* -- so the same pool was
-re-run at 20,000 nodes to isolate depth. **Depth changes nothing:**
-
-```
-20k    | 0.9301   +449.66 [+418.62, +486.36]
-200k   | 0.9324   +455.82 [+423.88, +493.83]
-Paired | +0.0023 +/- 0.0129 over 440 identically-indexed pairs
-Games  | 122 of 440 pairs came out differently
-```
-
-Both node counts put the entire equilibrium on the champion, exploitability
-0.0000, and both drop archetype 3 for the same piece-count reason. A tenth of
-the search buys the same verdict, so the remaining gap between +449.66 and
-+462.06 is the mix-versus-champion difference, not depth.
+Depth is worth a little to both armies and slightly less to the new one:
+`+0.0151 +/- 0.0126` for the current champion against `+0.0203 +/- 0.0136` for
+the previous, over the same 480 paired cells.
 
 ## Against a model of the real opponent
 
@@ -366,11 +337,10 @@ Both are resumable; Ctrl-C checkpoints and exits cleanly.
   40 of its pairs to Stockfish's piece ceiling, so 11 of 12 opponents are
   measured rather than a scattered 9%. Only one archetype offers real
   resistance at depth (0.6312); the rest sit above 0.87.
-* **Only the headline has been measured for the CURRENT champion.** The depth
-  gates, the no-blind-spot gate and the bot gate all describe the previous
-  12-bishop army, because they predate it. They remain valid measurements of
-  what they measured; they are simply not about the army that now ships.
-  `campaigns/gate_depth_pool_fsf.json` is the pool for redoing them.
+* ~~Only the headline has been measured for the CURRENT champion~~ **the depth
+  gates and the bot gate have both been redone** on the current army. What is
+  still unmeasured on the new pool is **re-targeting**: every A/B for that
+  toggle was run against the old 87-setup pool.
 * ~~The bot gate is withdrawn~~ **replaced**: `campaigns/gate_bot_fsf_200.json`
   measures 0.92 as White and 0.94 as Black on fairy-stockfish. The superseded
   `campaigns/gate_bot_200.json` is kept only as the record of what a weak
