@@ -18,8 +18,12 @@ space of armies. A drafting policy then realises the chosen army against a live
 opponent, handling the tactics the placement phase actually has, including two
 ways to win before a move is played.
 
-**The answer it arrived at is eleven bishops and six pawns.** Everything below
-is how that was established and how far it should be trusted.
+**The answer it arrived at is eleven bishops and six pawns** -- and a real
+opponent then beat it with **thirteen bishops and no pawns**, an army this
+project never once sampled. That result is measured and stands
+([below](#the-pool-is-a-sample-not-a-cover)). Everything here is how the answer
+was established and how far it should be trusted, which turns out to be less
+far than the error bars suggest.
 
 Python is the harness. There is a C move generator, used as a cross-check and
 perft oracle rather than to play anything.
@@ -212,6 +216,44 @@ above, so it is a different instrument, a separate state file, and its gate
 number is not comparable with the Stockfish-refereed ones. Comparing the old
 champion with whatever this produces needs a head-to-head under a single
 referee, not a subtraction.
+
+## The pool is a sample, not a cover
+
+A real game surfaced an army the expansion loop never produced: **thirteen
+bishops, no pawns**, all 39 points on bishops. Head to head against the
+champion under one referee:
+
+```
+Games   | 800 pairs
+Score   | 0.4700 +/- 0.0109   (from the champion's side)
+Split   | 2 swept / 107 at 0.75 / 488 drawn / 199 at 0.25 / 4 lost
+Elo     | -20.87  [-28.51, -13.25]
+SPRT    | [0,4] LLR -6.077 -> ACCEPT H0
+```
+
+**The champion loses.** Not by much, and 488 of 800 pairs are drawn, but the
+decisive pairs break 199 to 107 against it and the interval is clear of zero.
+
+Not one of the 60 setups in the pool is a pure bishop army. Every survivor
+keeps at least three pawns:
+
+```
+21x   11 bishops + 6 pawns     <- the champion
+16x   12 bishops + 3 pawns
+ 8x   10 bishops + 1 knight + 6 pawns
+ 5x   10 bishops + 1 rook + 4 pawns
+ 2x   10 bishops + 9 pawns
+```
+
+This is worth being precise about, because it is easy to read as the
+measurements being wrong. They are not. Exploitability 0 means **no army in
+the pool** beats the equilibrium mix, and that was true. It says nothing about
+armies outside the pool, and the mutation operators never walked all the way to
+the corner of the space where 13 bishops lives. A double oracle is only as good
+as what its challengers reach.
+
+So the honest status of "eleven bishops and six pawns" is: the best army this
+search **found**, beaten by the first outside army anyone tried it against.
 
 ## The setup phase has real tactics
 
