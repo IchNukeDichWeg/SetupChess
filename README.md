@@ -337,10 +337,13 @@ Both are resumable; Ctrl-C checkpoints and exits cleanly.
   40 of its pairs to Stockfish's piece ceiling, so 11 of 12 opponents are
   measured rather than a scattered 9%. Only one archetype offers real
   resistance at depth (0.6312); the rest sit above 0.87.
-* ~~Only the headline has been measured for the CURRENT champion~~ **the depth
-  gates and the bot gate have both been redone** on the current army. What is
-  still unmeasured on the new pool is **re-targeting**: every A/B for that
-  toggle was run against the old 87-setup pool.
+* **Re-targeting is NOT confirmed on the pool that ships.** On the clean
+  fairy-stockfish pool it measures **+7.53 Elo [-2.06, +17.12]** over 1,200
+  pairs with nothing unplayable, SPRT LLR +0.925 -> CONTINUE. The interval
+  includes zero. It was +24.63 on the old pool, but that pool was itself built
+  under the censored matrix, so the two are not a fair before-and-after. The
+  toggle stays on only because the test is still trending rather than flat;
+  if it settles NULL the default should become `--no-pool`.
 * ~~The bot gate is withdrawn~~ **replaced**: `campaigns/gate_bot_fsf_200.json`
   measures 0.92 as White and 0.94 as Black on fairy-stockfish. The superseded
   `campaigns/gate_bot_200.json` is kept only as the record of what a weak

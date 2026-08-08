@@ -93,11 +93,22 @@ HUNT_THEIR_POINTS = 12
 # zero unmeasured cells. Its champion, 11 bishops and 6 pawns, beat the old
 # 12-bishop one head to head by +112.09 Elo [+103.64, +120.67] over 800 pairs.
 #
-# CONSEQUENCE, stated because it is easy to miss: every re-targeting number
-# above was measured on the OLD pool. Re-targeting is still on by default, but
-# its effect size on THIS pool is unmeasured. The mechanism is unchanged and
-# the new pool is larger in support (13 setups carry weight against the old
-# pool's 11), so the direction is expected to hold -- expected, not measured.
+# RE-TARGETING IS NOW MEASURED ON THIS POOL, AND IT IS NOT CONFIRMED HERE:
+# +7.53 Elo [-2.06, +17.12] over 1,200 pairs, 0 unplayable, SPRT LLR +0.925 ->
+# CONTINUE. The interval includes zero. Against +24.63 on the old pool, so the
+# effect has largely evaporated once the matrix has no 32-piece blind spot.
+#
+# That is not a fair before-and-after: the old pool was itself built under the
+# censored matrix, so the +24.63 describes re-targeting over a field that was
+# missing its high-piece-count members. The clean number is the one that
+# describes this code.
+#
+# The toggle stays ON only because the test has not concluded -- LLR is
+# trending toward the H1 bound rather than sitting flat, and capping a
+# sequential test mid-trend is how a decision gets made on noise. Raising
+# --games replays nothing, so the run extends in place. If it settles NULL or
+# negative, the honest response is to default --no-pool, not to hunt for a
+# configuration where re-targeting wins.
 DEFAULT_POOL = "campaigns/expand_fsf.json"
 DEFAULT_TARGET = "campaigns/champion_fsf.json"
 
