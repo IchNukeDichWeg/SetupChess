@@ -62,7 +62,7 @@ def _game(args):
             out.append(score)
             continue
         fen = state.handoff_fen()
-        ok, why = rules.engine_safe(fen)
+        ok, why = rules.engine_safe(fen, arena.MAX_PIECES)
         if not ok:
             return k, None, why
         board = chess.Board(fen)
@@ -98,6 +98,13 @@ def main():
     ap.add_argument("--engine", default="stockfish")
     ap.add_argument("--nodes", type=int, default=20000)
     ap.add_argument("--jitter", type=float, default=0.15)
+    ap.add_argument("--max-pieces", type=int, default=32,
+                    help="piece ceiling for the engine; 0 for none, which is "
+                         "correct for fairy-stockfish and ./cuci.py. Judging a "
+                         "no-ceiling engine at 32 does not just lose games, it "
+                         "loses the HIGH-PIECE-COUNT ones, which biases the "
+                         "sample toward exactly the matchups the pool is not "
+                         "about (default: %(default)s)")
     ap.add_argument("--workers", type=int, default=0, help="0 = all cores")
     ap.add_argument("--seed", type=int, default=2026)
     args = ap.parse_args()
@@ -154,7 +161,7 @@ def main():
 
     if tasks:
         with mp.Pool(workers, initializer=arena.worker_init,
-                     initargs=(args.engine,)) as p:
+                     initargs=(args.engine, args.max_pieces)) as p:
             for i, (k, scores, info) in enumerate(
                     p.imap_unordered(_game, tasks), 1):
                 if scores is None:
