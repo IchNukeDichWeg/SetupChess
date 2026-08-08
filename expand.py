@@ -34,8 +34,15 @@ import solve
 import stats
 
 
-def new_state(seed, meta, seed_bot=False):
+def new_state(seed, meta, seed_bot=False, extra=None):
     """Fresh campaign. `seed_bot` adds the bot's wall and PINS it.
+
+    `extra` is a list of armies to add to the STARTING pool as ordinary
+    candidates -- not pinned, because they are ours to beat or breed from
+    rather than opponents to be measured against. This exists because the
+    search demonstrably does not reach every corner on its own: a real game
+    produced 13 bishops and no pawns, which beat the champion by 21 Elo, and
+    not one of the 60 setups the loop bred was a pure bishop army.
 
     Pinning matters: the prune ranks by equilibrium support and mean score, so
     a fixed opponent that is merely hard to beat rather than good at winning
@@ -44,6 +51,9 @@ def new_state(seed, meta, seed_bot=False):
     """
     rng = random.Random(seed)
     armies = poolmod.seed_pool(rng)
+    for army in (extra or []):
+        if poolmod.army_key(army) not in {poolmod.army_key(a) for a in armies}:
+            armies = armies + [army]
     pinned = []
     if seed_bot:
         pinned = [len(armies)]
@@ -52,9 +62,9 @@ def new_state(seed, meta, seed_bot=False):
             "cells": {}, "rounds": [], "seed": seed, "pinned": pinned}
 
 
-def load_state(path, seed, meta, seed_bot=False):
+def load_state(path, seed, meta, seed_bot=False, extra=None):
     if not os.path.exists(path):
-        return new_state(seed, meta, seed_bot)
+        return new_state(seed, meta, seed_bot, extra)
     with open(path) as f:
         state = json.load(f)
     state.setdefault("pinned", [])
@@ -294,6 +304,12 @@ def main():
     ap.add_argument("--max-minutes", type=float, default=0,
                     help="leave the round loop after this long and go to the "
                          "gate match; 0 for no limit")
+    ap.add_argument("--seed-army", action="append", metavar="JSON",
+                    help="JSON list of armies to add to the starting pool as "
+                         "candidates. Repeatable. The search does not reach "
+                         "every corner on its own -- 13 bishops and no pawns "
+                         "beat the champion by 21 Elo and was never bred -- so "
+                         "known-good armies can be handed to it directly")
     ap.add_argument("--seed-bot", action="store_true",
                     help="add chess.com's own drafted army (pool.BOT_WALL) to "
                          "the starting pool and PIN it, so every challenger is "
@@ -323,11 +339,25 @@ def main():
             "breadth": args.breadth, "crossover_rate": args.crossover_rate,
             "engine": os.path.basename(args.engine),
             "ply_limit": arena.PLY_LIMIT,
-            "max_pieces": args.max_pieces, "seed_bot": args.seed_bot}
-    state = load_state(args.state, args.seed, meta, args.seed_bot)
+            "max_pieces": args.max_pieces, "seed_bot": args.seed_bot,
+            "seed_army": sorted(os.path.basename(p)
+                                for p in (args.seed_army or []))}
+    extra = []
+    for path in (args.seed_army or []):
+        with open(path) as f:
+            extra.extend(poolmod.from_json(a) for a in json.load(f))
+    for army in extra:
+        ok, why = rules.validate_army(army)
+        if not ok:
+            sys.exit("seeded army is illegal: %s" % why)
+    if extra:
+        print("seeding %d extra armies from %s"
+              % (len(extra), ", ".join(args.seed_army)))
+    state = load_state(args.state, args.seed, meta, args.seed_bot, extra)
     # A campaign written before these keys existed was built at their defaults,
     # so fill them in rather than refusing to resume every state file in git.
-    for k, default in (("max_pieces", 32), ("seed_bot", False)):
+    for k, default in (("max_pieces", 32), ("seed_bot", False),
+                       ("seed_army", [])):
         state["meta"].setdefault(k, default)
     if state["meta"] != meta:
         sys.exit("state was built with different settings:\n  file: %r\n  now:  %r"
