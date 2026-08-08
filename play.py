@@ -93,24 +93,29 @@ HUNT_THEIR_POINTS = 12
 # zero unmeasured cells. Its champion, 11 bishops and 6 pawns, beat the old
 # 12-bishop one head to head by +112.09 Elo [+103.64, +120.67] over 800 pairs.
 #
-# RE-TARGETING IS NOW MEASURED ON THIS POOL, AND IT IS NOT CONFIRMED HERE:
-# +5.91 Elo [-0.18, +12.00] over 3,000 pairs, 0 unplayable, SPRT LLR +1.619 ->
-# CONTINUE. The interval still includes zero, barely. At 1,200 pairs it read
-# +7.53 [-2.06, +17.12], so extending moved the point estimate DOWN and only
-# narrowed the interval. Against +24.63 on the old pool, so the effect has
-# largely evaporated once the matrix has no 32-piece blind spot.
+# RE-TARGETING IS CONFIRMED ON THIS POOL, AND IT IS SMALL: +6.71 Elo
+# [+2.57, +10.85] over 6,500 pairs with nothing unplayable, SPRT [0,4]
+# LLR +4.232 -> ACCEPT H1. Against +24.63 on the old pool, so roughly four
+# fifths of the apparent effect was an artifact of the 32-piece blind spot,
+# not a property of re-targeting.
 #
-# That is not a fair before-and-after: the old pool was itself built under the
-# censored matrix, so the +24.63 describes re-targeting over a field that was
-# missing its high-piece-count members. The clean number is the one that
-# describes this code.
+# The two are NOT a fair before-and-after: the old pool was itself built under
+# the censored matrix, so its +24.63 describes re-targeting over a field
+# missing its high-piece-count members. +6.71 is the number that describes
+# this code.
 #
-# The toggle stays ON only because the test has not concluded -- LLR is
-# trending toward the H1 bound rather than sitting flat, and capping a
-# sequential test mid-trend is how a decision gets made on noise. Raising
-# --games replays nothing, so the run extends in place. If it settles NULL or
-# negative, the honest response is to default --no-pool, not to hunt for a
-# configuration where re-targeting wins.
+# The magnitude is quotable because the run went to a FIXED 6,500-pair budget
+# rather than halting the instant the statistic crossed -- a sequential test
+# stopped at its bound is always caught at a favourable fluctuation and its
+# effect size is biased upward by construction. The budget was raised twice
+# after looking at the trend (1,200 -> 3,000 -> 6,500), which is what SPRT is
+# built for, and the estimate moved +7.53 -> +5.91 -> +6.71, i.e. it wandered
+# rather than climbing toward the bound.
+#
+# Effective sample is much smaller than the headline: 2,988 of 6,500 pairs came
+# out identical because the drafter only re-targets in some games, so 3,512
+# carried information. That is why this needed a budget the other measurements
+# did not.
 DEFAULT_POOL = "campaigns/expand_fsf.json"
 DEFAULT_TARGET = "campaigns/champion_fsf.json"
 
