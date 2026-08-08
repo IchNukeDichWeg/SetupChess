@@ -116,6 +116,25 @@ HUNT_THEIR_POINTS = 12
 # out identical because the drafter only re-targets in some games, so 3,512
 # carried information. That is why this needed a budget the other measurements
 # did not.
+# Stay uncommitted instead of following one plan. PENDING: built, not yet
+# measured. The case for it is arithmetic on the existing payoff matrix rather
+# than a hunch:
+#
+#   fixed equilibrium mix     0.5456 vs the pool   (+31.8 Elo)
+#   hindsight best response   0.7410 vs the pool  (+182.6 Elo)
+#
+# so knowing the opponent's finished army and answering it perfectly is worth
+# +143.4 Elo over playing the mix. Re-targeting captures +6.71 of that, about
+# 5%, and the reason is commitment, measured on this pool: our FIRST placement
+# cuts the reachable armies from 60 to 29 before the opponent has revealed
+# anything, and by our eighth we are down to 12 while they have shown 7 pieces.
+# The information arrives exactly when our freedom is smallest.
+#
+# So this picks the placement that leaves the most pool armies reachable rather
+# than the next piece of one target. King timing is left to
+# KING_AT_POINTS_LEFT, since placing it early invites a rank-3 setup mate.
+OPTIONALITY = False
+
 DEFAULT_POOL = "campaigns/expand_fsf.json"
 DEFAULT_TARGET = "campaigns/champion_fsf.json"
 
@@ -168,7 +187,7 @@ class Drafter:
     """
 
     def __init__(self, target, color, pool=None, matrix=None,
-                 hunt_when=HUNT_WHEN):
+                 hunt_when=HUNT_WHEN, optionality=OPTIONALITY):
         self.color = color
         self.target = (target if color == chess.WHITE
                        else rules.mirror_army(target))
@@ -176,7 +195,9 @@ class Drafter:
         self.pool = pool
         self.matrix = matrix
         self.hunt_when = hunt_when
+        self.optionality = optionality
         self.retargets = 0
+        self.optional_moves = 0
 
     # --- best response ---------------------------------------------------
 
@@ -276,6 +297,39 @@ class Drafter:
                 best, best_key = (pt, sq), key
         return best
 
+    def _optionality_move(self, state, legal):
+        """The legal placement leaving the most pool armies reachable.
+
+        Candidates are restricted to placements that appear in at least one
+        currently-reachable army, so this cannot wander outside the pool: every
+        pool army spends the full 39 points, so staying reachable means staying
+        on track to complete SOME complete army. Kings are excluded and left to
+        the KING_AT_POINTS_LEFT rule, because placing one early invites the
+        rank-3 setup mate.
+
+        Ties go to the dearer piece, so it makes progress rather than stalling
+        on pawns that every army happens to share.
+        """
+        if not self.pool:
+            return None
+        ours = self._revealed(state, self.color)
+        reachable = [s for s in (set(a) for a in self.pool) if ours <= s]
+        if len(reachable) < 2:
+            return None
+        best, best_key = None, None
+        for pt, sq in legal:
+            if pt == chess.KING:
+                continue
+            own = (pt, sq if self.color == chess.WHITE
+                   else chess.square_mirror(sq))
+            n = sum(1 for s in reachable if own in s)
+            if not n:
+                continue
+            key = (n, rules.PIECE_COST[pt])
+            if best_key is None or key > best_key:
+                best, best_key = (pt, sq), key
+        return best
+
     def _remaining(self, state):
         """Target pieces not yet on the board, dearest first."""
         out = []
@@ -347,6 +401,15 @@ class Drafter:
             king = self._king_square(state, legal)
             if king:
                 return king
+
+        if self.optionality:
+            keep = self._optionality_move(state, legal)
+            if keep:
+                self.optional_moves += 1
+                for k, (pt, sq) in enumerate(self.target):
+                    if (pt, sq) == keep:
+                        self.placed.add(k)
+                return keep
 
         # follow the plan where the plan is still legal (a check restricts
         # `legal` to blocking squares, so this silently becomes "block")
@@ -673,6 +736,9 @@ def main():
     ap.add_argument("--pool", default=DEFAULT_POOL,
                     help="campaign state JSON driving best-response "
                     "re-targeting (default: %(default)s)")
+    ap.add_argument("--optionality", action="store_true",
+                    help="place to keep the most pool armies reachable instead "
+                         "of following one plan (PENDING: unmeasured)")
     ap.add_argument("--no-pool", action="store_true",
                     help="disable best-response re-targeting")
     ap.add_argument("--hunt-when", type=int, default=HUNT_WHEN,
@@ -732,7 +798,8 @@ def main():
     try:
         for color in colors:
             us = Drafter(ours, color, pool=armies, matrix=matrix,
-                         hunt_when=args.hunt_when)
+                         hunt_when=args.hunt_when,
+                         optionality=args.optionality)
             if args.opponent == "stdin":
                 them = StdinDrafter(not color)
             elif args.opponent == "bot":

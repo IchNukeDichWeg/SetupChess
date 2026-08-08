@@ -310,6 +310,60 @@ def test_bot_policy():
           "alone" % (counts.get(chess.PAWN, 0), counts.get(chess.KNIGHT, 0)))
 
 
+def test_optionality():
+    """Placing to stay uncommitted must widen the option set and still finish.
+
+    The failure mode this guards is a policy that keeps its options open by
+    never committing to anything and ends the setup with points unspent or an
+    army outside the pool. Every pool army spends the full 39, so staying
+    reachable should mean staying on track to complete one.
+    """
+    with open("campaigns/expand_fsf.json") as f:
+        armies = [pool.from_json(a) for a in json.load(f)["armies"]]
+    with open("campaigns/champion_fsf.json") as f:
+        champ = pool.from_json(json.load(f)["army"])
+
+    def draft(opt):
+        st = rules.SetupState()
+        us = play.Drafter(champ, chess.WHITE, pool=armies, optionality=opt)
+        them = play.Drafter(armies[1], chess.BLACK)
+        d = {chess.WHITE: us, chess.BLACK: them}
+        trace = []
+        for _ in range(200):
+            if st.result or st.complete:
+                break
+            turn = st.turn
+            st.place(*d[turn].choose(st))
+            if turn == chess.WHITE:
+                ours = {(p.piece_type, sq)
+                        for sq, p in st.board.piece_map().items()
+                        if p.color == chess.WHITE}
+                trace.append(sum(1 for a in armies if ours <= set(a)))
+        army = [(p.piece_type, sq) for sq, p in st.board.piece_map().items()
+                if p.color == chess.WHITE]
+        return trace, army
+
+    plain, plain_army = draft(False)
+    wide, wide_army = draft(True)
+    if wide[0] <= plain[0]:
+        fail("optionality did not widen the first placement: %d vs %d"
+             % (wide[0], plain[0]))
+    if sum(wide[:8]) <= sum(plain[:8]):
+        fail("optionality is not wider over the opening eight placements")
+    for name, army in (("plain", plain_army), ("optionality", wide_army)):
+        ok, why = rules.validate_army(army)
+        if not ok:
+            fail("%s drafted an illegal army: %s" % (name, why))
+        if rules.army_cost(army) != rules.BUDGET:
+            fail("%s left %d of %d points unspent"
+                 % (name, rules.BUDGET - rules.army_cost(army), rules.BUDGET))
+    if sorted(wide_army) not in [sorted(a) for a in armies]:
+        fail("optionality finished outside the pool")
+    print("PASS: optionality keeps %d armies reachable after one placement "
+          "against %d, stays wider through the opening, and still finishes a "
+          "legal 39-point army inside the pool" % (wide[0], plain[0]))
+
+
 def test_setup_game():
     # Replay of the checkmate-during-setup observed on the live analysis
     # board (docs/RULES.md): 1.@Qd1 @Qd8 2.@Pa2 @Ke6 3.@Qe1 is mate - the
@@ -1203,6 +1257,7 @@ def main():
     test_validate_fen()
     test_watchdog()
     test_bot_policy()
+    test_optionality()
     test_setup_game()
     test_pool(rng)
     test_arena_units()

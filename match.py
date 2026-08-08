@@ -41,14 +41,25 @@ import stats
 
 
 def _game(args):
-    """One (opponent, colour, seed) played both ways. Returns (a, b) scores."""
-    k, ours, theirs, color, nodes, jitter, pool_armies, matrix = args
+    """One (opponent, colour, seed) played both ways. Returns (a, b) scores.
+
+    `test` names the toggle under test. "retarget" is the original arm pair --
+    pool withheld versus pool given. "optionality" gives BOTH arms the pool and
+    varies only whether the drafter places to stay uncommitted, which is the
+    right isolation: re-targeting and optionality both read the pool, so an arm
+    without it would be testing two changes at once.
+    """
+    (k, ours, theirs, color, nodes, jitter, pool_armies, matrix, test) = args
     engine = arena._worker_engine()
     out = []
-    for use_pool in (False, True):
-        us = play.Drafter(ours, color,
-                          pool=pool_armies if use_pool else None,
-                          matrix=matrix if use_pool else None)
+    for on in (False, True):
+        if test == "optionality":
+            us = play.Drafter(ours, color, pool=pool_armies, matrix=matrix,
+                              optionality=on)
+        else:
+            us = play.Drafter(ours, color,
+                              pool=pool_armies if on else None,
+                              matrix=matrix if on else None)
         them = play.Drafter(theirs, not color)
         drafters = {color: us, not color: them}
         try:
@@ -98,6 +109,9 @@ def main():
     ap.add_argument("--engine", default="stockfish")
     ap.add_argument("--nodes", type=int, default=20000)
     ap.add_argument("--jitter", type=float, default=0.15)
+    ap.add_argument("--test", choices=("retarget", "optionality"),
+                    default="retarget",
+                    help="which toggle to A/B (default: %(default)s)")
     ap.add_argument("--max-pieces", type=int, default=32,
                     help="piece ceiling for the engine; 0 for none, which is "
                          "correct for fairy-stockfish and ./cuci.py. Judging a "
@@ -134,7 +148,7 @@ def main():
         theirs = field[k % len(field)]
         color = chess.WHITE if k % 2 == 0 else chess.BLACK
         tasks.append((k, ours, theirs, color, args.nodes, args.jitter,
-                      pool_armies, matrix))
+                      pool_armies, matrix, args.test))
     rng.shuffle(tasks)
 
     workers = args.workers or os.cpu_count()
@@ -184,10 +198,11 @@ def main():
     mapped = [(d + 1.0) / 2.0 for d in diffs]
     st = stats.score_stats(mapped)
 
-    print("\nre-targeting OFF: %.4f over %d games" % (sum(plain) / len(plain),
-                                                      len(plain)))
-    print("re-targeting ON : %.4f over %d games" % (sum(retarget) / len(retarget),
-                                                    len(retarget)))
+    label = args.test
+    print("\n%s OFF: %.4f over %d games"
+          % (label, sum(plain) / len(plain), len(plain)))
+    print("%s ON : %.4f over %d games"
+          % (label, sum(retarget) / len(retarget), len(retarget)))
     print("\npaired difference (ON minus OFF)")
     print("Pairs:   %d" % st["n"])
     print("Better:  %d   Same: %d   Worse: %d"
