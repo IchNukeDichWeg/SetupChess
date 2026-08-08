@@ -1,16 +1,28 @@
 # Setup Chess
 
-An engine for the chess.com variant [Setup Chess](https://www.chess.com/variants/setup-chess):
-before play, each side spends **39 points** placing an army on its own first
-three ranks (P=1, N=3, B=3, R=5, Q=9, king free and mandatory, duplicates
-unlimited). Once both armies are down, it is ordinary chess.
+**Finding the strongest opening army for the chess.com variant
+[Setup Chess](https://www.chess.com/variants/setup-chess).** Before play, each
+side spends **39 points** placing an army on its own first three ranks (P=1,
+N=3, B=3, R=5, Q=9, king free and mandatory, duplicates unlimited). Once both
+armies are down, it is ordinary chess.
 
-The interesting half is the drafting. This repo builds a candidate pool of
-armies, measures them against each other by playing games, solves for the
-best mix, and plays the placement phase with the tactics that phase actually
-has -- including two ways to win before move one.
+This is **not a chess engine**, and deliberately so. Once the armies are placed
+the position is ordinary chess, and `fairy-stockfish` plays it far better than
+anything here would. The whole question is the half that has no theory yet:
+**which 39 points, and on which squares.**
 
-Python is the harness; the move generator is C.
+So the repo is a measurement apparatus for one question. It breeds a pool of
+candidate armies, plays them against each other to fill a payoff matrix, solves
+that matrix for the equilibrium mix, and repeats -- a double oracle over the
+space of armies. A drafting policy then realises the chosen army against a live
+opponent, handling the tactics the placement phase actually has, including two
+ways to win before a move is played.
+
+**The answer it arrived at is eleven bishops and six pawns.** Everything below
+is how that was established and how far it should be trusted.
+
+Python is the harness. There is a C move generator, used as a cross-check and
+perft oracle rather than to play anything.
 
 ## What it found
 
@@ -227,7 +239,11 @@ against an army covering 23 of the opponent's 24 zone squares:
 
 Sparse armies get punished; dense ones shield themselves.
 
-## Why a C core rather than Stockfish
+## Choosing the referee, which mattered more than anything else
+
+Every army here is judged by playing games, so the engine doing the judging
+**is** the measuring instrument. Getting it wrong does not add noise, it
+manufactures results.
 
 Setup Chess positions are legal in the variant and illegal in *standard*
 chess: sixteen pawns, nine bishops, up to 48 pieces on the board. python-chess
@@ -235,23 +251,30 @@ rejects them by ordinary-chess history rules, and Stockfish's data structures
 assume 32 pieces -- the 42-piece pawn-wall mirror answers `depth 4` fine and
 then **segfaults at 20,000 nodes** (measured threshold on this build: 36
 pieces survive, 38 crash). The 40-piece champion-versus-bot matchup dies the
-same way, exit code -11. That is why 9% of gate pairs are unmeasured in every
-Stockfish-refereed campaign here.
+same way, exit code -11.
 
-> **Largely superseded.** `fairy-stockfish` 14.0.1 plays all of it: the
-> 40-piece matchup, the 42-piece wall, and the 48-piece mirror of the bot's
-> army, which is this variant's theoretical maximum. It defaults to
-> `UCI_Variant chess`, agreed with vanilla Stockfish on three forced-tactic
-> oracles, and costs 34.9 ms/move against our core's 15.6 ms at 20,000 nodes on
-> the 40-piece position. It is a Stockfish 14 derivative, so it is vastly
-> stronger than our core's -327 Elo.
->
-> Pass `--engine fairy-stockfish --max-pieces 0` to any harness here. The C
-> core stays as an independent cross-check and the perft oracle; it should not
-> referee a measurement again. This also removes the case for training an
-> NNUE, which existed only because nothing strong could play these positions.
+Every campaign built that way silently dropped its **high-piece-count** cells,
+and dense armies are exactly what a pawn wall loses to. Two results turned out
+to be artifacts of that hole:
 
-The C core is bitboard-based, so it has no piece-count ceiling:
+* the wrong bishop army was crowned -- the uncensored rebuild's champion beats
+  it by **+112 Elo**
+* re-targeting looked worth **+24.63 Elo** and is actually worth **+6.71**
+
+`fairy-stockfish` 14.0.1 plays all of it: the 40-piece matchup, the 42-piece
+wall, and the 48-piece mirror of the bot's army, which is this variant's
+theoretical maximum. It defaults to `UCI_Variant chess`, agreed with vanilla
+Stockfish on three forced-tactic oracles, and costs 34.9 ms/move against our C
+core's 15.6 ms at 20,000 nodes on the 40-piece position. Being a Stockfish 14
+derivative it is vastly stronger than our core's -327 Elo.
+
+**Pass `--engine fairy-stockfish --max-pieces 0` to every harness here.** It
+also removes the case for training an NNUE, which existed only because nothing
+strong could play these positions.
+
+The C core remains as an independent cross-check and the perft oracle, and
+should not referee a measurement again. It is bitboard-based, so unlike
+Stockfish it has no piece-count ceiling:
 
 ```
 Perft        | startpos(4) 197,281 exact; 8 setup positions to 42 pieces
@@ -270,14 +293,15 @@ so python-chess with the rights stripped is the reference.
 | `docs/BOT_MODEL.md` | chess.com's own bot, decoded from its shipped client: king to a corner on move one, material ignored while drafting |
 | `rules.py` | placement legality, points, FEN emission, validation |
 | `pool.py` | archetype seeds, mutation and crossover operators |
-| `arena.py` | fills the payoff matrix, engine vs engine, resumable |
+| `arena.py` | fills the payoff matrix by playing army against army, resumable |
 | `solve.py` | equilibrium mix, best response, exploitability |
 | `expand.py` | the double-oracle pool expansion loop; `--seed-bot` breeds against the modelled opponent |
 | `stats.py` | Elo, confidence intervals, SPRT |
-| `play.py` | drafts an army and plays the game out; `--opponent bot` is chess.com's own setup policy |
+| `play.py` | the drafting policy: realises an army against an opponent, then hands the position to the engine. `--opponent bot` is chess.com's own setup policy |
 | `match.py` | paired full-game A/B for a drafting change |
-| `duel.py` | engine versus engine over setup positions |
-| `Constants.h`, `movegen.c`, `eval.c`, `search.c` | the C core |
+| `duel.py` | engine versus engine over setup positions, for validating a referee |
+| `watchdog.py` | restarts a stalled campaign; expand.py hangs intermittently |
+| `Constants.h`, `movegen.c`, `eval.c`, `search.c` | the C move generator and a minimal search, used as a cross-check rather than to play |
 | `cengine.py`, `cuci.py` | ctypes binding and the UCI front end |
 | `selftest.py` | run before every commit |
 | `campaigns/` | campaign state and gate results, in git on purpose |
@@ -288,31 +312,53 @@ so python-chess with the rights stripped is the reference.
 ./setup.sh
 ```
 
-Installs dependencies, builds the C core and checks it with a perft oracle,
-and verifies a UCI engine answers `uci`.
+Installs dependencies, builds the C move generator and checks it with a perft
+oracle, and verifies a UCI engine answers `uci`. You also need
+`fairy-stockfish` on your PATH -- it is the referee for everything below, and
+vanilla Stockfish is not a substitute (see [Choosing the
+referee](#choosing-the-referee-which-mattered-more-than-anything-else)).
 
 ```bash
 python3 selftest.py
 ```
 
-```bash
-python3 play.py --opponent classic
-```
-
-Plays one game each colour, setup through result. `--opponent stdin` reads
-placements as `@Qd1` tokens for driving a game elsewhere.
-
-Longer jobs, which take minutes to hours:
+**Play the answer against something.** One game each colour, setup through
+result, using the shipping army:
 
 ```bash
-python3 arena.py --out ~/matrix.json --nodes 20000 --pairs 4 --workers 0
+python3 play.py --opponent bot --engine fairy-stockfish --max-pieces 0
 ```
+
+`--opponent bot` is chess.com's own setup policy, rebuilt from its shipped
+client. `--opponent stdin` reads placements as `@Qd1` tokens instead, which is
+how a real game elsewhere gets driven; `--live` relays a game move by move.
+
+**Re-derive the answer from scratch.** Hours, resumable, Ctrl-C checkpoints:
 
 ```bash
-python3 expand.py --state ~/expand.json --rounds 30 --challengers 32 --pairs 4 --screen-pairs 2 --workers 0 --final-games 400
+python3 expand.py --state ~/expand.json --engine fairy-stockfish --max-pieces 0 --rounds 30 --challengers 32 --pairs 4 --screen-pairs 2 --workers 0 --final-games 400
 ```
 
-Both are resumable; Ctrl-C checkpoints and exits cleanly.
+That is the double oracle: breed challengers, screen them against the current
+equilibrium, admit the survivors, re-solve, repeat. It ends on a 400-pair gate
+against the twelve hand-written archetypes.
+
+**Fill a payoff matrix directly**, if you have a pool of armies and just want
+them scored against each other:
+
+```bash
+python3 arena.py --out ~/matrix.json --pool ~/armies.json --engine fairy-stockfish --max-pieces 0 --nodes 20000 --pairs 4 --workers 0
+```
+
+**A/B a drafting change** over full games, paired so the opponent and colour
+cancel:
+
+```bash
+python3 match.py --target campaigns/champion_fsf.json --pool campaigns/expand_fsf.json --out ~/ab.json --engine fairy-stockfish --max-pieces 0 --games 1200 --workers 0
+```
+
+`expand.py` stalls intermittently at a multiprocessing teardown; wrap it in
+`python3 watchdog.py -- ...` to have that cost a restart rather than a night.
 
 ## Known limits
 
