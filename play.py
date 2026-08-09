@@ -60,134 +60,45 @@ HUNT_WHEN = 6
 # remaining points are this low.
 HUNT_THEIR_POINTS = 12
 
-# Best-response re-targeting is ON, confirmed twice by paired full-game A/B,
-# once per pool. On the 19-setup pool: +17.13 Elo [+12.36, +21.91] over 1522
-# pairs. On the 87-setup pool it is worth NEARLY DOUBLE: +29.63 Elo
-# [+23.46, +35.83] over 1187 pairs, SPRT [0,4] LLR +11.238 -> ACCEPT H1, both
-# run to a fixed budget rather than stopped at the bound. A bigger pool gives
-# the best response more to choose from, which is the effect you would hope
-# for and now the one that is measured. Pass --no-pool to turn it off.
+# Best-response re-targeting is ON: +6.71 Elo [+2.57, +10.85] over 6,500 pairs
+# on the pool that ships, SPRT [0,4] LLR +4.232 -> ACCEPT H1. Small, and it was
+# smaller than it looked: +24.63 on the old pool, four fifths of which was an
+# artifact of Stockfish's 32-piece blind spot. --no-pool turns it off.
 #
-# RE-RUN after the handoff turn-order fix, and it mattered: match.py plays
-# from handoff_fen(), which used to hand White the move unconditionally, and
-# the fix changed the outcome of 494 of the 1,187 pairs. Post-fix on the
-# 87-setup pool: +24.63 Elo [+18.06, +31.22], LLR +8.101 -> ACCEPT H1 at full
-# budget. The ranges overlap the pre-fix +29.63 heavily, so the fix did not
-# measurably change the effect, but only the post-fix number describes what
-# this code does. The 19-setup pool's +17.13 is still a PRE-FIX number and has
-# not been re-run. The champion gate never shared the problem: arena.py goes
-# through setup_fen(), which did not change.
+# The pool and the target move TOGETHER: re-targeting only considers armies
+# inside the pool, so a target that is not a member gets abandoned on the first
+# placement. Both point at the fairy-stockfish campaign, whose matrix has no
+# blind spot and whose champion beat the old one by +112.09 [+103.64, +120.67].
 #
-# Also measured at 10x the depth, the only longer-TC result in the repo: at
-# 200,000 nodes over the same 1,187 pairs it is +29.93 Elo [+23.66, +36.21],
-# LLR +11.037 -> ACCEPT H1, with 409 pairs coming out differently. Overlapping
-# ranges, so read it as "no decay with depth" rather than as an improvement.
-# Separate instrument, separate state file, never pooled with the 20k run.
-#
-# The pool and the target move TOGETHER and must stay consistent: re-targeting
-# only considers armies inside the pool, so a target that is not a member gets
-# abandoned on the first placement.
-#
-# Both now point at the fairy-stockfish campaign. Every earlier pool was built
-# with Stockfish at a 32-piece ceiling, so high-piece-count cells were holes and
-# dense armies were harder to keep; expand_fsf.json has no such blind spot and
-# zero unmeasured cells. Its champion, 11 bishops and 6 pawns, beat the old
-# 12-bishop one head to head by +112.09 Elo [+103.64, +120.67] over 800 pairs.
-#
-# RE-TARGETING IS CONFIRMED ON THIS POOL, AND IT IS SMALL: +6.71 Elo
-# [+2.57, +10.85] over 6,500 pairs with nothing unplayable, SPRT [0,4]
-# LLR +4.232 -> ACCEPT H1. Against +24.63 on the old pool, so roughly four
-# fifths of the apparent effect was an artifact of the 32-piece blind spot,
-# not a property of re-targeting.
-#
-# The two are NOT a fair before-and-after: the old pool was itself built under
-# the censored matrix, so its +24.63 describes re-targeting over a field
-# missing its high-piece-count members. +6.71 is the number that describes
-# this code.
-#
-# The magnitude is quotable because the run went to a FIXED 6,500-pair budget
-# rather than halting the instant the statistic crossed -- a sequential test
-# stopped at its bound is always caught at a favourable fluctuation and its
-# effect size is biased upward by construction. The budget was raised twice
-# after looking at the trend (1,200 -> 3,000 -> 6,500), which is what SPRT is
-# built for, and the estimate moved +7.53 -> +5.91 -> +6.71, i.e. it wandered
-# rather than climbing toward the bound.
-#
-# Effective sample is much smaller than the headline: 2,988 of 6,500 pairs came
-# out identical because the drafter only re-targets in some games, so 3,512
-# carried information. That is why this needed a budget the other measurements
-# did not.
-# Stay uncommitted instead of following one plan.
-#
-# The case for it was arithmetic on the payoff matrix, and the arithmetic was
-# WRONG in the direction that flattered the idea. A hindsight best response --
-# knowing the opponent's finished army and answering it perfectly -- looked
-# worth +143.4 Elo over the equilibrium mix. That figure is a max over cells
-# backed by four pairs, which lands on whichever cell got lucky. Corrected with
-# the shrinkage adapt.py calibrates against a 400-pair match:
-#
-#   shrink   mix          best response   ceiling
-#   0        +77.7 Elo    +257.4 Elo      +179.8   <- what motivated this
-#   8        +27.7 Elo     +73.6 Elo       +46.0   <- calibrated
-#
-# So the headroom for reacting at all is about +46 Elo, and measured
-# re-targeting already captures +6.71 of it. The remaining prize is modest.
-#
-# The commitment problem it targets is real: our FIRST placement cuts the
-# reachable armies from 60 to 29 before the opponent has revealed anything, and
-# by our eighth we are at 12 while they have shown 7 pieces.
-#
-# So this picks the placement that leaves the most pool armies reachable rather
-# than the next piece of one target.
+# Full history of every number here, with its caveats: docs/MEASUREMENTS.md
+
+# Stay uncommitted instead of following one plan, by placing whatever keeps the
+# most pool armies reachable.
 #
 # BROKEN, DO NOT ENABLE. Measured at -79.17 Elo [-83.83, -74.54] over 3,000
-# pairs, and that number is a BUG REPORT rather than a verdict on the idea.
-# Only _optionality_move respects the pool; the king rule, the forced-block
+# pairs, and that is a BUG REPORT rather than a verdict on the idea: only
+# _optionality_move respects the pool, while the king rule, the forced-block
 # path, the king hunt and the off-plan fallback do not, and any one of them can
-# drop the reachable set to zero. When it hits zero the drafter falls into
-# "spend the most expensive affordable piece", which built a 38-point army
-# outside the pool.
+# drop the reachable set to zero. When it does, the drafter falls into "spend
+# the most expensive affordable piece" and built a 38-point army outside the
+# pool. Constraining the king rule alone took 80 drafts from 0 finishing inside
+# the pool to 45; three still stop at 24-25 of 39 points.
 #
-# Threading the pool constraint through the king rule alone took 80 drafts from
-# 0 inside the pool to 45, and still leaves 3 finishing on 24-25 of 39 points.
-# Every remaining path needs the same treatment before this can be measured.
-#
-# Whether it is worth finishing: the ceiling above is +46 Elo, not the +143.4
-# that motivated it, and re-targeting already takes +6.71 of that for free.
-# Finishing means threading the pool constraint through four more placement
-# paths to chase at most ~39 Elo, and the -79 result means we do not even know
-# the sign of a correct implementation.
+# Not obviously worth finishing. The ceiling that motivated it was +143.4 Elo
+# and is really +46.0 once the winner's curse is corrected (docs/MEASUREMENTS.md),
+# and re-targeting already takes +6.71 of that for free.
 OPTIONALITY = False
 
 # Draw the target from the equilibrium support each game instead of always
-# playing the single best army. PENDING: built, not yet measured in play.
+# playing the single best army. PENDING: built, not measured in play.
 #
-# The solver produces a MIX for a reason and we were throwing it away. A pure
-# strategy in a zero-sum game is exploitable by construction, and online this
-# is not hypothetical: placements are visible, opponents play you repeatedly,
-# and the champion is published in this repo.
+# A pure strategy in a zero-sum game is exploitable by construction, and this
+# one is published in a public repo. Measured, the champion scores 0.4566
+# (-30.26 Elo [-40.27, -20.30]) against the pool's own best response to it, and
+# adapt.py shows a fixed army is solved after ONE game and stays solved.
 #
-# The hard counter is already in our own pool at index 31, itself an 11-bishop
-# 6-pawn army on different squares. Measured properly, 400 pairs:
-#
-#   champion vs that counter  ->  0.4566 +/- 0.0143  (-30.26 Elo
-#                                 [-40.27, -20.30], ACCEPT H0)
-#
-# SELECTION BIAS WARNING, because the first version of this comment fell for
-# it. That counter was found as the ARGMIN over 94 columns of a matrix whose
-# cells hold 8 pairs each. The minimum of 94 noisy samples is biased low by
-# construction, and the screen said 0.3438 (-112.3 Elo) -- nearly four times
-# the real effect. Any number read off this matrix by taking a max or a min
-# over many cells carries the same inflation. The reactive ceiling above
-# OPTIONALITY has since been recomputed on the shrunk matrix and fell from
-# +179.8 to +46.0 Elo. Averages over the matrix do not suffer this, since the
-# noise cancels rather than being selected for.
-#
-# It is a genuine trade, not a free win. Against an opponent drawn at RANDOM
-# from the pool the champion scores 0.5456 and the mix scores 0.5000, so mixing
-# costs about 32 Elo against a field that is not targeting you and saves about
-# 112 against one that is. Which is right depends on whether your opponents
-# adapt. Ours do.
+# It is a trade, not a free win: mixing costs roughly 32 Elo against a field
+# that is not targeting you and saves roughly 36 against one that is.
 MIX = False
 
 DEFAULT_POOL = "campaigns/expand_fsf.json"

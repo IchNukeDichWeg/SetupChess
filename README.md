@@ -421,6 +421,7 @@ so python-chess with the rights stripped is the reference.
 | file | what it is |
 |---|---|
 | `docs/RULES.md` | the rules, every line sourced, assumptions explicit |
+| `docs/MEASUREMENTS.md` | every measured claim with its interval and caveats, including the two that were wrong when first recorded |
 | `docs/BOT_MODEL.md` | chess.com's own bot, decoded from its shipped client: king to a corner on move one, material ignored while drafting |
 | `rules.py` | placement legality, points, FEN emission, validation |
 | `pool.py` | archetype seeds, mutation and crossover operators |
@@ -432,6 +433,7 @@ so python-chess with the rights stripped is the reference.
 | `match.py` | paired full-game A/B for a drafting change |
 | `duel.py` | engine versus engine over setup positions, for validating a referee |
 | `watchdog.py` | restarts a stalled campaign; expand.py hangs intermittently |
+| `adapt.py` | what happens when the opponent learns you, simulated on the matrix |
 | `Constants.h`, `movegen.c`, `eval.c`, `search.c` | the C move generator and a minimal search, used as a cross-check rather than to play |
 | `cengine.py`, `cuci.py` | ctypes binding and the UCI front end |
 | `selftest.py` | run before every commit |
