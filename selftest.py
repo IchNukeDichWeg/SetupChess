@@ -310,6 +310,55 @@ def test_bot_policy():
           "alone" % (counts.get(chess.PAWN, 0), counts.get(chess.KNIGHT, 0)))
 
 
+def test_adapt():
+    """A pure strategy must get solved and stay solved; a mixture must not.
+
+    Rock-paper-scissors is the oracle, because the answer is known exactly:
+    the equilibrium is uniform with value 0.5, a pure strategy scores 0
+    against its counter, and no counter exists for the mixture. If the
+    simulation cannot reproduce that it is not modelling a learning opponent.
+    """
+    import adapt
+    rps = [[0.5, 0.0, 1.0],
+           [1.0, 0.5, 0.0],
+           [0.0, 1.0, 0.5]]
+    uniform = [1 / 3.0] * 3
+    rng = random.Random(1)
+    pure = adapt.simulate(rps, "pure", 40, rng, uniform)
+    if any(abs(v) > 1e-9 for v in pure[1:]):
+        fail("a pure strategy was not solved by round 2: %r" % pure[:5])
+    runs = [adapt.simulate(rps, "mix", 40, random.Random(k), uniform)
+            for k in range(300)]
+    tail = [sum(r[i] for r in runs) / len(runs) for i in range(20, 40)]
+    avg = sum(tail) / len(tail)
+    if abs(avg - 0.5) > 0.03:
+        fail("the mixture drifted from the 0.5 equilibrium value: %.4f" % avg)
+
+    # and on the real matrix: the mixture must beat the pure strategy once the
+    # opponent has learned, which is the whole claim the file exists to make
+    with open("campaigns/expand_v3.json") as f:
+        st = json.load(f)
+    cellmap = {tuple(int(x) for x in k.split(",")): v
+               for k, v in st["cells"].items()}
+    m, keep, _ = solve.prepare(
+        arena.matrix_from_cells(cellmap, len(st["armies"])), 8)
+    x, value = solve.nash(m)
+    curves = {}
+    for policy in ("pure", "mix"):
+        rng = random.Random(7)
+        runs = [adapt.simulate(m, policy, 30, rng, list(x)) for _ in range(60)]
+        curves[policy] = sum(sum(r[15:]) / len(r[15:]) for r in runs) / len(runs)
+    if curves["mix"] <= curves["pure"]:
+        fail("mixing did not beat a pure strategy against a learner: %r" % curves)
+    if abs(curves["mix"] - value) > 0.10:
+        fail("the mixture strayed far from the equilibrium value: %.4f vs %.4f"
+             % (curves["mix"], value))
+    print("PASS: adapt reproduces rock-paper-scissors exactly (pure solved to "
+          "0.0 by round 2, mixture %.4f at equilibrium) and on the real matrix "
+          "mixing scores %.4f against a learner where the champion scores %.4f"
+          % (avg, curves["mix"], curves["pure"]))
+
+
 def test_optionality():
     """Placing to stay uncommitted must widen the option set and still finish.
 
@@ -1276,6 +1325,7 @@ def main():
     test_validate_fen()
     test_watchdog()
     test_bot_policy()
+    test_adapt()
     test_optionality()
     test_setup_game()
     test_pool(rng)

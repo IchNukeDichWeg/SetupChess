@@ -307,10 +307,34 @@ and this project has spent its whole budget searching compositions.
 > Averages do not: the noise cancels instead of being selected for.
 
 `play.py --mix` draws from the stored equilibrium support each game instead of
-always playing the argmax -- 7 distinct armies on the v3 campaign. It is a
-trade: mixing costs about 32 Elo against a field that is not targeting you and
-saves about 112 against one that is. Unmeasured in play; the arithmetic above
-is from the matrix.
+always playing the argmax -- 7 distinct armies on the v3 campaign.
+
+`adapt.py` simulates what happens when the opponent learns you, replaying the
+measured matrix against fictitious play. No engine, seconds to run:
+
+```
+round   pure      mix
+1       0.5525    0.6102     <- opponent is still guessing
+2       0.3438    0.5236     <- solved
+10      0.3438    0.5061
+200     0.3438    0.4986
+```
+
+**A fixed army is solved after one game and stays solved.** From round 2 the
+pure strategy is pinned at exactly one value forever, because the opponent
+found its counter and never has to look again. Searching for a better fixed
+army does not fix that; it only changes which army gets countered.
+
+Two things this does NOT establish. The levels are inflated -- the opponent's
+best response is an argmax over 8-pair cells, the same selection bias that made
+a -30 Elo counter look like -112 -- so read the gap as "large", not as a
+number. And a real opponent cannot see your finished army before choosing
+theirs, since placement alternates, so this is the pessimistic bound. The truth
+lies between it and the fixed-field numbers above.
+
+The shape is safe regardless: that a pure strategy decays while a mixture holds
+is a property of equilibria, not of this data. `selftest.py` pins it against
+rock-paper-scissors, where the answer is known exactly.
 
 ## The setup phase has real tactics
 
