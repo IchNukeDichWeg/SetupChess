@@ -56,8 +56,12 @@ def new_state(seed, meta, seed_bot=False, extra=None):
             armies = armies + [army]
     pinned = []
     if seed_bot:
-        pinned = [len(armies)]
-        armies = armies + [poolmod.BOT_WALL]
+        # the armies the bot has actually been OBSERVED playing, not the
+        # modelled BOT_WALL -- two live games refuted the model's piece
+        # preference, and every --seed-bot campaign before this faced a fiction
+        for army in poolmod.BOT_OBSERVED.values():
+            pinned.append(len(armies))
+            armies = armies + [army]
     return {"meta": meta, "armies": [poolmod.to_json(a) for a in armies],
             "cells": {}, "rounds": [], "seed": seed, "pinned": pinned}
 
@@ -311,12 +315,11 @@ def main():
                          "beat the champion by 21 Elo and was never bred -- so "
                          "known-good armies can be handed to it directly")
     ap.add_argument("--seed-bot", action="store_true",
-                    help="add chess.com's own drafted army (pool.BOT_WALL) to "
-                         "the starting pool and PIN it, so every challenger is "
-                         "screened against it and the prune cannot drop it. "
-                         "Its 24 pieces put most matchups over Stockfish's "
-                         "ceiling, so pair this with --engine ./cuci.py "
-                         "--max-pieces 0")
+                    help="add the armies chess.com's bot has been OBSERVED "
+                         "playing (pool.BOT_OBSERVED, two live games) and PIN "
+                         "them, so every challenger is screened against them "
+                         "and the prune cannot drop them. Both are queen-heavy; "
+                         "the modelled BOT_WALL they replace was refuted")
     ap.add_argument("--max-pieces", type=int, default=32,
                     help="piece ceiling for the engine; 0 for none, which is "
                          "correct for ./cuci.py (default: %(default)s)")

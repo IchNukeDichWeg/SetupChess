@@ -51,7 +51,37 @@ Predicted against observed, from the console on an otherwise empty board:
 The residual is the other eval terms. **Its king goes to a corner, on its
 first placement.**
 
-## Its piece preferences are the opposite of ours
+## REFUTED: the piece preferences below are not what it plays
+
+Two full setup phases played against the live bot on the analysis board, both
+as Black, both spending all 39 points:
+
+```
+2026-08-05   Ka8  Qc8 Qa7 Qb7  Rb8  Bc6  Pa6 Pb6 Pg7 Ph7
+2026-08-08   Ka8  Qb7 Qb8 Qa7  Nb6 Nc6  Bg6  Pa6 Pe6 Ph7
+```
+
+**Three queens in both.** The model below predicts the opposite: material
+absent from the setup sum, a standing bias against expensive pieces, and a
+drift toward pawns and knights. `play.BotDrafter` drafts 16 pawns and 7 knights
+from it. The live bot buys the dearest piece on the board, repeatedly.
+
+The king clause is untouched by this and is confirmed twice more: a corner on
+the very first placement, both games.
+
+What went wrong is not knowable from here. The eval terms this file could not
+decode -- coord, pinned, discovs, checkable, exposed, hill -- are absent from
+the model, and one of them evidently rewards queens enough to swamp a -0.3
+bias. Reading a minified eval's if-else chain told us the tie-breaks and not
+the terms that actually decide.
+
+The observed armies are in `pool.BOT_OBSERVED` and are what `--seed-bot` pins.
+`pool.BOT_WALL`, the modelled army, is kept only so that campaigns run against
+it can be understood, and should not be seeded.
+
+## The refuted model, kept for the record
+
+### Its piece preferences are the opposite of ours
 
 The remaining clauses of the same if-else chain, applied to the piece being
 dropped:
@@ -74,7 +104,8 @@ plausible part of why the solved mix scores 0.93 against hand-written armies.
 
 ## What this changes for us
 
-* **The lockout tactic never fires against their bot.** It needs an opponent
+* **The lockout tactic never fires against their bot.** (Still true: it places
+  the king first, which both live games confirm.) It needs an opponent
   who holds the king back; this one places it immediately. `play.py` already
   handles this correctly without a change, because the hunt requires their
   king to be unplaced AND their budget to be low, which never co-occur here.

@@ -510,6 +510,12 @@ class BotDrafter:
     absent from the setup sum entirely, so it has no reason to buy expensive
     pieces and drifts toward pawns and knights.
 
+    REFUTED IN PART. Two live games (docs/BOT_MODEL.md, pool.BOT_OBSERVED)
+    show the bot buying THREE QUEENS in both, spending 27 of 39 points on them.
+    The king clause below is confirmed twice more; the piece bias is wrong, and
+    so is the 16-pawn army this drafter builds from it. Use it as a stand-in
+    opponent if you like, but it is not the bot.
+
     APPROXIMATION, named because it changes what a gate against this means:
     their setup eval also carries coord, pinned, discovs, checkable, exposed
     and hill terms whose formulas docs/BOT_MODEL.md does not pin down, and

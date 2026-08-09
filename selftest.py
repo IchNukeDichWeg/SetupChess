@@ -253,16 +253,40 @@ def test_bot_policy():
         fail("pool.BOT_WALL is not a legal army: %s" % why)
     if pool.BOT_WALL in pool.ARCHETYPES.values():
         fail("BOT_WALL leaked into ARCHETYPES, which would change the gate field")
+
+    # the OBSERVED armies are the opponent model that matters: two live games,
+    # both 39 points, both three queens. They refute the piece-preference half
+    # of docs/BOT_MODEL.md that BOT_WALL is derived from.
+    if len(pool.BOT_OBSERVED) < 2:
+        fail("expected at least two observed bot armies")
+    for day, army in pool.BOT_OBSERVED.items():
+        ok, why = rules.validate_army(army)
+        if not ok:
+            fail("observed bot army %s is illegal: %s" % (day, why))
+        if rules.army_cost(army) != rules.BUDGET:
+            fail("observed bot army %s spends %d of %d"
+                 % (day, rules.army_cost(army), rules.BUDGET))
+        queens = sum(1 for pt, _ in army if pt == chess.QUEEN)
+        if queens < 2:
+            fail("observed bot army %s has %d queens; the transcription is "
+                 "probably wrong" % (day, queens))
+        if sorted(army) == sorted(pool.BOT_WALL):
+            fail("an observed army equals the refuted BOT_WALL model")
     if len(pool.seed_pool(random.Random(2026))) != 12:
         fail("the archetype gate field is no longer 12 armies")
 
     # --seed-bot pins it, and the pin points at the wall
     import expand
     st = expand.new_state(2026, {}, seed_bot=True)
-    if st["pinned"] != [12]:
-        fail("seed_bot pinned %r, expected [12]" % st["pinned"])
-    if pool.from_json(st["armies"][st["pinned"][0]]) != pool.BOT_WALL:
-        fail("the pinned index does not hold BOT_WALL")
+    if len(st["pinned"]) != len(pool.BOT_OBSERVED):
+        fail("seed_bot pinned %r, expected one index per observed army"
+             % st["pinned"])
+    pinned_armies = [pool.from_json(st["armies"][i]) for i in st["pinned"]]
+    for army in pool.BOT_OBSERVED.values():
+        if not any(sorted(army) == sorted(p) for p in pinned_armies):
+            fail("an observed bot army was not pinned by --seed-bot")
+    if any(sorted(pool.BOT_WALL) == sorted(p) for p in pinned_armies):
+        fail("--seed-bot still pins the refuted BOT_WALL model")
     if expand.new_state(2026, {})["pinned"]:
         fail("a campaign without --seed-bot pinned something")
 
@@ -305,9 +329,10 @@ def test_bot_policy():
 
     print("PASS: bot policy matches its 7 measured king-bonus values, opens "
           "with the king in a corner both colours, and drafts %d pawns and "
-          "%d knights with nothing expensive, matching pool.BOT_WALL; "
-          "--seed-bot pins it at index 12 and leaves the 12-army gate field "
-          "alone" % (counts.get(chess.PAWN, 0), counts.get(chess.KNIGHT, 0)))
+          "%d knights with nothing expensive, matching pool.BOT_WALL -- which "
+          "two live games REFUTE; --seed-bot pins the %d observed armies "
+          "instead" % (counts.get(chess.PAWN, 0), counts.get(chess.KNIGHT, 0),
+                       len(pool.BOT_OBSERVED)))
 
 
 def test_mix_default():

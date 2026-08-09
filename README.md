@@ -133,9 +133,26 @@ the previous, over the same 480 paired cells.
 ## Against a model of the real opponent
 
 The archetypes are hand-written guesses. `play.py --opponent bot` is
-chess.com's own setup policy rebuilt from its shipped client
+chess.com's setup policy rebuilt from its shipped client
 (`docs/BOT_MODEL.md`): king to a corner on move one, then 16 pawns and 7
 knights, because material is absent from its setup eval entirely.
+
+> **The second half of that model is REFUTED.** Two full setup phases played
+> against the live bot, both as Black, both spending all 39 points:
+>
+> ```
+> 2026-08-05   Ka8  Qc8 Qa7 Qb7  Rb8  Bc6  Pa6 Pb6 Pg7 Ph7
+> 2026-08-08   Ka8  Qb7 Qb8 Qa7  Nb6 Nc6  Bg6  Pa6 Pe6 Ph7
+> ```
+>
+> **Three queens in both** -- 27 of 39 points on the piece the model says it
+> avoids. The king clause is confirmed twice more, a corner on the very first
+> placement. Reading the minified eval gave us the tie-breaks and not the terms
+> that decide.
+>
+> The observed armies are `pool.BOT_OBSERVED` and are what `--seed-bot` now
+> pins. Every number below against `--opponent bot` describes the modelled
+> opponent, not the real one.
 
 The **current** champion (11 bishops + 6 pawns):
 

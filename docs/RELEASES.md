@@ -45,9 +45,11 @@ Machine  | Mac14,9 arm64, macOS
 
 ### Known limits
 
-- **Every opponent is one we built.** Twelve hand-written archetypes, our own
-  breeding pool, and a model of chess.com's bot. `docs/BOT_MODEL.md` records
-  that we never verified whether live opponents are that bot or humans.
+- **Every opponent is one we built, and the bot model is half wrong.** Two live
+  games show the bot buying THREE QUEENS each time, where the model predicts 16
+  pawns and 7 knights. Its king clause is confirmed; its piece preference is
+  refuted. Every `--opponent bot` number in this repo describes the model, not
+  the bot. The observed armies are now in `pool.BOT_OBSERVED`.
 - **The pool is a sample, not a cover.** Exploitability 0 means no army *in the
   pool* beats the mix. The first outside army anyone tried beat the champion.
 - **Mixing is on by a judgement, not a measurement.** A pure strategy is solved

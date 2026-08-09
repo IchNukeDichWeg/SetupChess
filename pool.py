@@ -212,21 +212,47 @@ def army_key(army):
     return tuple(sorted(army))
 
 
-# What chess.com's own setup policy actually drafts (play.BotDrafter): king to
-# a corner, then every pawn square filled and the rest of rank 1 in knights.
-# 37 of 39 points, 24 pieces, the last 2 points forfeited because no affordable
-# square is left. Deliberately NOT in ARCHETYPES: seed_pool() iterates that
-# dict and it is the twelve-army gate field the +462 and +455.82 numbers were
-# measured against, so adding to it would silently change the baseline.
+# What chess.com's bot ACTUALLY drafts, transcribed from two live games on the
+# analysis board. Both as Black, stored here in White's perspective like every
+# other army. Both spend the full 39 points and both buy THREE QUEENS.
 #
-# Hardcoded rather than imported, because play.py imports this module. The copy
-# is pinned to the policy by a selftest that re-drafts it and compares, so the
-# two cannot drift apart.
+#   2026-08-05  K, 3 queens, 1 rook, 1 bishop, 4 pawns
+#   2026-08-08  K, 3 queens, 2 knights, 1 bishop, 3 pawns
 #
-# It is opponent-independent in practice: over eight drafts against four very
-# different archetypes in both colours, seven produced exactly this and the
-# eighth swapped one pawn for a knight. That is why it can be treated as a
-# fixed army at all.
+# This REFUTES the piece-preference half of docs/BOT_MODEL.md, which predicted
+# a drift toward pawns and knights from a small standing bias against expensive
+# pieces (queen -0.3, rook -0.4) and material being absent from the setup eval.
+# The king clause is confirmed exactly -- a corner on the first placement, both
+# games -- but the bot buys the dearest piece on the board, repeatedly.
+BOT_OBSERVED = {
+    "2026-08-05": [(chess.PAWN, chess.G2),
+     (chess.PAWN, chess.H2),
+     (chess.PAWN, chess.A3),
+     (chess.PAWN, chess.B3),
+     (chess.BISHOP, chess.C3),
+     (chess.ROOK, chess.B1),
+     (chess.QUEEN, chess.C1),
+     (chess.QUEEN, chess.A2),
+     (chess.QUEEN, chess.B2),
+     (chess.KING, chess.A1)],
+    "2026-08-08": [(chess.PAWN, chess.H2),
+     (chess.PAWN, chess.A3),
+     (chess.PAWN, chess.E3),
+     (chess.KNIGHT, chess.B3),
+     (chess.KNIGHT, chess.C3),
+     (chess.BISHOP, chess.G3),
+     (chess.QUEEN, chess.B1),
+     (chess.QUEEN, chess.A2),
+     (chess.QUEEN, chess.B2),
+     (chess.KING, chess.A1)],
+}
+
+# SUPERSEDED, kept because --seed-bot campaigns were run against it and their
+# results are meaningless without knowing what they faced. This is what
+# play.BotDrafter drafts from the modelled policy: king to a corner, then every
+# pawn square filled and the rest of rank 1 in knights, 37 of 39 points.
+#
+# It is not what the bot plays. Do not seed campaigns with it.
 BOT_WALL = [(chess.PAWN, sq) for sq in
             (chess.A2, chess.B2, chess.C2, chess.D2, chess.E2, chess.F2,
              chess.G2, chess.H2, chess.A3, chess.B3, chess.C3, chess.D3,
