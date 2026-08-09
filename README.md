@@ -237,6 +237,39 @@ number is not comparable with the Stockfish-refereed ones. Comparing the old
 champion with whatever this produces needs a head-to-head under a single
 referee, not a subtraction.
 
+## A real game, start to finish
+
+Played on chess.com's own analysis board against its built-in bot,
+2026-08-08. We drafted with `--mix` on, so the army came from the equilibrium
+support rather than the argmax: **12 bishops and 3 pawns, king b1**.
+
+```
+setup   1. @Bg1 @Ka8   2. @Bb3 @Qb7   3. @Bc3 @Pa6   4. @Bf1 @Nb6
+        5. @Ba2 @Qb8   6. @Be2 @Nc6   7. @Bc2 @Qa7   8. @Bd2 @Ph7
+        9. @Bf2 @Pe6  10. @Kb1 @Bg6  11-16. @Ba3 @Bd3 @Be3 @Pb2 @Ph2 @Pg3
+                                            (Black passes throughout)
+
+chess   16... e5  17. Bxb6 Qaxb6  18. Bxb6 Bxd3  19. Bexd3 h5
+        20. Bxa6 Qxb6  21. Bxb6 Qxb6  22. Be4 Kb8  23. Bxc6 Qxc6
+        24. Bxe5+ Ka8  25. Bd5 Qxd5  26. Bxd5+ Ka7  27. Be3#
+```
+
+**1-0, checkmate on move 27.** The chess phase was played by `fairy-stockfish`
+at 2M nodes per move; the drafting was ours.
+
+Three things the game settled, none of which a self-play campaign could:
+
+* the bot placed its king in a **corner on its first placement**, as
+  `docs/BOT_MODEL.md` predicts from the shipped client
+* it then bought **three queens** -- 27 of 39 points on the piece that model
+  says it avoids. The piece-preference half of our model is refuted
+* White placed 16th and last, so **Black moved first** in the chess phase, the
+  turn-parity rule confirmed live once more
+
+The bishop mass ate the queens: every queen that captured on b6 was recaptured
+by another bishop, because eleven bishops defend each other on both colours.
+The evaluation was +21 within one move of the handoff.
+
 ## The pool is a sample, not a cover
 
 A real game surfaced an army the expansion loop never produced: **thirteen
