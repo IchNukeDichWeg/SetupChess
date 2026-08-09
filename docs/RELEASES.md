@@ -17,6 +17,7 @@ Army     | 11 bishops + 6 pawns, king b1   (fingerprint ec385f649cf8af3e)
 Gate     | 0.9038 +/- 0.0146, +389.06 [+361.65, +420.48] vs 12 archetypes
 SPRT     | [0,4] LLR +41.444 -> ACCEPT H1, 800 games, 0 unplayable
 Pool     | 94 setups, exploitability 0, seeded with a real opponent's army
+Stable   | champion unchanged at shrink 0, 4, 8, 16, 32; support 7 armies
 Referee  | fairy-stockfish 14.0.1, no piece ceiling
 TC       | 20,000 nodes fixed, 15% per-game jitter
 Bench    | 404,905 nodes (C move generator, cross-check only)
@@ -75,7 +76,13 @@ Machine  | Mac14,9 arm64, macOS
 4. Confirm `DEFAULT_POOL` and `DEFAULT_TARGET` point at the frozen campaign and
    that the target is a member of the pool -- re-targeting abandons a target
    that is not.
-5. Write the notes: headline, fixed-field stats block, what changed, known
+5. **Confirm the champion survives the noise correction.** It is the argmax of
+   equilibrium weights over cells backed by a handful of pairs, which is the
+   same extreme-over-noise that produced two wrong numbers in this repo. Solve
+   again at `adapt.shrink_cells(..., k)` for k in 0, 8, 32; if the winner
+   changes, the choice was luck and the campaign needs more pairs per cell.
+   Pinned by `selftest.py`, and v1 is stable across all three.
+6. Write the notes: headline, fixed-field stats block, what changed, known
    limits. Prose-only notes are not notes.
-6. Name what is still owed. A known-limits section that admits the unmeasured
+7. Name what is still owed. A known-limits section that admits the unmeasured
    case is worth more than one claiming completeness.

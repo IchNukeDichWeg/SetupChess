@@ -355,6 +355,28 @@ def test_adapt():
             fail("shrink %.1f predicts the counter cell at %.4f, expected "
                  "%.4f +/- %.2f" % (k, got, want, tol))
 
+    # THE CHAMPION MUST NOT BE A NOISE ARTIFACT. It is selected as the argmax
+    # of equilibrium weights computed from cells backed by four pairs, which is
+    # exactly the kind of extreme-over-noise that produced two wrong numbers in
+    # this repo. If a different army wins once the cells are shrunk, the
+    # shipping choice was luck and the campaign needs more pairs per cell.
+    with open("campaigns/champion_v3.json") as f:
+        shipped = pool.from_json(json.load(f)["army"])
+    with open("campaigns/expand_v3.json") as f:
+        _s = json.load(f)
+    _armies = [pool.from_json(a) for a in _s["armies"]]
+    _cells = {tuple(int(x) for x in k.split(",")): v
+              for k, v in _s["cells"].items()}
+    for k in (0.0, 8.0, 32.0):
+        raw = (adapt.shrink_cells(_cells, len(_armies), k) if k > 0
+               else arena.matrix_from_cells(_cells, len(_armies)))
+        mm, kk, _ = solve.prepare(raw, 8)
+        xx, _val = solve.nash(mm)
+        top = kk[max(range(len(mm)), key=lambda i: xx[i])]
+        if sorted(_armies[top]) != sorted(shipped):
+            fail("at shrink %.1f the equilibrium favours army %d, not the "
+                 "shipped champion -- the choice was noise" % (k, top))
+
     # and on the real matrix: the mixture must beat the pure strategy once the
     # opponent has learned, which is the whole claim the file exists to make
     with open("campaigns/expand_v3.json") as f:
@@ -376,8 +398,9 @@ def test_adapt():
              % (curves["mix"], value))
     print("PASS: adapt reproduces rock-paper-scissors exactly (pure solved to "
           "0.0 by round 2, mixture %.4f at equilibrium), its shrinkage predicts "
-          "the 400-pair counter cell where the raw matrix is off by 0.11, and "
-          "mixing scores %.4f against a learner where the champion scores %.4f"
+          "the 400-pair counter cell where the raw matrix is off by 0.11, the "
+          "shipped champion survives shrink 0 to 32, and mixing scores %.4f "
+          "against a learner where the champion scores %.4f"
           % (avg, curves["mix"], curves["pure"]))
 
 
