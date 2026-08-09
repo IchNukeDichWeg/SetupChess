@@ -67,8 +67,21 @@ HUNT_THEIR_POINTS = 12
 #
 # The pool and the target move TOGETHER: re-targeting only considers armies
 # inside the pool, so a target that is not a member gets abandoned on the first
-# placement. Both point at the fairy-stockfish campaign, whose matrix has no
-# blind spot and whose champion beat the old one by +112.09 [+103.64, +120.67].
+# placement.
+#
+# Both point at the v3 campaign, which was seeded with the 13-bishop army a real
+# opponent actually played. That choice trades measured performance in one
+# direction for measured performance in another, so it is a judgement about the
+# opponent distribution rather than a free improvement:
+#
+#   v3 vs 13 bishops       +7.60 [+3.76, +11.45]   v2 scored -20.87
+#   v3 vs v2 head to head  -1.74 [-11.43, +7.96]   no difference
+#   v3 vs the archetypes   0.9038                  v2 scored 0.9425
+#
+# It goes to v3 because the archetypes are hand-written guesses that nobody
+# plays, while 13 bishops is the one army we have ever seen a human choose.
+# Switch DEFAULT_POOL and DEFAULT_TARGET back to expand_fsf/champion_fsf if you
+# expect the archetype-shaped field instead.
 #
 # Full history of every number here, with its caveats: docs/MEASUREMENTS.md
 
@@ -101,8 +114,8 @@ OPTIONALITY = False
 # that is not targeting you and saves roughly 36 against one that is.
 MIX = False
 
-DEFAULT_POOL = "campaigns/expand_fsf.json"
-DEFAULT_TARGET = "campaigns/champion_fsf.json"
+DEFAULT_POOL = "campaigns/expand_v3.json"
+DEFAULT_TARGET = "campaigns/champion_v3.json"
 
 
 def sample_target(champion_path, armies, rng):

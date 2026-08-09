@@ -30,13 +30,13 @@ perft oracle rather than to play anything.
 
 ## What it found
 
-**Bishops dominate, and it is not an artifact.** The solved army is eleven
-bishops and six pawns, bred by the expansion loop rather than hand-written:
+**Bishops dominate, and it is not an artifact.** The shipping army is eleven
+bishops and six pawns:
 
 ```
-  3 | B B B B B P . .
-  2 | B B . P P P P P
-  1 | B B B B K . . .
+  3 | P B B B B . B P
+  2 | B P B P B P . P
+  1 | . K . B . B B .
       a b c d e f g h
 ```
 
