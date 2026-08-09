@@ -50,9 +50,10 @@ Machine  | Mac14,9 arm64, macOS
   that we never verified whether live opponents are that bot or humans.
 - **The pool is a sample, not a cover.** Exploitability 0 means no army *in the
   pool* beats the mix. The first outside army anyone tried beat the champion.
-- **A fixed army is solved after one game.** `adapt.py` shows a pure strategy
-  pinned forever once the opponent counters it. `--mix` exists and is off,
-  because it cannot be honestly measured against a field that does not adapt.
+- **Mixing is on by a judgement, not a measurement.** A pure strategy is solved
+  after one game and pinned forever (`adapt.py`), so the drafter now samples the
+  equilibrium support. No harness here can score that choice: they all assume a
+  fixed field, where mixing costs about 32 Elo. `--no-mix` reverts it.
 - **`--optionality` is broken**, not rejected. Its only measurement, -79 Elo,
   was of a bug in four unconstrained placement paths.
 - **`expand.py` stalls intermittently** at a multiprocessing teardown. Cause

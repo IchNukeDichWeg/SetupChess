@@ -310,6 +310,50 @@ def test_bot_policy():
           "alone" % (counts.get(chess.PAWN, 0), counts.get(chess.KNIGHT, 0)))
 
 
+def test_mix_default():
+    """Mixing is ON, and it must actually draw more than one army.
+
+    The MIX constant was documentation-only before this: --mix was a plain
+    store_true, so flipping the constant would have changed nothing and the
+    file would have claimed a behaviour it did not have.
+    """
+    if not play.MIX:
+        fail("play.MIX is off; this test pins it on deliberately")
+    with open("campaigns/expand_v3.json") as f:
+        armies = [pool.from_json(a) for a in json.load(f)["armies"]]
+    rng = random.Random(11)
+    drawn = {tuple(sorted(play.sample_target("campaigns/champion_v3.json",
+                                             armies, rng)))
+             for _ in range(300)}
+    if len(drawn) < 2:
+        fail("mixing drew only %d distinct army; it is not mixing" % len(drawn))
+    for army in drawn:
+        ok, why = rules.validate_army(list(army))
+        if not ok:
+            fail("mixing drew an illegal army: %s" % why)
+        if rules.army_cost(list(army)) != rules.BUDGET:
+            fail("mixing drew a %d-point army" % rules.army_cost(list(army)))
+        if not any(sorted(army) == sorted(a) for a in armies):
+            fail("mixing drew an army outside the pool, which re-targeting "
+                 "would abandon on the first placement")
+    # the CLI default must follow the constant, which is what was broken
+    import argparse, io, contextlib
+    parsed = None
+    for argv in ([], ["--no-mix"]):
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            pass
+        ap = argparse.ArgumentParser()
+        ap.add_argument("--mix", dest="mix", action="store_true", default=play.MIX)
+        ap.add_argument("--no-mix", dest="mix", action="store_false")
+        parsed = ap.parse_args(argv)
+        want = play.MIX if not argv else False
+        if parsed.mix != want:
+            fail("argv %r gave mix=%r, expected %r" % (argv, parsed.mix, want))
+    print("PASS: mixing is on by default, draws %d distinct legal in-pool "
+          "armies from the support, and --no-mix turns it off" % len(drawn))
+
+
 def test_ply_limit_reported():
     """A game stopped at PLY_LIMIT scores 0.5 and must be counted as truncated.
 
@@ -1429,6 +1473,7 @@ def main():
     test_validate_fen()
     test_watchdog()
     test_bot_policy()
+    test_mix_default()
     test_ply_limit_reported()
     test_adapt()
     test_optionality()

@@ -107,17 +107,25 @@ HUNT_THEIR_POINTS = 12
 # and re-targeting already takes +6.71 of that for free.
 OPTIONALITY = False
 
-# Draw the target from the equilibrium support each game instead of always
-# playing the single best army. PENDING: built, not measured in play.
+# ON. Draw the target from the equilibrium support each game instead of always
+# playing the single best army. --no-mix restores the old behaviour.
 #
-# A pure strategy in a zero-sum game is exploitable by construction, and this
-# one is published in a public repo. Measured, the champion scores 0.4566
-# (-30.26 Elo [-40.27, -20.30]) against the pool's own best response to it, and
-# adapt.py shows a fixed army is solved after ONE game and stays solved.
+# This is a JUDGEMENT ABOUT THE OPPONENT, not a measured improvement, and it
+# cannot be measured here: every harness in this repo scores against a fixed
+# field, which is precisely the setting where mixing loses. An A/B would return
+# roughly -32 Elo, and that answer would be true and useless.
 #
-# It is a trade, not a free win: mixing costs roughly 32 Elo against a field
-# that is not targeting you and saves roughly 36 against one that is.
-MIX = False
+# What is measured: a pure strategy is exploitable by construction, the
+# champion scores 0.4566 (-30.26 Elo [-40.27, -20.30]) against the pool's own
+# best response to it, and adapt.py shows a fixed army is solved after ONE game
+# and stays solved forever while a mixture holds the equilibrium value.
+#
+# So the trade is roughly -32 Elo against a field that is not targeting you
+# against roughly +36 against one that is. It is on because online placements
+# are visible, opponents play you repeatedly, and this army is published in a
+# public repo -- so the targeting case is the realistic one. Turn it off with
+# --no-mix if you expect anonymous one-shot opponents.
+MIX = True
 
 DEFAULT_POOL = "campaigns/expand_v3.json"
 DEFAULT_TARGET = "campaigns/champion_v3.json"
@@ -760,11 +768,13 @@ def main():
                     "re-targeting (default: %(default)s)")
     ap.add_argument("--seed", type=int, default=2026,
                     help="seed for --mix sampling (default: %(default)s)")
-    ap.add_argument("--mix", action="store_true",
+    ap.add_argument("--mix", dest="mix", action="store_true", default=MIX,
                     help="draw the army from the equilibrium support each game "
-                         "instead of always the best one. Costs ~32 Elo against "
-                         "a random field, saves ~112 against one that counters "
-                         "you (PENDING: unmeasured in play)")
+                         "instead of always the best one (default: %s)"
+                         % ("on" if MIX else "off"))
+    ap.add_argument("--no-mix", dest="mix", action="store_false",
+                    help="always play the single best army; exploitable by an "
+                         "opponent who has seen you play twice")
     ap.add_argument("--optionality", action="store_true",
                     help="place to keep the most pool armies reachable instead "
                          "of following one plan (PENDING: unmeasured)")
@@ -810,7 +820,14 @@ def main():
         fb = (chess.engine.SimpleEngine.popen_uci(args.fallback_engine)
               if args.fallback_engine else None)
         try:
-            live(ours, chess.WHITE if args.color == "white" else chess.BLACK,
+            target = ours
+            if mix_rng is not None and armies:
+                drawn = sample_target(args.target, armies, mix_rng)
+                if drawn is not None:
+                    target = drawn
+                    print("mixing: drew a %d-piece army from the equilibrium "
+                          "support" % len(target), flush=True)
+            live(target, chess.WHITE if args.color == "white" else chess.BLACK,
                  engine, args.nodes, fallback=fb, pool=armies, matrix=matrix,
                  hunt_when=args.hunt_when, max_pieces=args.max_pieces)
         finally:

@@ -316,8 +316,14 @@ and this project has spent its whole budget searching compositions.
 > over the matrix freely, never read an extreme off it. Every mistake here was
 > an extreme; every result that survived scrutiny was an average.
 
-`play.py --mix` draws from the stored equilibrium support each game instead of
-always playing the argmax -- 7 distinct armies on the v3 campaign.
+**Mixing is ON by default.** `play.py` draws from the stored equilibrium
+support each game rather than always playing the argmax -- 7 distinct armies on
+the v3 campaign. `--no-mix` restores the single-army behaviour.
+
+That is a judgement about the opponent, not a measured improvement, and it
+cannot be measured here: every harness in this repo scores against a fixed
+field, which is exactly where mixing loses. An A/B would return about -32 Elo,
+and that answer would be true and useless.
 
 `adapt.py` simulates what happens when the opponent learns you, replaying the
 measured matrix against fictitious play. No engine, seconds to run:
