@@ -208,7 +208,7 @@ of 31; the pool went 13 to 69 in three rounds; and the fill cost per round went
 1,728 to 4,032 to 11,984 pairs, because it grows with pool times admitted.
 
 ```bash
-python3 expand.py --state campaigns/expand_bot_fsf.json --seed-bot \
+python3 expand.py --state campaigns/expand_bot_new.json --seed-bot \
   --engine fairy-stockfish --max-pieces 0 --rounds 30 --workers 0 \
   --final-games 400
 ```
