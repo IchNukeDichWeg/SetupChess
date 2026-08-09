@@ -37,10 +37,26 @@ everywhere.**
 | 87 setups | Stockfish | +29.63 [+23.46, +35.83] | 1,187 |
 | 87, post handoff fix | Stockfish | +24.63 [+18.06, +31.22] | 1,187 |
 | 87, at 200k nodes | Stockfish | +29.93 [+23.66, +36.21] | 1,187 |
+| **19 setups, uncensored** | **fairy-stockfish** | **+8.57 [+5.31, +11.83]** | **3,000** |
 | **60 setups, uncensored** | **fairy-stockfish** | **+6.71 [+2.57, +10.85]** | **6,500** |
 
-The last row is the one that describes the shipping code. The others are on the
-censored matrix and are not a fair before-and-after with it.
+The two bold rows are the honest ones. The Stockfish rows are on the censored
+matrix and are not a fair before-and-after with them.
+
+### "Re-targeting grows with the pool" is withdrawn
+
+On the censored matrix the effect looked like it scaled: +17.13 on 19 setups,
++29.63 on 87, described at the time as "nearly double, which is the effect you
+would hope for". On the clean instrument the two pools give **+8.57** and
+**+6.71**, intervals overlapping, and the smaller pool is if anything ahead.
+
+The scaling story was part of the censoring artifact. A bigger pool has more
+high-piece-count members, so a bigger pool lost more cells to Stockfish's
+ceiling, so its best response was chosen from a more selectively-sampled set.
+
+Recorded because a prediction was made before this run and it was wrong: the
+smaller pool was expected to score lower, on exactly the reasoning above. It
+did not.
 
 The magnitude is quotable because the run went to a **fixed 6,500-pair budget**
 rather than halting when the statistic crossed. The budget was raised twice

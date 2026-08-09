@@ -65,6 +65,11 @@ HUNT_THEIR_POINTS = 12
 # smaller than it looked: +24.63 on the old pool, four fifths of which was an
 # artifact of Stockfish's 32-piece blind spot. --no-pool turns it off.
 #
+# It does NOT grow with the pool, though it looked like it did on the censored
+# matrix. Measured on the clean instrument: 19 setups +8.57 [+5.31, +11.83],
+# 60 setups +6.71 [+2.57, +10.85]. Overlapping, and the smaller pool is if
+# anything ahead. See docs/MEASUREMENTS.md.
+#
 # The pool and the target move TOGETHER: re-targeting only considers armies
 # inside the pool, so a target that is not a member gets abandoned on the first
 # placement.
