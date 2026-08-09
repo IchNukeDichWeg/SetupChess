@@ -255,6 +255,51 @@ as what its challengers reach.
 So the honest status of "eleven bishops and six pawns" is: the best army this
 search **found**, beaten by the first outside army anyone tried it against.
 
+### Handing the gap to the loop fixes it
+
+Re-run with the 13-bishop army seeded into the starting pool (`--seed-army`),
+94 setups, exploitability 0. The new champion is again 11 bishops and 6 pawns,
+a different arrangement, king on b1:
+
+```
+                            score     Elo                    verdict
+v3 vs 13 bishops           0.5109   +7.60 [+3.76, +11.45]   ACCEPT H1
+v2 vs 13 bishops           0.4700  -20.87 [-28.51, -13.25]  ACCEPT H0
+v3 vs v2, head to head     0.4975   -1.74 [-11.43,  +7.96]  CONTINUE
+```
+
+A **28 Elo swing** on the matchup that was seeded, and **no measured
+difference** between the two champions head to head. The double oracle could
+not invent 13 bishops, but handed it, it found answers.
+
+It was not free. Against the twelve archetypes the v3 mix scores **0.9038**
+where v2 scored **0.9425** on the same instrument -- nine losses in 800 games
+against four. Hedging against an army the archetypes do not contain costs
+something against everything else.
+
+Note also how drawish this matchup is: **717 of 800 pairs drew**. The two
+armies are close enough that the chess phase usually cannot separate them.
+
+### Being predictable is worse than any of this
+
+Every number above is for a FIXED army, and a fixed army is exploitable by
+construction. From the same matrix, against an opponent who knows what we play:
+
+```
+we play the champion (a pure strategy)  ->  0.3438  (-112.3 Elo)
+we play the equilibrium mix             ->  0.5000     (0.0 Elo)
+```
+
+The hard counter is already in our own pool at index 31, itself an 11-bishop
+6-pawn army, scoring 0.6562 against the champion. Online, placements are
+visible and opponents play you repeatedly, so this is not hypothetical.
+
+`play.py --mix` draws from the stored equilibrium support each game instead of
+always playing the argmax -- 7 distinct armies on the v3 campaign. It is a
+trade: mixing costs about 32 Elo against a field that is not targeting you and
+saves about 112 against one that is. Unmeasured in play; the arithmetic above
+is from the matrix.
+
 ## The setup phase has real tactics
 
 Two ways the game ends before a single move is played, both verified against
