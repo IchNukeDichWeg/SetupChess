@@ -285,14 +285,26 @@ armies are close enough that the chess phase usually cannot separate them.
 Every number above is for a FIXED army, and a fixed army is exploitable by
 construction. From the same matrix, against an opponent who knows what we play:
 
+The hard counter is already in our own pool -- an 11-bishop 6-pawn army on
+different squares, with the king on f1 instead of b1. Measured over 400 pairs:
+
 ```
-we play the champion (a pure strategy)  ->  0.3438  (-112.3 Elo)
-we play the equilibrium mix             ->  0.5000     (0.0 Elo)
+champion vs its own best response   0.4566 +/- 0.0143
+                                   -30.26 Elo [-40.27, -20.30], ACCEPT H0
 ```
 
-The hard counter is already in our own pool at index 31, itself an 11-bishop
-6-pawn army, scoring 0.6562 against the champion. Online, placements are
-visible and opponents play you repeatedly, so this is not hypothetical.
+Online, placements are visible and opponents play you repeatedly, so being
+predictable is not a hypothetical cost. Note also what the counter *is*: the
+same composition on different squares. **Arrangement beats composition here**,
+and this project has spent its whole budget searching compositions.
+
+> **A methodological correction worth keeping.** That counter was found as the
+> argmin over 94 columns of a matrix whose cells hold 8 pairs each, and the
+> screen said 0.3438, or -112.3 Elo -- nearly four times the real effect. The
+> minimum of 94 noisy samples is biased low by construction. Every number in
+> this repo read off the matrix by taking a max or min over many cells carries
+> the same inflation, **including the +143.4 reactive ceiling** quoted above.
+> Averages do not: the noise cancels instead of being selected for.
 
 `play.py --mix` draws from the stored equilibrium support each game instead of
 always playing the argmax -- 7 distinct armies on the v3 campaign. It is a

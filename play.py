@@ -139,18 +139,26 @@ OPTIONALITY = False
 # Draw the target from the equilibrium support each game instead of always
 # playing the single best army. PENDING: built, not yet measured in play.
 #
-# The solver produces a MIX for a reason and we were throwing it away. Against
-# an opponent who knows what we play and answers it perfectly, computed on the
-# 94-setup matrix:
-#
-#   we play the champion (a pure strategy)  ->  we score 0.3438  (-112.3 Elo)
-#   we play the equilibrium mix             ->  we score 0.5000     (0.0 Elo)
-#
-# The hard counter is already sitting in our own pool at index 31 -- itself an
-# 11-bishop, 6-pawn army -- and it scores 0.6562 against the champion. A pure
+# The solver produces a MIX for a reason and we were throwing it away. A pure
 # strategy in a zero-sum game is exploitable by construction, and online this
 # is not hypothetical: placements are visible, opponents play you repeatedly,
 # and the champion is published in this repo.
+#
+# The hard counter is already in our own pool at index 31, itself an 11-bishop
+# 6-pawn army on different squares. Measured properly, 400 pairs:
+#
+#   champion vs that counter  ->  0.4566 +/- 0.0143  (-30.26 Elo
+#                                 [-40.27, -20.30], ACCEPT H0)
+#
+# SELECTION BIAS WARNING, because the first version of this comment fell for
+# it. That counter was found as the ARGMIN over 94 columns of a matrix whose
+# cells hold 8 pairs each. The minimum of 94 noisy samples is biased low by
+# construction, and the screen said 0.3438 (-112.3 Elo) -- nearly four times
+# the real effect. Any number read off this matrix by taking a max or a min
+# over many cells carries the same inflation, including the +143.4 reactive
+# ceiling quoted above OPTIONALITY. Averages over the matrix (the 0.5456 mean,
+# the equilibrium value) do not, since the noise cancels rather than being
+# selected for.
 #
 # It is a genuine trade, not a free win. Against an opponent drawn at RANDOM
 # from the pool the champion scores 0.5456 and the mix scores 0.5000, so mixing
