@@ -132,8 +132,23 @@ HUNT_THEIR_POINTS = 12
 # The information arrives exactly when our freedom is smallest.
 #
 # So this picks the placement that leaves the most pool armies reachable rather
-# than the next piece of one target. King timing is left to
-# KING_AT_POINTS_LEFT, since placing it early invites a rank-3 setup mate.
+# than the next piece of one target.
+#
+# BROKEN, DO NOT ENABLE. Measured at -79.17 Elo [-83.83, -74.54] over 3,000
+# pairs, and that number is a BUG REPORT rather than a verdict on the idea.
+# Only _optionality_move respects the pool; the king rule, the forced-block
+# path, the king hunt and the off-plan fallback do not, and any one of them can
+# drop the reachable set to zero. When it hits zero the drafter falls into
+# "spend the most expensive affordable piece", which built a 38-point army
+# outside the pool.
+#
+# Threading the pool constraint through the king rule alone took 80 drafts from
+# 0 inside the pool to 45, and still leaves 3 finishing on 24-25 of 39 points.
+# Every remaining path needs the same treatment before this can be measured.
+#
+# Whether it is worth finishing is genuinely unclear: the +143.4 ceiling above
+# that motivated it is a max over noisy matrix cells and is inflated by the
+# same selection bias that made a counter look like -112 Elo when it was -30.
 OPTIONALITY = False
 
 # Draw the target from the equilibrium support each game instead of always
@@ -344,6 +359,24 @@ class Drafter:
                 best, best_key = (pt, sq), key
         return best
 
+    def _keep_reachable(self, state, legal):
+        """`legal` filtered to placements some reachable pool army contains.
+
+        Returns `legal` unchanged when optionality is off, or when nothing
+        would survive the filter -- a drafter with no legal move is worse than
+        one that steps outside the pool.
+        """
+        if not self.optionality or not self.pool:
+            return legal
+        ours = self._revealed(state, self.color)
+        reachable = [s for s in (set(a) for a in self.pool) if ours <= s]
+        if not reachable:
+            return legal
+        kept = [(pt, sq) for pt, sq in legal
+                if any((pt, sq if self.color == chess.WHITE
+                        else chess.square_mirror(sq)) in s for s in reachable)]
+        return kept or legal
+
     def _optionality_move(self, state, legal):
         """The legal placement leaving the most pool armies reachable.
 
@@ -445,7 +478,12 @@ class Drafter:
 
         must_king = state.board.king(self.color) is None
         if must_king and state.points[self.color] <= KING_AT_POINTS_LEFT:
-            king = self._king_square(state, legal)
+            # With optionality on, the king has to respect reachability too.
+            # It is chosen by safety alone, and one king on a square no
+            # reachable army uses collapses the option set to zero and drops
+            # the drafter into the off-plan fallback, which builds junk:
+            # measured, a 38-point army outside the pool and -79 Elo.
+            king = self._king_square(state, self._keep_reachable(state, legal))
             if king:
                 return king
 
