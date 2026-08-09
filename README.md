@@ -314,10 +314,12 @@ measured matrix against fictitious play. No engine, seconds to run:
 
 ```
 round   pure      mix
-1       0.5525    0.6102     <- opponent is still guessing
-2       0.3438    0.5236     <- solved
-10      0.3438    0.5061
-200     0.3438    0.4986
+1       0.5175    0.5398     <- opponent is still guessing
+2       0.4479    0.5127     <- solved
+10      0.4479    0.5057
+200     0.4479    0.4974
+
+second half   pure 0.4479 (-36.3 Elo)   mix 0.5002 (+0.2 Elo)
 ```
 
 **A fixed army is solved after one game and stays solved.** From round 2 the
@@ -325,16 +327,20 @@ pure strategy is pinned at exactly one value forever, because the opponent
 found its counter and never has to look again. Searching for a better fixed
 army does not fix that; it only changes which army gets countered.
 
-Two things this does NOT establish. The levels are inflated -- the opponent's
-best response is an argmax over 8-pair cells, the same selection bias that made
-a -30 Elo counter look like -112 -- so read the gap as "large", not as a
-number. And a real opponent cannot see your finished army before choosing
-theirs, since placement alternates, so this is the pessimistic bound. The truth
-lies between it and the fixed-field numbers above.
+**The levels are corrected, and the correction is calibrated against a real
+match.** The opponent's best response is an argmax over cells backed by four
+pairs, which lands on whichever cell got lucky -- raw, it valued the counter at
+0.3438 where a 400-pair match measured **0.4566**. Shrinking each cell toward
+0.5 by 8 pseudo-observations predicts that cell to within 0.009. It is a
+single-point calibration, so treat the ~36 Elo as an order of magnitude.
 
-The shape is safe regardless: that a pure strategy decays while a mixture holds
-is a property of equilibria, not of this data. `selftest.py` pins it against
-rock-paper-scissors, where the answer is known exactly.
+Still not a real-game number: placement alternates, so a live opponent cannot
+see your finished army before committing to theirs. This is the pessimistic
+bound, and the truth lies between it and the fixed-field numbers above.
+
+The shape is safe regardless, being a property of equilibria rather than of
+this data. `selftest.py` pins it against rock-paper-scissors, where the answer
+is known exactly, and pins the shrinkage against the 400-pair cell.
 
 ## The setup phase has real tactics
 

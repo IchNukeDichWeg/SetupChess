@@ -334,6 +334,27 @@ def test_adapt():
     if abs(avg - 0.5) > 0.03:
         fail("the mixture drifted from the 0.5 equilibrium value: %.4f" % avg)
 
+    # the shrinkage must reproduce the one cell measured at 400 pairs. Without
+    # it the opponent's best response is an argmax over 4-pair cells and lands
+    # on whichever got lucky: raw it predicts 0.3438 where the real match
+    # measured 0.4566.
+    with open("campaigns/expand_v3.json") as f:
+        _st = json.load(f)
+    _cells = {tuple(int(x) for x in k.split(",")): v
+              for k, v in _st["cells"].items()}
+    _champ = pool.from_json(json.load(open("campaigns/champion_v3.json"))["army"])
+    _ci = next(i for i, a in enumerate(_st["armies"])
+               if sorted(pool.from_json(a)) == sorted(_champ))
+    for k, want, tol in ((0.0, 0.3438, 0.01), (adapt.SHRINK, 0.4566, 0.02)):
+        raw = (adapt.shrink_cells(_cells, len(_st["armies"]), k) if k > 0
+               else arena.matrix_from_cells(_cells, len(_st["armies"])))
+        mm, kk, _ = solve.prepare(raw, 8)
+        pos = kk.index(_ci)
+        got = min(mm[pos][j] for j in range(len(mm)))
+        if abs(got - want) > tol:
+            fail("shrink %.1f predicts the counter cell at %.4f, expected "
+                 "%.4f +/- %.2f" % (k, got, want, tol))
+
     # and on the real matrix: the mixture must beat the pure strategy once the
     # opponent has learned, which is the whole claim the file exists to make
     with open("campaigns/expand_v3.json") as f:
@@ -354,7 +375,8 @@ def test_adapt():
         fail("the mixture strayed far from the equilibrium value: %.4f vs %.4f"
              % (curves["mix"], value))
     print("PASS: adapt reproduces rock-paper-scissors exactly (pure solved to "
-          "0.0 by round 2, mixture %.4f at equilibrium) and on the real matrix "
+          "0.0 by round 2, mixture %.4f at equilibrium), its shrinkage predicts "
+          "the 400-pair counter cell where the raw matrix is off by 0.11, and "
           "mixing scores %.4f against a learner where the champion scores %.4f"
           % (avg, curves["mix"], curves["pure"]))
 

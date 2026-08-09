@@ -15,12 +15,15 @@ losing to the same setup twice.
 
     python3 adapt.py --state campaigns/expand_v3.json --champion campaigns/champion_v3.json
 
-WHAT THIS CANNOT TELL YOU. The opponent's best response is an argmax over
-matrix cells holding 8 pairs each, and the max of many noisy samples is biased
-in its own favour -- measured, that bias turned a -30 Elo counter into an
-apparent -112. So the LEVELS here are pessimistic by an unknown amount. The
-SHAPE is not: that a pure strategy decays as it is learned while a mixture does
-not is a property of equilibria, not of this data.
+The opponent's best response is an argmax over cells backed by four pairs
+each, and the max of many noisy samples is biased in its own favour: taken
+raw, that bias made a counter look like -112 Elo when a 400-pair match put it
+at -30. --shrink corrects for it, see SHRINK.
+
+STILL NOT A REAL-GAME NUMBER. Placement alternates, so a live opponent cannot
+see your finished army before committing to theirs. This models someone who
+knows your whole army in advance, which is the pessimistic bound. The truth
+lies between it and the fixed-field measurements elsewhere in this repo.
 """
 
 import argparse
@@ -31,6 +34,37 @@ import arena
 import pool as poolmod
 import solve
 import stats
+
+
+# Pseudo-observations at 0.5 added to every cell before the opponent picks its
+# best response. Cells hold four pairs, so an argmax over ~90 columns lands on
+# whichever cell got lucky rather than whichever army is actually the counter.
+#
+# CALIBRATED, not guessed. One cell in this matrix has been measured properly
+# at 400 pairs (campaigns/champ_vs_counter.json, 0.4566). Predicting that cell
+# from the campaign matrix:
+#
+#   k=0   0.3438   off by -0.1129
+#   k=4   0.4219   off by -0.0347
+#   k=8   0.4479   off by -0.0087     <- this
+#   k=16  0.4688   off by +0.0121
+#
+# A single-point calibration, so treat 8 as the right order of magnitude rather
+# than a tuned constant. Set --shrink 0 to see the raw, badly biased version.
+SHRINK = 8.0
+
+
+def shrink_cells(cells, n, k):
+    """Per-cell means pulled toward 0.5 by `k` pseudo-observations."""
+    acc = {}
+    for (i, j, g), v in cells.items():
+        if v is None:
+            continue
+        acc.setdefault((i, j), []).append(v)
+    out = [[None] * n for _ in range(n)]
+    for (i, j), vs in acc.items():
+        out[i][j] = (sum(vs) + k * 0.5) / (len(vs) + k)
+    return out
 
 
 def simulate(m, policy, rounds, rng, weights=None):
@@ -70,6 +104,10 @@ def main():
     ap.add_argument("--rounds", type=int, default=200)
     ap.add_argument("--trials", type=int, default=200,
                     help="independent repetitions, averaged")
+    ap.add_argument("--shrink", type=float, default=SHRINK,
+                    help="pseudo-observations at 0.5 per cell, correcting the "
+                         "winner's curse in the opponent's best response "
+                         "(default: %(default)s, 0 disables)")
     ap.add_argument("--max-holes", type=int, default=8)
     ap.add_argument("--seed", type=int, default=2026)
     args = ap.parse_args()
@@ -78,14 +116,16 @@ def main():
         state = json.load(f)
     cells = {tuple(int(x) for x in k.split(",")): v
              for k, v in state["cells"].items()}
-    m, keep, rep = solve.prepare(
-        arena.matrix_from_cells(cells, len(state["armies"])), args.max_holes)
+    raw = (shrink_cells(cells, len(state["armies"]), args.shrink)
+           if args.shrink > 0
+           else arena.matrix_from_cells(cells, len(state["armies"])))
+    m, keep, rep = solve.prepare(raw, args.max_holes)
     x, value = solve.nash(m)
 
     print("pool %d setups, equilibrium value %.4f, exploitability %.4f"
           % (len(m), value, solve.exploitability(m, x)))
-    print("%d rounds x %d trials, opponent plays fictitious play\n"
-          % (args.rounds, args.trials))
+    print("%d rounds x %d trials, opponent plays fictitious play, shrink %.1f\n"
+          % (args.rounds, args.trials, args.shrink))
 
     print("%-6s %-14s %-14s %-14s" % ("round", "pure", "mix", "difference"))
     curves = {}
