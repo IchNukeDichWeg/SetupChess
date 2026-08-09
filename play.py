@@ -22,6 +22,7 @@ stdin, one `@Qd1` token per line, for driving a real game elsewhere.
 
 import argparse
 import json
+import random
 import sys
 import time
 
@@ -135,8 +136,46 @@ HUNT_THEIR_POINTS = 12
 # KING_AT_POINTS_LEFT, since placing it early invites a rank-3 setup mate.
 OPTIONALITY = False
 
+# Draw the target from the equilibrium support each game instead of always
+# playing the single best army. PENDING: built, not yet measured in play.
+#
+# The solver produces a MIX for a reason and we were throwing it away. Against
+# an opponent who knows what we play and answers it perfectly, computed on the
+# 94-setup matrix:
+#
+#   we play the champion (a pure strategy)  ->  we score 0.3438  (-112.3 Elo)
+#   we play the equilibrium mix             ->  we score 0.5000     (0.0 Elo)
+#
+# The hard counter is already sitting in our own pool at index 31 -- itself an
+# 11-bishop, 6-pawn army -- and it scores 0.6562 against the champion. A pure
+# strategy in a zero-sum game is exploitable by construction, and online this
+# is not hypothetical: placements are visible, opponents play you repeatedly,
+# and the champion is published in this repo.
+#
+# It is a genuine trade, not a free win. Against an opponent drawn at RANDOM
+# from the pool the champion scores 0.5456 and the mix scores 0.5000, so mixing
+# costs about 32 Elo against a field that is not targeting you and saves about
+# 112 against one that is. Which is right depends on whether your opponents
+# adapt. Ours do.
+MIX = False
+
 DEFAULT_POOL = "campaigns/expand_fsf.json"
 DEFAULT_TARGET = "campaigns/champion_fsf.json"
+
+
+def sample_target(champion_path, armies, rng):
+    """An army drawn from the stored equilibrium support. None if absent.
+
+    The weights come from the campaign that produced the champion, so this
+    plays the solver's actual answer rather than its argmax. See MIX.
+    """
+    with open(champion_path) as f:
+        support = json.load(f).get("support") or {}
+    support = {int(k): v for k, v in support.items() if int(k) < len(armies)}
+    if not support:
+        return None
+    idx = sorted(support)
+    return armies[rng.choices(idx, weights=[support[i] for i in idx], k=1)[0]]
 
 
 def load_pool(path):
@@ -736,6 +775,13 @@ def main():
     ap.add_argument("--pool", default=DEFAULT_POOL,
                     help="campaign state JSON driving best-response "
                     "re-targeting (default: %(default)s)")
+    ap.add_argument("--seed", type=int, default=2026,
+                    help="seed for --mix sampling (default: %(default)s)")
+    ap.add_argument("--mix", action="store_true",
+                    help="draw the army from the equilibrium support each game "
+                         "instead of always the best one. Costs ~32 Elo against "
+                         "a random field, saves ~112 against one that counters "
+                         "you (PENDING: unmeasured in play)")
     ap.add_argument("--optionality", action="store_true",
                     help="place to keep the most pool armies reachable instead "
                          "of following one plan (PENDING: unmeasured)")
@@ -761,6 +807,7 @@ def main():
     ap.add_argument("--out", help="write the game log here (no default)")
     args = ap.parse_args()
 
+    mix_rng = random.Random(args.seed) if args.mix else None
     ours = load_army(args.target)
     ok, why = rules.validate_army(ours)
     if not ok:
@@ -797,7 +844,12 @@ def main():
     games = []
     try:
         for color in colors:
-            us = Drafter(ours, color, pool=armies, matrix=matrix,
+            target = ours
+            if mix_rng is not None and armies:
+                drawn = sample_target(args.target, armies, mix_rng)
+                if drawn is not None:
+                    target = drawn
+            us = Drafter(target, color, pool=armies, matrix=matrix,
                          hunt_when=args.hunt_when,
                          optionality=args.optionality)
             if args.opponent == "stdin":
