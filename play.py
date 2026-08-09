@@ -117,19 +117,25 @@ HUNT_THEIR_POINTS = 12
 # out identical because the drafter only re-targets in some games, so 3,512
 # carried information. That is why this needed a budget the other measurements
 # did not.
-# Stay uncommitted instead of following one plan. PENDING: built, not yet
-# measured. The case for it is arithmetic on the existing payoff matrix rather
-# than a hunch:
+# Stay uncommitted instead of following one plan.
 #
-#   fixed equilibrium mix     0.5456 vs the pool   (+31.8 Elo)
-#   hindsight best response   0.7410 vs the pool  (+182.6 Elo)
+# The case for it was arithmetic on the payoff matrix, and the arithmetic was
+# WRONG in the direction that flattered the idea. A hindsight best response --
+# knowing the opponent's finished army and answering it perfectly -- looked
+# worth +143.4 Elo over the equilibrium mix. That figure is a max over cells
+# backed by four pairs, which lands on whichever cell got lucky. Corrected with
+# the shrinkage adapt.py calibrates against a 400-pair match:
 #
-# so knowing the opponent's finished army and answering it perfectly is worth
-# +143.4 Elo over playing the mix. Re-targeting captures +6.71 of that, about
-# 5%, and the reason is commitment, measured on this pool: our FIRST placement
-# cuts the reachable armies from 60 to 29 before the opponent has revealed
-# anything, and by our eighth we are down to 12 while they have shown 7 pieces.
-# The information arrives exactly when our freedom is smallest.
+#   shrink   mix          best response   ceiling
+#   0        +77.7 Elo    +257.4 Elo      +179.8   <- what motivated this
+#   8        +27.7 Elo     +73.6 Elo       +46.0   <- calibrated
+#
+# So the headroom for reacting at all is about +46 Elo, and measured
+# re-targeting already captures +6.71 of it. The remaining prize is modest.
+#
+# The commitment problem it targets is real: our FIRST placement cuts the
+# reachable armies from 60 to 29 before the opponent has revealed anything, and
+# by our eighth we are at 12 while they have shown 7 pieces.
 #
 # So this picks the placement that leaves the most pool armies reachable rather
 # than the next piece of one target.
@@ -146,9 +152,11 @@ HUNT_THEIR_POINTS = 12
 # 0 inside the pool to 45, and still leaves 3 finishing on 24-25 of 39 points.
 # Every remaining path needs the same treatment before this can be measured.
 #
-# Whether it is worth finishing is genuinely unclear: the +143.4 ceiling above
-# that motivated it is a max over noisy matrix cells and is inflated by the
-# same selection bias that made a counter look like -112 Elo when it was -30.
+# Whether it is worth finishing: the ceiling above is +46 Elo, not the +143.4
+# that motivated it, and re-targeting already takes +6.71 of that for free.
+# Finishing means threading the pool constraint through four more placement
+# paths to chase at most ~39 Elo, and the -79 result means we do not even know
+# the sign of a correct implementation.
 OPTIONALITY = False
 
 # Draw the target from the equilibrium support each game instead of always
@@ -170,10 +178,10 @@ OPTIONALITY = False
 # cells hold 8 pairs each. The minimum of 94 noisy samples is biased low by
 # construction, and the screen said 0.3438 (-112.3 Elo) -- nearly four times
 # the real effect. Any number read off this matrix by taking a max or a min
-# over many cells carries the same inflation, including the +143.4 reactive
-# ceiling quoted above OPTIONALITY. Averages over the matrix (the 0.5456 mean,
-# the equilibrium value) do not, since the noise cancels rather than being
-# selected for.
+# over many cells carries the same inflation. The reactive ceiling above
+# OPTIONALITY has since been recomputed on the shrunk matrix and fell from
+# +179.8 to +46.0 Elo. Averages over the matrix do not suffer this, since the
+# noise cancels rather than being selected for.
 #
 # It is a genuine trade, not a free win. Against an opponent drawn at RANDOM
 # from the pool the champion scores 0.5456 and the mix scores 0.5000, so mixing

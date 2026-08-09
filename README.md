@@ -303,8 +303,10 @@ and this project has spent its whole budget searching compositions.
 > screen said 0.3438, or -112.3 Elo -- nearly four times the real effect. The
 > minimum of 94 noisy samples is biased low by construction. Every number in
 > this repo read off the matrix by taking a max or min over many cells carries
-> the same inflation, **including the +143.4 reactive ceiling** quoted above.
-> Averages do not: the noise cancels instead of being selected for.
+> the same inflation. The reactive ceiling that motivated `--optionality` was
+> recomputed on the shrunk matrix and fell from **+179.8 to +46.0 Elo** --
+> against which measured re-targeting already captures +6.71. Averages do not
+> suffer this: the noise cancels instead of being selected for.
 
 `play.py --mix` draws from the stored equilibrium support each game instead of
 always playing the argmax -- 7 distinct armies on the v3 campaign.
