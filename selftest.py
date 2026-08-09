@@ -377,6 +377,29 @@ def test_adapt():
             fail("at shrink %.1f the equilibrium favours army %d, not the "
                  "shipped champion -- the choice was noise" % (k, top))
 
+    # SPLIT-HALF RELIABILITY. Everything the double oracle does -- rank, prune,
+    # solve -- rests on per-army mean scores. Each is an average over ~370
+    # pairs even though its cells hold four, so it should be precise. If this
+    # ever falls, the pool ordering is noise and so is the champion.
+    halves = []
+    for parity in (0, 1):
+        tot = {}
+        for k, v in _s["cells"].items():
+            i, j, g = (int(x) for x in k.split(","))
+            if v is None or i == j or g % 2 != parity:
+                continue
+            tot.setdefault(i, []).append(v)
+        halves.append({i: sum(v) / len(v) for i, v in tot.items() if len(v) > 30})
+    shared = sorted(set(halves[0]) & set(halves[1]))
+    if len(shared) < 50:
+        fail("split-half check covered only %d armies" % len(shared))
+    import statistics
+    r = statistics.correlation([halves[0][i] for i in shared],
+                               [halves[1][i] for i in shared])
+    if r < 0.90:
+        fail("split-half reliability of the army ranking is %.3f; the pool "
+             "ordering is noise" % r)
+
     # and on the real matrix: the mixture must beat the pure strategy once the
     # opponent has learned, which is the whole claim the file exists to make
     with open("campaigns/expand_v3.json") as f:
@@ -399,9 +422,10 @@ def test_adapt():
     print("PASS: adapt reproduces rock-paper-scissors exactly (pure solved to "
           "0.0 by round 2, mixture %.4f at equilibrium), its shrinkage predicts "
           "the 400-pair counter cell where the raw matrix is off by 0.11, the "
-          "shipped champion survives shrink 0 to 32, and mixing scores %.4f "
+          "shipped champion survives shrink 0 to 32, the army ranking has "
+          "split-half reliability %.3f, and mixing scores %.4f "
           "against a learner where the champion scores %.4f"
-          % (avg, curves["mix"], curves["pure"]))
+          % (avg, r, curves["mix"], curves["pure"]))
 
 
 def test_optionality():

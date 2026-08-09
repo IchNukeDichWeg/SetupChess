@@ -308,8 +308,13 @@ and this project has spent its whole budget searching compositions.
 > this repo read off the matrix by taking a max or min over many cells carries
 > the same inflation. The reactive ceiling that motivated `--optionality` was
 > recomputed on the shrunk matrix and fell from **+179.8 to +46.0 Elo** --
-> against which measured re-targeting already captures +6.71. Averages do not
-> suffer this: the noise cancels instead of being selected for.
+> against which measured re-targeting already captures +6.71.
+>
+> **Averages are fine, and measurably so.** Split-half reliability of the army
+> ranking is **r = 0.995** over 93 armies, because an army's mean score
+> averages ~370 pairs even though each cell holds four. The rule is: average
+> over the matrix freely, never read an extreme off it. Every mistake here was
+> an extreme; every result that survived scrutiny was an average.
 
 `play.py --mix` draws from the stored equilibrium support each game instead of
 always playing the argmax -- 7 distinct armies on the v3 campaign.
