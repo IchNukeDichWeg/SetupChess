@@ -143,7 +143,13 @@ def game_nodes(base, jitter, i, j, g, color):
 
 
 def play_game(white_army, black_army, engine, nodes):
-    """Returns White's score (1.0 / 0.5 / 0.0) and the ply count."""
+    """Returns White's score, the ply count, and whether it was truncated.
+
+    A game stopped at PLY_LIMIT scores 0.5, which is indistinguishable from a
+    real draw once it reaches the matrix. That is a reasonable way to score an
+    unfinished game and a terrible thing to leave unreported, so the truncation
+    is counted and printed at the end of a run.
+    """
     fen = rules.setup_fen(white_army, black_army)
     ok, why = rules.engine_safe(fen, MAX_PIECES)
     if not ok:
@@ -156,9 +162,10 @@ def play_game(white_army, black_army, engine, nodes):
             break
         board.push(result.move)
     outcome = board.outcome(claim_draw=True)
+    cut = outcome is None
     if outcome is None or outcome.winner is None:
-        return 0.5, board.ply()
-    return (1.0 if outcome.winner == chess.WHITE else 0.0), board.ply()
+        return 0.5, board.ply(), cut
+    return (1.0 if outcome.winner == chess.WHITE else 0.0), board.ply(), cut
 
 
 def play_pair(ai, aj, nodes, jitter, i, j, g):
@@ -172,9 +179,11 @@ def play_pair(ai, aj, nodes, jitter, i, j, g):
         if not ok:
             raise Unplayable(why)
     engine = _worker_engine()
-    w, ply_w = play_game(ai, aj, engine, game_nodes(nodes, jitter, i, j, g, 0))
-    b, ply_b = play_game(aj, ai, engine, game_nodes(nodes, jitter, i, j, g, 1))
-    return (w, 1.0 - b), ply_w + ply_b
+    w, ply_w, cut_w = play_game(ai, aj, engine,
+                                game_nodes(nodes, jitter, i, j, g, 0))
+    b, ply_b, cut_b = play_game(aj, ai, engine,
+                                game_nodes(nodes, jitter, i, j, g, 1))
+    return (w, 1.0 - b), int(cut_w) + int(cut_b)
 
 
 def play_cell(task):
@@ -182,7 +191,7 @@ def play_cell(task):
     i, j, g, armies, nodes, jitter = task
     ai, aj = armies
     try:
-        (w, b), plies = play_pair(ai, aj, nodes, jitter, i, j, g)
+        (w, b), truncated = play_pair(ai, aj, nodes, jitter, i, j, g)
     except Unplayable as e:
         return i, j, g, "unplayable", str(e)
     except (chess.engine.EngineError, chess.engine.EngineTerminatedError) as e:
@@ -190,7 +199,7 @@ def play_cell(task):
         _ENGINE = None
         return i, j, g, None, str(e)
     # both games scored from i's perspective, then averaged
-    return i, j, g, (w + b) / 2.0, plies
+    return i, j, g, (w + b) / 2.0, truncated
 
 
 def play_match(task):
@@ -295,7 +304,7 @@ def main():
         return
 
     start = time.time()
-    done = errors = unplayable = 0
+    done = errors = unplayable = truncated = 0
     reasons = {}
     with mp.Pool(workers, initializer=worker_init,
                  initargs=(args.engine, args.max_pieces)) as p:
@@ -315,6 +324,7 @@ def main():
                 print("  engine error on (%d,%d,%d): %s" % (i, j, g, info))
             else:
                 cells[(i, j, g)] = score
+                truncated += info or 0
             if done % 25 == 0 or done == len(tasks):
                 save_state(args.out, cells, meta)
                 rate = done / max(1e-9, time.time() - start)
@@ -334,6 +344,15 @@ def main():
     if sym:
         print("P[i][j]+P[j][i] mean %.4f (want 1.00), min %.3f max %.3f"
               % (sum(sym) / len(sym), min(sym), max(sym)))
+    if truncated:
+        # A truncated game scores 0.5, so a high rate means the draws in this
+        # matrix are partly the ply limit rather than chess.
+        played = 2 * (len(tasks) - unplayable)
+        print("%d of %d games hit the %d-ply limit (%.1f%%) and were scored as "
+              "draws" % (truncated, played, PLY_LIMIT,
+                         100.0 * truncated / max(played, 1)))
+    else:
+        print("no game hit the %d-ply limit" % PLY_LIMIT)
     if unplayable:
         print("%d game pairs skipped:" % unplayable)
         for tag, n_ in sorted(reasons.items(), key=lambda kv: -kv[1]):

@@ -310,6 +310,41 @@ def test_bot_policy():
           "alone" % (counts.get(chess.PAWN, 0), counts.get(chess.KNIGHT, 0)))
 
 
+def test_ply_limit_reported():
+    """A game stopped at PLY_LIMIT scores 0.5 and must be counted as truncated.
+
+    Scoring an unfinished game as a draw is fine; letting it disappear into the
+    matrix as if it were a real draw is not. Every draw-heavy result in this
+    repo depends on being able to tell the two apart -- the champion versus 13
+    bishops drew 717 of 800 pairs, and only 3.1% of those games hit the limit.
+    """
+    saved, saved_max = arena.PLY_LIMIT, arena.MAX_PIECES
+    arena.MAX_PIECES = 0          # ./cuci.py has no ceiling; the mirror is 36
+    try:
+        engine = chess.engine.SimpleEngine.popen_uci("./cuci.py")
+    except Exception as e:                       # pragma: no cover
+        fail("could not start ./cuci.py: %s" % e)
+    try:
+        army = pool.from_json(json.load(open("campaigns/champion_v3.json"))["army"])
+        arena.PLY_LIMIT = 6
+        score, plies, cut = arena.play_game(army, army, engine, 400)
+        if not cut:
+            fail("a game stopped at a 6-ply limit was not flagged as truncated")
+        if score != 0.5:
+            fail("a truncated game scored %r, expected 0.5" % score)
+        if plies > 6:
+            fail("the ply limit was overshot: %d" % plies)
+        arena.PLY_LIMIT = saved
+        score, plies, cut = arena.play_game(army, army, engine, 400)
+        if cut:
+            fail("a game that finished normally was flagged as truncated")
+    finally:
+        arena.PLY_LIMIT, arena.MAX_PIECES = saved, saved_max
+        engine.quit()
+    print("PASS: arena flags ply-limit truncations and scores them 0.5, so "
+          "draw-heavy matrices can be told apart from unfinished ones")
+
+
 def test_adapt():
     """A pure strategy must get solved and stay solved; a mixture must not.
 
@@ -1394,6 +1429,7 @@ def main():
     test_validate_fen()
     test_watchdog()
     test_bot_policy()
+    test_ply_limit_reported()
     test_adapt()
     test_optionality()
     test_setup_game()

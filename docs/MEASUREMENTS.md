@@ -134,6 +134,21 @@ at 400 pairs: `k=8` predicts it to within 0.009 where the raw matrix is off by
 **Averages over the matrix are unaffected** — the noise cancels rather than
 being selected for. Only extremes are poisoned.
 
+## The draws are real
+
+A game stopped at `PLY_LIMIT` (300) scores 0.5, which is indistinguishable from
+a genuine draw once it reaches the matrix. Several results here are very
+draw-heavy -- the champion against 13 bishops drew **717 of 800 pairs** -- so
+the obvious worry is that the draws are the limit rather than chess.
+
+Measured on that exact matchup, which is the most drawish in the repo:
+**5 of 160 games hit the limit, 3.1%**. The draws are real: threefold, the
+fifty-move rule, and blocked positions two bishop armies cannot break.
+
+`arena.py` now reports the truncation rate at the end of every run. It was
+computing the ply counts all along and discarding them, so no run before this
+one ever said.
+
 ## Rules verified live, not assumed
 
 Played against chess.com's own board and client:
