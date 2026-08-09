@@ -28,6 +28,9 @@ far than the error bars suggest.
 Python is the harness. There is a C move generator, used as a cross-check and
 perft oracle rather than to play anything.
 
+Current version **v1**; what shipped and what it does not know are in
+[docs/RELEASES.md](docs/RELEASES.md).
+
 ## What it found
 
 **Bishops dominate, and it is not an artifact.** The shipping army is eleven
@@ -421,6 +424,7 @@ so python-chess with the rights stripped is the reference.
 | file | what it is |
 |---|---|
 | `docs/RULES.md` | the rules, every line sourced, assumptions explicit |
+| `docs/RELEASES.md` | what shipped in each version, its known limits, and the release checklist |
 | `docs/MEASUREMENTS.md` | every measured claim with its interval and caveats, including the two that were wrong when first recorded |
 | `docs/BOT_MODEL.md` | chess.com's own bot, decoded from its shipped client: king to a corner on move one, material ignored while drafting |
 | `rules.py` | placement legality, points, FEN emission, validation |
