@@ -347,9 +347,14 @@ v3     b1     0.9734      0.9641      0.5109       0.5109   0.9038
 v4     f1     0.9006      0.9569      0.6247       0.6247   0.9406
 ```
 
-All three champions are the **same 11 bishops and 6 pawns**, differing only in
-which square the king stands on. That is the result: against real opponents,
-arrangement decides these matchups and material does not.
+All three champions are the **same 11 bishops and 6 pawns**. v2 and v4 differ
+by **two pieces**: the king moves e1 to f1 and one bishop moves d1 to g3,
+nothing else. Those two squares are the difference between 0.4869 and 0.9569
+against the bot army we actually met. v3 is a genuinely different arrangement,
+8 of its 17 non-king pieces elsewhere.
+
+That is the result: against real opponents, arrangement decides these matchups
+and material does not.
 
 Read the v2 row. It has the **best archetype gate of the three** and it is the
 only army here that cannot beat a real opponent -- against the bot army we

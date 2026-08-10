@@ -85,12 +85,16 @@ HUNT_THEIR_POINTS = 12
 #   v3   b1     0.9734      0.9641      0.5109       0.5109
 #   v4   f1     0.9006      0.9569      0.6247       0.6247   <- ships
 #
-# The three champions are the SAME 11 bishops + 6 pawns and differ only in king
-# square, which is the whole result: arrangement decides these matchups, not
-# material. v2's archetype gate is the best of the three (0.9425) and it is the
-# one army here that cannot beat a real opponent -- it draws 764 of 800 pairs
-# against the bot army we actually met. That is why the archetype gate is a
-# screen and this grid is the decision.
+# All three are the SAME MATERIAL, 11 bishops + 6 pawns. v2 and v4 differ by
+# TWO PIECES: king e1 -> f1 and a bishop d1 -> g3. Nothing else moves. That is
+# the whole result -- those two squares take 0.4869 to 0.9569 against the bot
+# army we actually met, and 0.4700 to 0.6247 against 13 bishops. v3 is a
+# genuinely different arrangement (8 of 17 non-king pieces elsewhere).
+#
+# v2's archetype gate is the best of the three (0.9425) and it is the one army
+# here that cannot beat a real opponent -- it draws 764 of 800 pairs against
+# that same bot army. That is why the archetype gate is a screen and this grid
+# is the decision.
 #
 # v4 gives up ground against both bot armies (see docs/MEASUREMENTS.md, where
 # --seed-bot is rejected on exactly that) and buys much more against the army

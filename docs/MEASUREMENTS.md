@@ -196,9 +196,20 @@ the bot army we actually met over the board it draws **764 of 800 pairs** at
 unfinished game.
 
 **Arrangement decides it, material does not.** All three champions are the same
-11 bishops and 6 pawns. The only difference in the whole table is which square
-the king stands on: e1, b1, f1. That single choice spans 0.4869 to 0.9641
-against one fixed opponent.
+11 bishops and 6 pawns. v2 and v4 differ by **two pieces and nothing else** --
+the king moves e1 to f1, and one bishop moves d1 to g3:
+
+```
+                bot 08-05   bot 08-08   13 bishops
+v2  Ke1, Bd1    0.9172      0.4869      0.4700
+v4  Kf1, Bg3    0.9006      0.9569      0.6247
+```
+
+Two squares are worth 0.4869 -> 0.9569 against one fixed opponent. v3 is a
+genuinely different arrangement, 8 of its 17 non-king pieces on other squares.
+
+This is why a search over compositions is not enough, and why the pool has to
+carry arrangements as distinct members rather than deduplicating on material.
 
 **v4 ships despite `--seed-bot`, not because of it.** The rejection above
 stands: v4 is worse against both bot armies than v3. What it buys is the
