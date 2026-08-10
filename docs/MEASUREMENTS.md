@@ -313,6 +313,51 @@ colours are swapped within every pair. Left alone deliberately: adding
 `ucinewgame` would change the instrument and make every number already in this
 file incomparable to anything measured after it.
 
+## The mixture contains an army that loses
+
+`MIX` is on, so `play.py` draws from the 13-army equilibrium support each game
+rather than always playing the champion. Only the champion had ever been
+measured against a real opponent. Screening all 13 against all three, 100 pairs
+a cell (a KILL FILTER at about +/-0.02 on these, sized to separate a losing
+army from a winning one, not to rank them):
+
+```
+idx  w      army             bot1    bot2    13b     worst
+83   0.091  9P 10B 1K  Kf1   0.4412  0.8275  0.5750  0.4412  <- loses
+72   0.020  9P 10B 1K  Kh2   0.9762  0.9888  0.5600  0.5600
+69   0.009  6P 11B 1K  Kh1   0.9563  0.9425  0.5737  0.5737
+51   0.007  9P 10B 1K  Kf1   0.9875  0.9825  0.5750  0.5750
+43   0.162  6P 11B 1K  Kg1   0.9750  0.9750  0.6012  0.6012
+76   0.046  6P 11B 1K  Ke1   0.9475  0.9825  0.6012  0.6012
+71   0.008  9P 10B 1K  Kf1   0.8337  0.9450  0.6050  0.6050
+60   0.015  6P 11B 1K  Kh1   0.9712  0.9650  0.6088  0.6088
+54   0.273  6P 11B 1K  Kf1   0.9050  0.9663  0.6125  0.6125  <- champion
+87   0.090  6P 11B 1K  Kf1   0.9663  0.9788  0.6262  0.6262
+34   0.009  9P 10B 1K  Ke1   0.9637  0.9712  0.6275  0.6275
+63   0.180  6P 11B 1K  Kf1   0.9762  0.9850  0.6325  0.6325
+40   0.084  6P 11B 1K  Kf1   0.8425  0.9475  0.6375  0.6375
+```
+
+Oracle: idx 54 is the shipped champion, and the screen returns 0.9050 / 0.9663
+/ 0.6125 against its 400-pair 0.9006 / 0.9525 / 0.6247. The screen is sound.
+
+**Index 83 scores below 0.5 against a real opponent and the drafter plays it
+9.1% of the time.** It earns that weight honestly: the equilibrium is solved
+over the pool, and 83 is good against pool members. It is not good against
+reality. This is "the pool is a sample, not a cover" arriving inside the
+shipped mixture rather than outside it.
+
+The prediction on record was half right. It named the `9P 10B` armies as the
+suspects and the worst one is `9P 10B`, but `34` is also `9P 10B` and ranks
+third best. It also predicted the casualty would appear against `bot2`; it
+appeared against `bot1`, where nothing else fell below 0.82.
+
+**Do not read the ranking off this table.** It is the max and min over 13
+armies times 3 columns at +/-0.02, which is exactly the extreme-over-noise that
+produced two wrong numbers elsewhere in this file. The screen licenses a
+confirmation run and nothing else. In particular `40` at 0.6375 versus the
+champion's 0.6125 is inside the noise and is a candidate, not a result.
+
 ## Being predictable
 
 The champion against the pool's best response to it, 400 pairs:
