@@ -226,6 +226,71 @@ And the answer is still bishops. Four independent campaigns, two of them
 seeded with armies specifically chosen to break bishops, all land on
 **11 bishops + 6 pawns** at the top of the mix.
 
+## One bishop is worth 0.477
+
+A king-square sweep: all 17 non-king pieces of the v4 champion held fixed, the
+king moved to every free square in its own zone, each against the bot's
+2026-08-08 army, 800 games a square.
+
+```
+king  score vs bot2
+e1    0.9641 +/- 0.0064   <- best
+f1    0.9525 +/- 0.0076   (the shipped champion; oracle, see below)
+d1    0.9400 +/- 0.0088
+g1    0.9237 +/- 0.0090
+h1    0.8997 +/- 0.0102
+c2    0.8431 +/- 0.0130
+h3    0.7844 +/- 0.0140   <- worst
+```
+
+**A prediction was registered before this ran and it was wrong.** The v2
+champion collapses against this opponent (0.4869) and has its king on e1, so
+e1 was predicted to score materially below the others. It scored best. The
+king-square explanation of that collapse is REFUTED. The secondary prediction
+held: both off-back-rank squares are the two worst.
+
+Refuting it leaves exactly one variable, because the e1 variant and the v2
+champion differ by **one piece**:
+
+```
+16 pieces identical, king e1 identical
+Bg3   0.9641 +/- 0.0064
+Bd1   0.4869 +/- 0.0044
+```
+
+Moving one bishop from g3 to d1 costs **0.477 of score**, roughly 470 Elo, on
+the same instrument against the same opponent. That is the largest single
+effect measured anywhere in this repo, and it is one piece on one square.
+
+Consequences, in order of how much they should change what you do:
+
+- A search over compositions cannot find this. Neither can a search that
+  deduplicates armies by material. The pool must carry arrangements.
+- The archetype gate cannot see it either: v2 has the best gate of the three
+  champions and holds the losing bishop.
+- Nothing here says ship the e1 variant. It is better than the shipped
+  champion **against one opponent**, which is exactly the reasoning that made
+  `--seed-bot` fail. It needs the full grid before it can displace anything.
+
+### Two instrument notes from this run
+
+`h3` skipped 400 pairs as `opposite_check`, all of them the `(0,0)`
+self-play diagonal, which is the P[i][i] sanity cell rather than the
+measurement. Its two measurement cells are complete at 400 pairs each, so
+0.7844 is a full 800-game result with one sanity check missing.
+
+**Re-runs are not bit-identical.** The f1 variant is the shipped champion
+against an opponent it had already played 800 games against, included
+deliberately as an oracle. It returned 0.9525 where the earlier run returned
+0.9569 -- inside both intervals, so the sweep is sound, but not the exact
+repeat that identical pools and an identical seed would imply. Cause:
+`arena.py` never sends `ucinewgame` and never clears the hash, so the engine's
+transposition table carries across games inside a worker and the result
+depends on which worker took which game. This adds variance, not bias, since
+colours are swapped within every pair. Left alone deliberately: adding
+`ucinewgame` would change the instrument and make every number already in this
+file incomparable to anything measured after it.
+
 ## Being predictable
 
 The champion against the pool's best response to it, 400 pairs:
