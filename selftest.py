@@ -855,9 +855,20 @@ def test_pool(rng):
         ok, why = rules.validate_army(a)
         if not ok:
             fail("pooled army invalid: %s" % why)
+    # A release fingerprint that depends on placement order is not an identity.
+    # v1 published one that did, and two identical matchup pools fingerprinted
+    # differently mid-campaign because one listed the king first.
+    shuffled = list(sized[0])
+    rng.shuffle(shuffled)
+    if pool.fingerprint(shuffled) != pool.fingerprint(sized[0]):
+        fail("fingerprint changed when the placements were reordered")
+    if len({pool.fingerprint(a) for a in sized}) != len(sized):
+        fail("fingerprint collided across %d distinct armies" % len(sized))
+
     print("PASS: %d archetypes legal and distinct, 2000 mutations and 2000 "
           "bred armies legal, crossover recombines, %d-army pool with no "
-          "duplicates" % (len(pool.ARCHETYPES), len(sized)))
+          "duplicates, fingerprints order-independent and collision-free"
+          % (len(pool.ARCHETYPES), len(sized)))
 
 
 def test_arena_units():

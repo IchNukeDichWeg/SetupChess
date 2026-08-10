@@ -10,6 +10,7 @@ somewhere to start and the arena a baseline to measure the solved strategy
 against; none of them is claimed to be good until the matrix says so.
 """
 
+import hashlib
 import random
 
 import chess
@@ -210,6 +211,20 @@ def breed(parents, rng, crossover_rate=0.35, max_steps=3):
 def army_key(army):
     """Order-independent identity, so the pool never holds a duplicate."""
     return tuple(sorted(army))
+
+
+def fingerprint(army):
+    """Short printable identity for release notes and frozen snapshots.
+
+    Goes through army_key, so it does NOT depend on the order the placements
+    happen to be stored in. The v1 notes carry `ec385f649cf8af3e`, which was
+    sha256 of the army in its stored order and therefore gave two different
+    values for the same army depending on serialisation -- the same trap that
+    made two identical matchup pools look different mid-campaign. That value is
+    kept in docs/RELEASES.md as published; anything from v2 on uses this.
+    """
+    return hashlib.sha256(repr(army_key(tuple(tuple(p) for p in army)))
+                          .encode()).hexdigest()[:16]
 
 
 # What chess.com's bot ACTUALLY drafts, transcribed from two live games on the
