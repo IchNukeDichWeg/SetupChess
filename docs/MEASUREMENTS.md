@@ -425,6 +425,48 @@ re-solved with the real opponents pinned as columns, so the solver never gives
 weight to an army that loses to them; that costs a campaign rather than an
 edit. `expand.py --gate-pool` is half of it.
 
+## A fourth real opponent: the wall a human actually played
+
+Game #106991479, live and rated, opponent 1826. They drafted **15 pawns, 2
+knights, a bishop, a rook and a queen** -- a full wall, 38 of 39 points.
+
+That shape had been written off. `BOT_WALL` is the pawn-and-knight army
+`docs/BOT_MODEL.md` predicted the BOT would build, and two live bot games
+refuted it when the bot bought three queens instead. The conclusion drawn at
+the time was that the wall was a modelling error. It was not: the model was
+wrong about **who** plays a wall, not about whether anyone does.
+
+The shipped champion against it, 400 pairs, same instrument:
+**0.8912 +/- 0.0107, +365.43 Elo**, 1.8% truncation.
+
+```
+the champion's real-opponent grid, now four columns
+bot 08-05     0.9684 +/- 0.0064
+bot 08-08     0.9850 +/- 0.0045
+13 bishops    0.6369 +/- 0.0098   <- still binding
+human wall    0.8912 +/- 0.0107
+worst         0.6369, unchanged
+```
+
+**The fourth column confirms rather than overturns.** The wall lands well
+above the binding column, so every worst-case ranking on the three-column
+grid stands and nothing needs re-running. A prediction was registered before
+the run -- "above 0.90, because eleven bishops cut a static structure on the
+diagonals" -- and it was 0.009 too high against a 0.011 margin. The direction
+was right and the threshold was wrong.
+
+### What the game itself is worth, which is less
+
+The game was WON by checkmate, and that is close to meaningless as evidence.
+The army actually played was 10 bishops + 9 pawns, not the champion's 11 + 6:
+the drafter was driven by hand through a browser, one placement mis-clicked
+because the piece bank RE-LAYS OUT as pieces become unaffordable and the
+captured pixel coordinates went stale, and the rest was finished manually
+under time pressure. One game, wrong army, no conclusion.
+
+The transcript is the deliverable. `pool.HUMAN_OBSERVED` holds the wall and
+`campaigns/pool_real_opponents.json` is now four armies rather than three.
+
 ## Being predictable
 
 The champion against the pool's best response to it, 400 pairs:

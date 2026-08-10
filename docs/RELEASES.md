@@ -63,10 +63,13 @@ Machine  | Mac14,9 arm64, macOS
 
 ### Known limits
 
-- **The whole decision rests on THREE opponents.** Two bot armies and one human
-  army. Every ranking in this release is a worst-case over three columns. That
-  field is the binding uncertainty now, and no amount of compute widens it --
-  only playing more real games does.
+- **The whole decision rests on FOUR opponents.** Two bot armies and two human
+  armies. Every ranking in this release is a worst-case over those columns.
+  That field is the binding uncertainty now, and no amount of compute widens it
+  -- only playing more real games does. The fourth, a 15-pawn wall from a live
+  rated game, was added after the notes above were written and scores 0.8912
+  +/- 0.0107, so it confirms the ranking rather than changing it. The other
+  three cells in the stats block predate it.
 - **The shipped army's archetype gate is unmeasured.** The 0.9406 figure
   belongs to index 54. Index 63 has never been played against the archetypes.
 - **Only 6 of 13 support members are confirmed** against real opponents. The
