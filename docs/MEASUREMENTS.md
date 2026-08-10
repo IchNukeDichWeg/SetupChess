@@ -358,6 +358,47 @@ produced two wrong numbers elsewhere in this file. The screen licenses a
 confirmation run and nothing else. In particular `40` at 0.6375 versus the
 champion's 0.6125 is inside the noise and is a candidate, not a result.
 
+### Confirmed at 400 pairs, and the solver's argmax was not the best army
+
+Index 83 confirms: **0.4481 +/- 0.0209** against the bot's 2026-08-05 army,
+below 0.5 at 95%. It is removed from the sampled support in
+`campaigns/champion_v4b.json`.
+
+The two screen leaders were confirmed on all three columns, and both beat the
+shipped champion's worst case, which the registered prediction said they would
+not:
+
+```
+      bot 08-05           bot 08-08           13 bishops          worst
+54    0.9006 (shipped)    0.9525 (shipped)    0.6247 (shipped)    0.6247
+40    0.8431 +/- 0.0137   0.9434 +/- 0.0082   0.6372 +/- 0.0102   0.6372
+63    0.9684 +/- 0.0064   0.9850 +/- 0.0045   0.6369 +/- 0.0098   0.6369
+```
+
+**Index 63 dominates index 54 on every column**, outside the interval on the
+two bot armies and inside it on the 13-bishop column. Index 40 ties 63 on the
+worst column and gives up 0.125 on `bot 08-05`, so the worst-column rule alone
+cannot separate them and the tie goes to dominance. `DEFAULT_TARGET` is now 63.
+
+The solver crowned 54 with weight 0.273 against 63's 0.180, because the
+equilibrium is solved over the pool. **The argmax of a pool equilibrium is not
+the best army against real opponents**, which is the same lesson as
+`--seed-bot` and the 13-bishop seed, arriving this time inside the mixture.
+
+Only 2 of the 13 were confirmed, so 63 is the best army *that was checked*, not
+the best in the support. `87` and `34` screened at 0.6262 and 0.6275 and were
+never run at 400 pairs.
+
+### Removing 83 is not free
+
+Index 83 earned 9.1% honestly: the mixture is a Nash equilibrium **over the
+pool**, so dropping a support member makes the mix exploitable by some pool
+army. The trade taken is a measured loss against an opponent that exists for a
+theoretical loss against one never seen. The principled fix is a campaign
+re-solved with the real opponents pinned as columns, so the solver never gives
+weight to an army that loses to them; that costs a campaign rather than an
+edit. `expand.py --gate-pool` is half of it.
+
 ## Being predictable
 
 The champion against the pool's best response to it, 400 pairs:

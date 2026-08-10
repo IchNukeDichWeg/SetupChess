@@ -83,7 +83,29 @@ HUNT_THEIR_POINTS = 12
 #        king   bot 08-05   bot 08-08   13 bishops   worst
 #   v2   e1     0.9172      0.4869      0.4700       0.4700
 #   v3   b1     0.9734      0.9641      0.5109       0.5109
-#   v4   f1     0.9006      0.9569      0.6247       0.6247   <- ships
+#   v4   f1     0.9006      0.9569      0.6247       0.6247
+#
+# The target is index 63 of that campaign, NOT the argmax index 54 that the
+# solver crowned. Measured against the same three opponents, 63 DOMINATES 54:
+#
+#        bot 08-05   bot 08-08   13 bishops   worst
+#   54   0.9006      0.9525      0.6247       0.6247
+#   63   0.9684      0.9850      0.6369       0.6369   <- ships
+#
+# Better on all three, outside the interval on the first two and inside it on
+# the third. Index 40 ties 63 on the worst column (0.6372) and is far worse on
+# bot 08-05 (0.8431), so the tie is broken on dominance rather than on the
+# worst column alone, which cannot separate 0.6372 from 0.6369.
+#
+# Index 54 IS the v4 row above; its bot 08-08 cell reads 0.9569 there and
+# 0.9525 here because they are two runs of the same 800 games. arena.py never
+# clears the engine hash, so a re-run is not bit-identical. Both are inside the
+# other's interval; see docs/MEASUREMENTS.md.
+#
+# The solver preferred 54 because the equilibrium is solved over the POOL. The
+# pool is not the opponent distribution, which is the same lesson as --seed-bot
+# and the 13-bishop army. Weights still come from the solver; only the argmax
+# is overridden.
 #
 # All three are the SAME MATERIAL, 11 bishops + 6 pawns. v2 and v4 differ by
 # TWO PIECES: king e1 -> f1 and a bishop d1 -> g3. Nothing else moves. That is
@@ -141,10 +163,28 @@ OPTIONALITY = False
 # are visible, opponents play you repeatedly, and this army is published in a
 # public repo -- so the targeting case is the realistic one. Turn it off with
 # --no-mix if you expect anonymous one-shot opponents.
+#
+# ONE ARMY WAS REMOVED FROM THE SAMPLED SUPPORT BY HAND. Index 83 of the v4
+# campaign held 9.1% of the weight and LOSES to a real opponent: 0.4481
+# +/- 0.0209 against the bot's 2026-08-05 army over 400 pairs, below 0.5 at
+# 95%. Every one of the 13 support members was screened against all three real
+# opponents to find it; nothing else fell below 0.56. campaigns/champion_v4b.json
+# carries the remaining 12, renormalised.
+#
+# THIS IS NOT FREE, and the cost is real rather than theoretical. Index 83
+# earned its weight honestly: the mixture is a Nash equilibrium OVER THE POOL,
+# and dropping a support member makes the mix exploitable by some pool army.
+# The trade is a measured loss against an opponent that exists for a
+# theoretical loss against one that has never been seen. Restore it by pointing
+# DEFAULT_TARGET back at campaigns/champion_v4.json.
+#
+# The principled fix is a campaign re-solved with the real opponents pinned as
+# columns, so the solver never gives weight to an army that loses to them. That
+# costs a campaign; this costs an edit. See docs/MEASUREMENTS.md.
 MIX = True
 
 DEFAULT_POOL = "campaigns/expand_v4.json"
-DEFAULT_TARGET = "campaigns/champion_v4.json"
+DEFAULT_TARGET = "campaigns/champion_v4b.json"
 
 
 def sample_target(champion_path, armies, rng):
