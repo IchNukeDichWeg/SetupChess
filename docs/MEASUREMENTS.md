@@ -166,6 +166,46 @@ So a seeded army is not a free hedge. It changes which cells the equilibrium
 is solved over, and the champion can move to one that is worse against the
 very army that was seeded. `DEFAULT_TARGET` stays on the v3 champion.
 
+## The only three opponents that exist, and what ships
+
+The gate above is twelve archetypes we wrote. Three armies have ever been
+played against us for real: the bot's two, and thirteen bishops from a human.
+Every champion against every one, 800 games a cell, `fairy-stockfish`, no
+ceiling, 20k nodes with 15% jitter. Every cell's armies were fingerprint-checked
+against the champion files before this table was built.
+
+```
+       king   bot 08-05   bot 08-08   13 bishops   worst    archetype gate
+v2     e1     0.9172      0.4869      0.4700       0.4700   0.9425
+v3     b1     0.9734      0.9641      0.5109       0.5109   0.9038
+v4     f1     0.9006      0.9569      0.6247       0.6247   0.9406
+```
+
+Margins are +/- 0.0044 to +/- 0.0110, all 800 games. **`play.py` defaults to
+v4**, on a rule fixed before the last three cells were run: take the best worst
+column, not the best average and not the best gate. A gap between 0.90 and 0.97
+against an army you beat either way is worth less than one between 0.51 and
+0.62 against an army that is actually close.
+
+Three things this says that the archetype gate could not:
+
+**The archetype gate is a screen, not the decision.** v2 has the best gate of
+the three and is the only champion that cannot beat a real opponent. Against
+the bot army we actually met over the board it draws **764 of 800 pairs** at
+0.4869. Truncation was 1.1%, so those are real draws -- a fortress, not an
+unfinished game.
+
+**Arrangement decides it, material does not.** All three champions are the same
+11 bishops and 6 pawns. The only difference in the whole table is which square
+the king stands on: e1, b1, f1. That single choice spans 0.4869 to 0.9641
+against one fixed opponent.
+
+**v4 ships despite `--seed-bot`, not because of it.** The rejection above
+stands: v4 is worse against both bot armies than v3. What it buys is the
+13-bishop column, +0.11. Why is not established -- v3 and v4 differ in seeds
+*and* in round count (14 against 11), so this is not a clean attribution of the
+gain to any one cause.
+
 And the answer is still bishops. Four independent campaigns, two of them
 seeded with armies specifically chosen to break bishops, all land on
 **11 bishops + 6 pawns** at the top of the mix.

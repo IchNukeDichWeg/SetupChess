@@ -74,19 +74,31 @@ HUNT_THEIR_POINTS = 12
 # inside the pool, so a target that is not a member gets abandoned on the first
 # placement.
 #
-# Both point at the v3 campaign, which was seeded with the 13-bishop army a real
-# opponent actually played. That choice trades measured performance in one
-# direction for measured performance in another, so it is a judgement about the
-# opponent distribution rather than a free improvement:
+# Both point at the v4 campaign. Chosen on the WORST CASE over the only three
+# armies anyone has ever actually played against us -- the bot's two and the
+# thirteen bishops a human drafted -- rather than on the twelve hand-written
+# archetypes, which nobody plays. All nine cells are 800 games, fairy-stockfish,
+# no piece ceiling:
 #
-#   v3 vs 13 bishops       +7.60 [+3.76, +11.45]   v2 scored -20.87
-#   v3 vs v2 head to head  -1.74 [-11.43, +7.96]   no difference
-#   v3 vs the archetypes   0.9038                  v2 scored 0.9425
+#        king   bot 08-05   bot 08-08   13 bishops   worst
+#   v2   e1     0.9172      0.4869      0.4700       0.4700
+#   v3   b1     0.9734      0.9641      0.5109       0.5109
+#   v4   f1     0.9006      0.9569      0.6247       0.6247   <- ships
 #
-# It goes to v3 because the archetypes are hand-written guesses that nobody
-# plays, while 13 bishops is the one army we have ever seen a human choose.
-# Switch DEFAULT_POOL and DEFAULT_TARGET back to expand_fsf/champion_fsf if you
-# expect the archetype-shaped field instead.
+# The three champions are the SAME 11 bishops + 6 pawns and differ only in king
+# square, which is the whole result: arrangement decides these matchups, not
+# material. v2's archetype gate is the best of the three (0.9425) and it is the
+# one army here that cannot beat a real opponent -- it draws 764 of 800 pairs
+# against the bot army we actually met. That is why the archetype gate is a
+# screen and this grid is the decision.
+#
+# v4 gives up ground against both bot armies (see docs/MEASUREMENTS.md, where
+# --seed-bot is rejected on exactly that) and buys much more against the army
+# that is actually close. Winning 0.90 instead of 0.97 against something you
+# beat either way costs less than 0.51 against something you do not.
+#
+# Switch back to expand_v3/champion_v3 if the bot is the only opponent you
+# expect, or to expand_fsf/champion_fsf for the archetype-shaped field.
 #
 # Full history of every number here, with its caveats: docs/MEASUREMENTS.md
 
@@ -127,8 +139,8 @@ OPTIONALITY = False
 # --no-mix if you expect anonymous one-shot opponents.
 MIX = True
 
-DEFAULT_POOL = "campaigns/expand_v3.json"
-DEFAULT_TARGET = "campaigns/champion_v3.json"
+DEFAULT_POOL = "campaigns/expand_v4.json"
+DEFAULT_TARGET = "campaigns/champion_v4.json"
 
 
 def sample_target(champion_path, armies, rng):

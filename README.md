@@ -333,6 +333,38 @@ something against everything else.
 Note also how drawish this matchup is: **717 of 800 pairs drew**. The two
 armies are close enough that the chess phase usually cannot separate them.
 
+### Judged on real opponents instead, the answer changes again
+
+The archetypes are twelve armies we invented. Three armies have ever actually
+been played against us: two the bot drafted and the thirteen bishops a human
+drafted. Every champion against every one of them, 800 games a cell,
+`fairy-stockfish`, no piece ceiling:
+
+```
+       king   bot 08-05   bot 08-08   13 bishops   worst    archetype gate
+v2     e1     0.9172      0.4869      0.4700       0.4700   0.9425
+v3     b1     0.9734      0.9641      0.5109       0.5109   0.9038
+v4     f1     0.9006      0.9569      0.6247       0.6247   0.9406
+```
+
+All three champions are the **same 11 bishops and 6 pawns**, differing only in
+which square the king stands on. That is the result: against real opponents,
+arrangement decides these matchups and material does not.
+
+Read the v2 row. It has the **best archetype gate of the three** and it is the
+only army here that cannot beat a real opponent -- against the bot army we
+actually met over the board it draws **764 of 800 pairs** and scores 0.4869,
+with truncation at 1.1%, so those are real draws and not the ply limit. An
+army can look best against a field of guesses and be a fortress against the
+thing you will actually face.
+
+`play.py` now defaults to **v4**, chosen on the worst column rather than the
+average or the gate. Winning 0.90 instead of 0.97 against something you beat
+either way costs less than 0.51 instead of 0.62 against something you do not.
+Note that this is the same campaign whose `--seed-bot` component is rejected
+in `docs/MEASUREMENTS.md`: v4 is genuinely *worse* against both bot armies
+than v3. It ships despite that, not because of it.
+
 ### Being predictable is worse than any of this
 
 Every number above is for a FIXED army, and a fixed army is exploitable by
@@ -367,8 +399,8 @@ and this project has spent its whole budget searching compositions.
 > an extreme; every result that survived scrutiny was an average.
 
 **Mixing is ON by default.** `play.py` draws from the stored equilibrium
-support each game rather than always playing the argmax -- 7 distinct armies on
-the v3 campaign. `--no-mix` restores the single-army behaviour.
+support each game rather than always playing the argmax -- 13 distinct armies
+on the v4 campaign. `--no-mix` restores the single-army behaviour.
 
 That is a judgement about the opponent, not a measured improvement, and it
 cannot be measured here: every harness in this repo scores against a fixed

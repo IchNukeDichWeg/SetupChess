@@ -13,7 +13,7 @@ empirical distribution of what we have played so far. That is the standard
 model of a learning adversary and it is what a human does informally after
 losing to the same setup twice.
 
-    python3 adapt.py --state campaigns/expand_v3.json --champion campaigns/champion_v3.json
+    python3 adapt.py --state campaigns/expand_v4.json --champion campaigns/champion_v4.json
 
 The opponent's best response is an argmax over cells backed by four pairs
 each, and the max of many noisy samples is biased in its own favour: taken
