@@ -385,9 +385,35 @@ equilibrium is solved over the pool. **The argmax of a pool equilibrium is not
 the best army against real opponents**, which is the same lesson as
 `--seed-bot` and the 13-bishop seed, arriving this time inside the mixture.
 
-Only 2 of the 13 were confirmed, so 63 is the best army *that was checked*, not
-the best in the support. `87` and `34` screened at 0.6262 and 0.6275 and were
-never run at 400 pairs.
+### The remaining two, and where this ranking runs out of resolution
+
+`87` and `34` closed at 400 pairs as well, so four of the thirteen support
+members are now confirmed on all three columns:
+
+```
+      bot 08-05           bot 08-08           13 bishops          worst
+63    0.9684 +/- 0.0064   0.9850 +/- 0.0045   0.6369 +/- 0.0098   0.6369  ships
+87    0.9753 +/- 0.0054   0.9772 +/- 0.0060   0.6378 +/- 0.0116   0.6378
+40    0.8431 +/- 0.0137   0.9434 +/- 0.0082   0.6372 +/- 0.0102   0.6372
+34    0.9469 +/- 0.0082   0.9688 +/- 0.0068   0.6294 +/- 0.0110   0.6294
+54    0.9006 +/- 0.0110   0.9525 +/- 0.0076   0.6247 +/- 0.0096   0.6247
+```
+
+**Nothing changes.** `87` has the highest worst column by **0.0009** against
+margins of +/-0.011, which is a twelfth of the error bar, and it does not
+dominate: it beats 63 on one bot army and loses on the other. Acting on that
+gap is the extreme-over-noise mistake this file already records twice.
+
+The top three worst columns are 0.6378, 0.6372 and 0.6369. **They are one
+number.** The switch from 54 to 63 was justified on dominance -- 63 wins both
+bot columns outside their intervals -- and NOT on the worst column, where
+0.6369 against 0.6247 includes zero.
+
+Screen-to-confirmation drift bounds what this budget can resolve. Measured over
+four armies on the binding column: `-0.0003`, `+0.0044`, `+0.0116`, `+0.0019`.
+So a 100-pair screen locates an army to about `+/-0.012` of its 400-pair value,
+which is larger than every gap at the top of this table. Separating these would
+need a different budget, not another confirmation round.
 
 ### Removing 83 is not free
 
