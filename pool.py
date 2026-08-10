@@ -262,6 +262,47 @@ BOT_OBSERVED = {
      (chess.KING, chess.A1)],
 }
 
+
+# What HUMANS actually draft, transcribed from live rated games. Same storage
+# convention: both were played as Black, stored here in White's perspective.
+#
+#   2026-08-08  13 bishops, no pawns (also in campaigns/pool_13bishop.json)
+#   2026-08-10  15 pawns, 2 knights, bishop, rook, queen -- a full wall
+#
+# The wall matters more than its result. `BOT_WALL` below is the pawn-and-
+# knight army docs/BOT_MODEL.md predicted the BOT would build, and two live
+# games refuted it: the bot buys queens. Nobody had seen the wall played at
+# all, so it was written off as a modelling error. A 1826-rated human then
+# drafted almost exactly it. The model was wrong about WHO plays a wall, not
+# about whether anyone does, and the real-opponent field was one archetype
+# short until this game.
+#
+# 38 of 39 points, so a point went unspent -- transcribed as played, not
+# corrected.
+HUMAN_OBSERVED = {
+    "2026-08-10-wall": [(chess.KING, chess.D1),
+     (chess.QUEEN, chess.C1),
+     (chess.ROOK, chess.A1),
+     (chess.BISHOP, chess.B2),
+     (chess.KNIGHT, chess.E1),
+     (chess.KNIGHT, chess.G1),
+     (chess.PAWN, chess.A2),
+     (chess.PAWN, chess.C2),
+     (chess.PAWN, chess.D2),
+     (chess.PAWN, chess.E2),
+     (chess.PAWN, chess.F2),
+     (chess.PAWN, chess.G2),
+     (chess.PAWN, chess.H2),
+     (chess.PAWN, chess.A3),
+     (chess.PAWN, chess.B3),
+     (chess.PAWN, chess.C3),
+     (chess.PAWN, chess.D3),
+     (chess.PAWN, chess.E3),
+     (chess.PAWN, chess.F3),
+     (chess.PAWN, chess.G3),
+     (chess.PAWN, chess.H3)],
+}
+
 # SUPERSEDED, kept because --seed-bot campaigns were run against it and their
 # results are meaningless without knowing what they faced. This is what
 # play.BotDrafter drafts from the modelled policy: king to a corner, then every
