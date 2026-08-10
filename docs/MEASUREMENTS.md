@@ -130,6 +130,35 @@ more than one way.
 The loop answers them rather than adopting them, which is what an opponent
 model should do.
 
+### `--seed-bot` is REJECTED, and the control is why
+
+The gate above is against the archetypes. Against the bot armies themselves,
+both champions played the same two matchups, 800 pairs each, same instrument:
+
+| opponent | v3, never bred against it | v4, bred against it | difference |
+|---|---|---|---|
+| 2026-08-05, 4P 1B 1R 3Q | **0.9734 +/- 0.0055** | 0.9006 +/- 0.0110 | **-0.0728 +/- 0.0123** |
+| 2026-08-08, 3P 2N 1B 3Q | **0.9641 +/- 0.0064** | 0.9569 +/- 0.0071 | -0.0072 +/- 0.0096 |
+
+Seeding the opponent made us **worse against that opponent** on one army and
+no better on the other. The first difference excludes zero; the second does
+not. Truncation was 0.2%/0.4% for v3 and 1.9%/0.8% for v4, so the scores are
+chess, not the ply limit.
+
+The prediction on record before the run was parity, on the reasoning that the
+bot's armies never entered the support so the loop had found them easy. Half
+right: the loop did ignore them. What it did not do was leave the champion
+alone.
+
+Both champions are **11 bishops + 6 pawns**. The only difference is the king,
+b1 for v3 and f1 for v4 -- and f1 is the same square the best response to v3
+uses (see "Being predictable"). v4 crowned its own counter-army: better
+against a field of bishops, worse against queens.
+
+So a seeded army is not a free hedge. It changes which cells the equilibrium
+is solved over, and the champion can move to one that is worse against the
+very army that was seeded. `DEFAULT_TARGET` stays on the v3 champion.
+
 And the answer is still bishops. Four independent campaigns, two of them
 seeded with armies specifically chosen to break bishops, all land on
 **11 bishops + 6 pawns** at the top of the mix.

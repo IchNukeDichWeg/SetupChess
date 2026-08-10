@@ -210,6 +210,13 @@ def cell_tasks(armies, pairs, cells, indices_a, indices_b, nodes, jitter):
 # So a challenger must clear --screen-margin against the support AND against
 # every pinned opponent separately. That is the original criterion plus "does
 # not lose to the bot", which is what breeding against it should mean.
+#
+# The screen does its job and the campaign still does not pay. Measured head to
+# head, the champion bred against the two observed bot armies scores WORSE
+# against one of them than a champion that never saw them, -0.0728 +/- 0.0123
+# over 800 pairs. A pin does not only add a constraint, it changes which cells
+# the equilibrium is solved over, and the argmax can move to an army that is
+# better against the pool and worse against the pin. See docs/MEASUREMENTS.md.
 
 
 def our_strategies(weights, pinned):
@@ -319,7 +326,10 @@ def main():
                          "playing (pool.BOT_OBSERVED, two live games) and PIN "
                          "them, so every challenger is screened against them "
                          "and the prune cannot drop them. Both are queen-heavy; "
-                         "the modelled BOT_WALL they replace was refuted")
+                         "the modelled BOT_WALL they replace was refuted. "
+                         "MEASURED AND REJECTED: the champion this produces is "
+                         "worse against the seeded armies than one that never "
+                         "saw them, -0.0728 +/- 0.0123 on the first of the two")
     ap.add_argument("--max-pieces", type=int, default=32,
                     help="piece ceiling for the engine; 0 for none, which is "
                          "correct for ./cuci.py (default: %(default)s)")
