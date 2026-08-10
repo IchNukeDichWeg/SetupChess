@@ -1112,8 +1112,40 @@ def test_expand_smoke(engine_path, tmpdir):
     with open(path) as f:
         if len(json.load(f)["rounds"]) < len(state["rounds"]):
             fail("resume lost rounds")
+    # --gate-pool swaps the gate field. It must be validated BEFORE the rounds
+    # run, or a typo costs the whole campaign, and the gate file must record
+    # which field produced it or two gates cannot be told apart.
+    gp = os.path.join(tmpdir, "selftest_gatepool_%d.json" % os.getpid())
+    with open(gp, "w") as f:
+        json.dump([pool.to_json(a)
+                   for a in list(pool.ARCHETYPES.values())[:3]], f)
+    gpath = os.path.join(tmpdir, "selftest_expand_gp_%d.json" % os.getpid())
+    r3 = subprocess.run(cmd[:3] + [gpath] + cmd[4:] + ["--gate-pool", gp],
+                        capture_output=True, text=True)
+    if r3.returncode != 0:
+        fail("--gate-pool exited %d:\n%s\n%s" % (r3.returncode, r3.stdout, r3.stderr))
+    if "3 armies from" not in r3.stdout:
+        fail("--gate-pool did not name its field:\n%s" % r3.stdout)
+    with open(gpath + ".gate") as f:
+        if "3 armies from" not in json.load(f).get("gate_field", ""):
+            fail("gate file did not record which field produced it")
+
+    bad = os.path.join(tmpdir, "selftest_gatepool_bad_%d.json" % os.getpid())
+    with open(bad, "w") as f:
+        json.dump([[[5, 0], [5, 1], [5, 2], [5, 3], [5, 4], [6, 7]]], f)  # 45 pts
+    bpath = os.path.join(tmpdir, "selftest_expand_bad_%d.json" % os.getpid())
+    r4 = subprocess.run(cmd[:3] + [bpath] + cmd[4:] + ["--gate-pool", bad],
+                        capture_output=True, text=True)
+    out = r4.stdout + r4.stderr
+    if "gate-pool army is illegal" not in out:
+        fail("an illegal --gate-pool was not rejected:\n%s" % out)
+    if "round 0 done" in r4.stdout:
+        fail("an illegal --gate-pool was caught only AFTER a round ran")
+
     print("PASS: expand end to end (%d rounds, %d setups, gate match reported, "
-          "resume kept its rounds)" % (len(state["rounds"]), len(state["armies"])))
+          "resume kept its rounds, --gate-pool swaps the field, records it, "
+          "and rejects an illegal one before any round runs)"
+          % (len(state["rounds"]), len(state["armies"])))
 
 
 def test_drafter():

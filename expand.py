@@ -330,6 +330,13 @@ def main():
                          "MEASURED AND REJECTED: the champion this produces is "
                          "worse against the seeded armies than one that never "
                          "saw them, -0.0728 +/- 0.0123 on the first of the two")
+    ap.add_argument("--gate-pool", metavar="JSON",
+                    help="JSON list of armies to use as the final gate field "
+                         "instead of the twelve hand-written archetypes. The "
+                         "archetype gate is a SCREEN: the champion that scored "
+                         "best on it (0.9425) is the one that cannot beat a "
+                         "real opponent. campaigns/pool_real_opponents.json "
+                         "holds every army ever actually played against us")
     ap.add_argument("--max-pieces", type=int, default=32,
                     help="piece ceiling for the engine; 0 for none, which is "
                          "correct for ./cuci.py (default: %(default)s)")
@@ -366,6 +373,20 @@ def main():
     if extra:
         print("seeding %d extra armies from %s"
               % (len(extra), ", ".join(args.seed_army)))
+
+    # Validated HERE rather than at the gate, which is hours later: an
+    # unreadable or illegal --gate-pool used to surface only after the whole
+    # campaign had run.
+    gate_base = None
+    if args.gate_pool:
+        with open(args.gate_pool) as f:
+            gate_base = [poolmod.from_json(a) for a in json.load(f)]
+        for army in gate_base:
+            ok, why = rules.validate_army(army)
+            if not ok:
+                sys.exit("gate-pool army is illegal: %s" % why)
+        print("gate field: %d armies from %s"
+              % (len(gate_base), os.path.basename(args.gate_pool)))
     state = load_state(args.state, args.seed, meta, args.seed_bot, extra)
     # A campaign written before these keys existed was built at their defaults,
     # so fill them in rather than refusing to resume every state file in git.
@@ -585,7 +606,18 @@ def main():
               % args.state)
         return
     armies = [poolmod.from_json(a) for a in state["armies"]]
-    base = poolmod.seed_pool(random.Random(state["seed"]))
+    # The gate field. Twelve hand-written archetypes by default, which is a
+    # SCREEN and not a decision: measured against the three armies anyone has
+    # ever actually played, the champion with the BEST archetype gate (0.9425)
+    # was the only one that could not beat a real opponent, drawing 764 of 800
+    # pairs. --gate-pool swaps in a field you supply. See docs/MEASUREMENTS.md.
+    if gate_base is not None:
+        base = gate_base
+        gate_field = "%d armies from %s" % (len(base),
+                                            os.path.basename(args.gate_pool))
+    else:
+        base = poolmod.seed_pool(random.Random(state["seed"]))
+        gate_field = "%d hand-written archetypes" % len(base)
     gate_w = our_strategies(weights, state.get("pinned", []))
     if not gate_w:
         sys.exit("the equilibrium is entirely pinned opponents; there is no "
@@ -617,14 +649,14 @@ def main():
         if k in gate:
             continue
         tasks.append(("g%d" % k, ours, theirs, args.nodes, args.jitter, k))
-    print("\n=== gate match: solved mix vs the %d hand-written archetypes ==="
-          % len(base))
+    print("\n=== gate match: solved mix vs %s ===" % gate_field)
     print("%d pairs to play, colours swapped inside each pair" % len(tasks))
 
     def save_gate():
         with open(gate_path + ".tmp", "w") as f:
             json.dump({"by_index": {str(k): v for k, v in gate.items()},
                        "support": {str(k): v for k, v in weights.items()},
+                       "gate_field": gate_field,
                        "meta": state["meta"]}, f)
         os.replace(gate_path + ".tmp", gate_path)
 

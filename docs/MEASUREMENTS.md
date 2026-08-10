@@ -211,6 +211,11 @@ genuinely different arrangement, 8 of its 17 non-king pieces on other squares.
 This is why a search over compositions is not enough, and why the pool has to
 carry arrangements as distinct members rather than deduplicating on material.
 
+`expand.py --gate-pool campaigns/pool_real_opponents.json` gates a campaign on
+this field instead of the archetypes. The archetype gate stays the default,
+because three armies are too few to breed against without overfitting -- which
+is the same trap `--seed-bot` fell into, one section up.
+
 **v4 ships despite `--seed-bot`, not because of it.** The rejection above
 stands: v4 is worse against both bot armies than v3. What it buys is the
 13-bishop column, +0.11. Why is not established -- v3 and v4 differ in seeds
