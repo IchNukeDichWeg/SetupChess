@@ -115,10 +115,17 @@ a human played, so its field contains **every real opponent ever observed**.
 
 ```
 campaign   seeded with                        gate vs the 12 archetypes
-v2         nothing                            0.9425 +/- 0.0117
+v2         nothing                            0.9425 +/- 0.0116
 v3         13 bishops                         0.9038 +/- 0.0146
 v4         13 bishops + 2 real bot armies     0.9406 +/- 0.0117
 ```
+
+All three rows are `fairy-stockfish`, `max_pieces 0`, 800 games, and each
+reproduces from its own gate file with `stats.report`. **The campaign named v2
+here is `campaigns/champion_fsf.json`, not `campaigns/champion_v2.json`** --
+the latter is an older stockfish-era army (3P 9B 1Q, king e1) whose gate is on
+the censored referee and cannot be compared to these. The filenames predate the
+vN vocabulary and were never renamed.
 
 v3 paid for its hedge; **v4 did not.** Its interval does not overlap v3's, so
 adding the real opponents on top of the 13-bishop army recovered the archetype
