@@ -106,6 +106,34 @@ archetype performance: the gate fell **0.9425 → 0.9038**.
 Exploitability 0 means no army **in the pool** beats the mix. That is a much
 weaker claim than it reads as.
 
+## Breeding against the real opponent, not the modelled one
+
+The v4 campaign is the first bred against the armies chess.com's bot has
+actually been observed playing (`pool.BOT_OBSERVED`, both queen-heavy) rather
+than `BOT_WALL`, the refuted 16-pawn model. It also carries the 13-bishop army
+a human played, so its field contains **every real opponent ever observed**.
+
+```
+campaign   seeded with                        gate vs the 12 archetypes
+v2         nothing                            0.9425 +/- 0.0117
+v3         13 bishops                         0.9038 +/- 0.0146
+v4         13 bishops + 2 real bot armies     0.9406 +/- 0.0117
+```
+
+v3 paid for its hedge; **v4 did not.** Its interval does not overlap v3's, so
+adding the real opponents on top of the 13-bishop army recovered the archetype
+performance that seeding 13 bishops alone had cost. Why is not established:
+v4 also filled in 11 rounds against v3's 14, so pool composition differs in
+more than one way.
+
+**The bot's armies are not in the equilibrium support**, in either campaign.
+The loop answers them rather than adopting them, which is what an opponent
+model should do.
+
+And the answer is still bishops. Four independent campaigns, two of them
+seeded with armies specifically chosen to break bishops, all land on
+**11 bishops + 6 pawns** at the top of the mix.
+
 ## Being predictable
 
 The champion against the pool's best response to it, 400 pairs:
