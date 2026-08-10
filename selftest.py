@@ -1081,8 +1081,23 @@ def test_expand_units(tmpdir):
     back = expand.load_state(path, 2026, meta)
     if back["armies"] != state["armies"] or back["cells"] != state["cells"]:
         fail("state did not survive a save/load round trip")
-    print("PASS: expand state round trip, cell_tasks covers both directions "
-          "and skips done cells, screen_scores weights by the mix")
+    # A drawish support makes the screen blind and it fails SILENTLY as
+    # "converged". This is the v5 campaign's failure mode, reproduced.
+    if not expand.screen_blind([0.5] * 24, [], 0.5):
+        fail("a screen where every challenger scored exactly the margin was "
+             "not flagged as blind")
+    if expand.screen_blind([0.5, 0.5, 0.75], [], 0.5):
+        fail("a screen with a challenger above the margin was called blind")
+    if expand.screen_blind([0.5, 0.25], [], 0.5):
+        fail("a screen with a challenger below the margin was called blind")
+    if expand.screen_blind([0.5] * 5, [3], 0.5):
+        fail("a screen that admitted something was called blind")
+    if expand.screen_blind([], [], 0.5):
+        fail("an empty screen was called blind")
+
+    print("PASS: expand state round trip, cell_tasks covers both directions, "
+          "skips done cells, screen_scores weights by the mix, and a screen "
+          "that resolves nothing is told apart from one that rejects")
 
 
 def test_expand_smoke(engine_path, tmpdir):

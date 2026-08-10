@@ -219,6 +219,21 @@ def cell_tasks(armies, pairs, cells, indices_a, indices_b, nodes, jitter):
 # better against the pool and worse against the pin. See docs/MEASUREMENTS.md.
 
 
+def screen_blind(vals, admitted, margin):
+    """Did the screen fail to resolve anything, rather than reject everything?
+
+    Admission needs a score strictly above `margin`. If the support draws
+    nearly every game then every challenger lands exactly ON the margin and
+    none can ever clear it, so the loop reports "converged" having measured
+    nothing. Seen for real in the v5 campaign: seeded with the 13-bishop army
+    and nothing strong, that army took the whole support, and at
+    --screen-pairs 1 all 24 challengers scored exactly 0.500 in round 0. The
+    shipped champion draws 717 of 800 pairs against that army, so this is what
+    a fortress does, not bad luck.
+    """
+    return bool(vals) and not admitted and all(v == margin for v in vals)
+
+
 def our_strategies(weights, pinned):
     """Equilibrium weights with pinned opponents removed and renormalised.
 
@@ -514,10 +529,28 @@ def main():
             print("  %d challengers beat the support but not the pinned "
                   "opponent" % lost_to_pin)
         killed = [i for i in new_idx if i not in admitted]
+        vals = [v for v in scored.values() if v is not None]
         print("  screen: %d admitted, %d killed (best %.3f)"
               % (len(admitted), len(killed),
-                 max((v for v in scored.values() if v is not None),
-                     default=float("nan"))))
+                 max(vals, default=float("nan"))))
+
+        # A DRAWISH SUPPORT MAKES THE SCREEN BLIND, and it fails silently as
+        # "converged". Admission needs a score strictly above --screen-margin,
+        # but if the support draws nearly everything then every challenger
+        # lands exactly on 0.5 and none can ever clear it. Seen for real: a
+        # campaign seeded with the 13-bishop army and nothing strong let that
+        # army take the whole support, and at --screen-pairs 1 all 24
+        # challengers scored exactly 0.500 in round 0 and the loop declared
+        # convergence having measured nothing. The champion draws 717 of 800
+        # pairs against that army, so this is the expected behaviour of a
+        # fortress, not bad luck.
+        if screen_blind(vals, admitted, args.screen_margin):
+            print("  WARNING: every challenger scored exactly %.3f. The "
+                  "support is drawish enough that this screen cannot resolve "
+                  "anything, so a 'converged' verdict here means UNMEASURED, "
+                  "not settled. Raise --screen-pairs (2 was used for the "
+                  "campaigns that worked) or seed a strong army so a fortress "
+                  "cannot hold the whole support." % args.screen_margin)
 
         if not admitted:
             state["rounds"].append({"round": rnd, "admitted": 0,

@@ -467,6 +467,47 @@ under time pressure. One game, wrong army, no conclusion.
 The transcript is the deliverable. `pool.HUMAN_OBSERVED` holds the wall and
 `campaigns/pool_real_opponents.json` is now four armies rather than three.
 
+## The v5 campaign measured nothing, and said it had converged
+
+Run with the human armies seeded and the real-opponent field as the gate. It
+stopped after two rounds having admitted **zero** challengers out of 47, then
+reported "the pool has converged" and produced a gate number. All of that is
+worthless, and the failure is worth more than the campaign would have been.
+
+What happened: the support collapsed to **one army, the 13-bishop army, at
+weight 1.0**. That is the most drawish army in this repo -- the shipped
+champion draws 717 of 800 pairs against it. Admission needs a score strictly
+above `--screen-margin 0.5`, so every challenger drew both its games, scored
+**exactly 0.500**, and could never clear the bar. Zero admitted, twice, and
+the loop counted that as two dry rounds and declared convergence.
+
+```
+round 0   24 challengers   0 admitted   best 0.500
+round 1   23 challengers   0 admitted   best 0.500
+gate      0.8275 +/- 0.0119 vs the 4 real opponents   <- this is just 13 bishops
+```
+
+The gate number is the 13-bishop army playing a field that contains itself. It
+is not a champion and must not be quoted as one.
+
+Two errors in the command, both avoidable by reading what the campaigns that
+worked actually used:
+
+| | v3 / v4 (worked) | v5 (failed) |
+|---|---|---|
+| `--screen-pairs` | 2 | 1 (the default) |
+| seeded | `pool_13bishop.json`, which also holds a STRONG army | two human armies only |
+
+The strong army is what kept 13 bishops from owning the support in v3 and v4.
+Remove it and a fortress takes the whole equilibrium, because a draw-everything
+army is a perfectly good strategy in a symmetric zero-sum game: value 0.5,
+exploitability 0, nothing to improve.
+
+**A converged double oracle and a blind screen look identical from the
+outside.** `expand.screen_blind` now separates them and the loop prints a
+warning naming both fixes; `selftest.py` pins it. Without that, the honest
+reading of any "converged" verdict is UNMEASURED rather than settled.
+
 ## Being predictable
 
 The champion against the pool's best response to it, 400 pairs:
