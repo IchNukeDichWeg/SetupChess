@@ -272,6 +272,28 @@ Consequences, in order of how much they should change what you do:
   champion **against one opponent**, which is exactly the reasoning that made
   `--seed-bot` fail. It needs the full grid before it can displace anything.
 
+### The e1 variant does not displace the champion
+
+Judged on one column it looked like an upgrade. Judged on all three it is not:
+
+```
+column        v4 (shipped)        e1 variant          difference
+bot 08-05     0.9006 +/- 0.0110   0.9116 +/- 0.0102   +0.0109 +/- 0.0150  includes zero
+bot 08-08     0.9525 +/- 0.0076   0.9641 +/- 0.0064   +0.0116 +/- 0.0100  excludes zero
+13 bishops    0.6247 +/- 0.0096   0.6028 +/- 0.0094   -0.0219 +/- 0.0134  excludes zero
+
+worst         0.6247              0.6028              -> v4 KEEPS the default
+```
+
+It wins the column it was found on and loses the binding one, both outside
+their intervals. **This is the second demonstration tonight that optimising on
+an observed opponent picks a worse army**, the first being `--seed-bot`, and
+this time the change was a single piece. The worst-case rule caught it.
+
+The prediction registered before the run was half right: the variant did not
+displace the champion, but the 13-bishop cell was predicted "near 0.5" and
+came in at 0.6028, much nearer the champion than expected.
+
 ### Two instrument notes from this run
 
 `h3` skipped 400 pairs as `opposite_check`, all of them the `(0,0)`
