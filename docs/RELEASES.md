@@ -5,6 +5,88 @@ written down because anything living only in someone's head gets skipped.
 
 ---
 
+## v3 -- the column that constrained everything finally moved
+
+Every ranking in v2 was pinned by one number: 0.6369 against thirteen bishops,
+an army a human invented and the search never produced. Four campaigns had
+failed to move it. v6 moved it to 0.6891, and this release is that plus a
+fourth real opponent, a mixture that needs no surgery, and a bug that had been
+silently converting failed campaigns into confident answers.
+
+```
+Army     | 11 bishops + 6 pawns, king e1   (fingerprint 66fd725f21948911)
+         | index 57 of the v6 campaign
+vs bot 2026-08-05 | 0.9513 +/- 0.0078   +516.32 Elo
+vs bot 2026-08-08 | 0.9884 +/- 0.0037   +772.19 Elo
+vs 13 bishops     | 0.6891 +/- 0.0106   +138.26 Elo   <- binding column
+vs the human wall | 0.8959 +/- 0.0105   +373.92 Elo
+Worst    | 0.6891, the rule the army was chosen by (was 0.6369)
+Mean     | 0.8812
+Games    | 800 per cell, plus 30 cells of screening behind them
+Mixture  | 9 armies, ALL screened, none removed, weakest worst 0.5050
+Pool     | 72 setups, exploitability 0, gated on real opponents not archetypes
+Stable   | index 57 in the support at shrink 0, 4, 8, 16, 32, weight 0.1719
+Referee  | fairy-stockfish 14.0.1, no piece ceiling
+TC       | 20,000 nodes fixed, 15% per-game jitter
+Bench    | 404,905 nodes (C move generator, cross-check only)
+Machine  | Mac14,9 arm64, macOS
+```
+
+### What changed
+
+- **The binding column moved, 0.6369 -> 0.6891.** First progress on it since
+  v4. Two v6 armies cleared the old champion and both confirmed at 400 pairs
+  on all four opponents.
+- **The mixture ships intact.** All nine support armies were measured against
+  all four real opponents before shipping and none scores below 0.5, so v6
+  keeps its Nash property over the pool. v2 had to remove index 83 by hand
+  after finding it was LOSING at 0.4481 while holding 9.1% of the weight.
+- **A fourth real opponent.** A 1826-rated human played a fifteen-pawn wall in
+  a live game -- the shape `docs/BOT_MODEL.md` predicted for the BOT and two
+  live bot games refuted. The model was wrong about who plays a wall, not
+  about whether anyone does.
+- **`expand.py --gate-pool`, used for the first time in a shipped campaign.**
+  v6 was gated on the four real opponents rather than the twelve archetypes.
+- **A blind screen no longer passes for a converged pool.** The v5 campaign
+  admitted 0 of 47 challengers, announced convergence and produced a gate
+  number, having measured nothing: its support collapsed to a fortress that
+  drew every screen game, so every challenger landed exactly on the admission
+  margin. `expand.screen_blind` separates the two and names both fixes.
+- **The first competitive non-bishop army in six campaigns.** Index 33 of v6 --
+  9 bishops, 6 pawns and 2 knights -- dominates the v2 champion on all four
+  columns. It does not ship, see below.
+
+### Known limits
+
+- **The shipped army is not the dominant one.** Index 33 beats the v2 champion
+  on all four columns and has the better mean (0.8938 against 0.8812); index
+  57 has the higher floor and REGRESSES 0.0171 on `bot 2026-08-05`. The
+  registered rule is worst column primary with dominance only as a tiebreak,
+  and 57 wins it by 0.0178 against a 0.0153 margin. Maximin buys the floor and
+  pays in the average. This is a judgement, and 33 is one line away.
+- **Only 2 of the 9 support armies are confirmed at 400 pairs.** The other
+  seven are 100-pair screens, which resolve to about +/-0.05 and can prove an
+  army is not losing but cannot rank it.
+- **The gain is on the column v6 was seeded to attack.** Whether seeding helps
+  or hurts has never been cleanly attributed across six campaigns, and
+  `--seed-bot` is a measured example of the same move backfiring.
+- **The shipped army's archetype gate is unmeasured.** No index-57 number
+  against the twelve archetypes exists. That is deliberate -- the gate is a
+  screen, not a decision -- but it means the two eras are not comparable there.
+- **Still only FOUR opponents.** Two bot armies, two human. Every ranking here
+  is a worst case over four columns, and no amount of compute widens that --
+  only playing more real games does.
+- **Two registered predictions were wrong this cycle**, both about v6: that
+  nothing would clear the binding column, and that the winner would collapse
+  on a bot column. Recorded in `docs/MEASUREMENTS.md` rather than quietly
+  dropped.
+- Carried over unfixed: `--optionality` is broken, `expand.py` stalls
+  intermittently at a multiprocessing teardown, one engine survives a hard
+  kill sometimes, drafting variance is unmeasured, and re-runs are not
+  bit-identical because `arena.py` never sends `ucinewgame`.
+
+---
+
 ## v2 -- judged on opponents that exist, not archetypes we invented
 
 The army barely changed and almost everything about how it was chosen did. v1

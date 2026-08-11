@@ -363,12 +363,29 @@ with truncation at 1.1%, so those are real draws and not the ply limit. An
 army can look best against a field of guesses and be a fortress against the
 thing you will actually face.
 
-`play.py` now defaults to **v4**, chosen on the worst column rather than the
-average or the gate. Winning 0.90 instead of 0.97 against something you beat
-either way costs less than 0.51 instead of 0.62 against something you do not.
-Note that this is the same campaign whose `--seed-bot` component is rejected
-in `docs/MEASUREMENTS.md`: v4 is genuinely *worse* against both bot armies
-than v3. It ships despite that, not because of it.
+Armies are chosen on the worst column rather than the average or the gate.
+Winning 0.90 instead of 0.97 against something you beat either way costs less
+than 0.51 instead of 0.62 against something you do not.
+
+### What ships now, and the column that finally moved
+
+A fourth real opponent has since been added -- a fifteen-pawn wall a human
+played in a live rated game -- and the v6 campaign moved the binding column
+for the first time since v4:
+
+```
+            bot 08-05  bot 08-08  13 bishops  wall     worst
+v4 champion 0.9684     0.9850     0.6369      0.8912   0.6369
+v6 idx 57   0.9513     0.9884     0.6891      0.8959   0.6891   <- ships
+v6 idx 33   0.9931     0.9969     0.6713      0.9137   0.6713
+```
+
+`play.py` defaults to **v6 index 57**, 11 bishops and 6 pawns with the king on
+e1. Index 33 -- the first competitive non-bishop army in six campaigns, with
+two knights -- **dominates the old champion on all four columns** and has the
+better mean, but a lower floor. The rule registered before the run was worst
+column primary with dominance only as a tiebreak, so 57 ships; the trade is
+that maximin buys the floor and pays in the average. See `docs/RELEASES.md`.
 
 ### Being predictable is worse than any of this
 
@@ -404,8 +421,13 @@ and this project has spent its whole budget searching compositions.
 > an extreme; every result that survived scrutiny was an average.
 
 **Mixing is ON by default.** `play.py` draws from the stored equilibrium
-support each game rather than always playing the argmax -- 13 distinct armies
-on the v4 campaign. `--no-mix` restores the single-army behaviour.
+support each game rather than always playing the argmax -- 9 distinct armies
+on the v6 campaign. `--no-mix` restores the single-army behaviour.
+
+Every one of those nine is screened against all four real opponents before the
+campaign ships, and none scores below 0.5. That check exists because v2 shipped
+with a support member quietly **losing** at 0.4481 while holding 9.1% of the
+weight, so the drafter chose an already-beaten army about one game in eleven.
 
 That is a judgement about the opponent, not a measured improvement, and it
 cannot be measured here: every harness in this repo scores against a fixed
