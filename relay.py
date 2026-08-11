@@ -10,7 +10,31 @@ place next.
 
 Mixing is on by default (play.MIX), so the army is drawn from the equilibrium
 support -- pass the same --seed every turn or it will draw a different army
-mid-game and abandon the pieces it has already placed.
+mid-game and abandon the pieces it has already placed. For a ONE-SHOT
+anonymous opponent pass --no-mix: mixing is a hedge against someone who plays
+you repeatedly, which a stranger from the pairing pool is not.
+
+A HUMAN HAS TO DRIVE THE BROWSER. An agent cannot, and this was measured the
+hard way over three rated games:
+
+  * chess.com forfeits if the FIRST placement does not arrive within roughly
+    20 seconds. That timeout is independent of the clock, so a slower time
+    control does not help -- 5|2 and 10|15 both forfeited -- and Setup Chess
+    has no daily pool to escape into.
+  * an agent needs one round trip to notice the pairing and another to place,
+    which is already most of that budget.
+  * the piece bank RE-LAYS OUT as pieces stop being affordable, so pixel
+    coordinates captured at 39 points are wrong later in the draft. One game
+    was corrupted by a bishop click landing on a pawn.
+  * screenshot pixels are NOT CSS pixels: the viewport measured 1512 CSS wide
+    while screenshots came back 1456, a 0.963 factor. Read the board rect from
+    `.TheBoard-layers` and the bank from `[data-piece]`, then scale by
+    screenshot_width / window.innerWidth. Guessing from the rank labels is
+    wrong; that was verified against a placed piece.
+
+So the division of labour this file was written for is the one that works:
+the human clicks, this prints what to click next, and the latency sits on the
+human side where it is free.
 """
 
 import argparse
