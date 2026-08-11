@@ -508,6 +508,50 @@ outside.** `expand.screen_blind` now separates them and the loop prints a
 warning naming both fixes; `selftest.py` pins it. Without that, the honest
 reading of any "converged" verdict is UNMEASURED rather than settled.
 
+## v6 ships, and the two decision rules disagree
+
+The corrected campaign ran properly: 16 rounds, pool 72, support 9,
+exploitability 0. Screening all nine support armies against the binding
+column found two above the champion's 0.6369, and both confirmed at 400
+pairs on all four real opponents:
+
+```
+             bot 08-05           bot 08-08           13 bishops          wall                worst
+v4 champion  0.9684 +/- 0.0064   0.9850 +/- 0.0045   0.6369 +/- 0.0098   0.8912 +/- 0.0107   0.6369
+v6 idx 57    0.9513 +/- 0.0078   0.9884 +/- 0.0037   0.6891 +/- 0.0106   0.8959 +/- 0.0105   0.6891  ships
+v6 idx 33    0.9931 +/- 0.0030   0.9969 +/- 0.0019   0.6713 +/- 0.0110   0.9137 +/- 0.0098   0.6713
+```
+
+**The binding column moves 0.6369 -> 0.6891**, the first real progress on it
+since v4 and the reason this campaign was worth running.
+
+**Worst column and dominance point at different armies.** Index 33 DOMINATES
+the old champion on all four and has the better mean (0.8938 against 0.8812);
+index 57 has the higher floor but gives up 0.0171 on `bot 08-05`. The rule
+registered before the run was worst column primary, dominance only as a
+tiebreak, and 57 leads by 0.0178 against a combined margin of 0.0153 -- not a
+tie, so the rule decides it and is not being re-chosen after the fact. What it
+costs is stated rather than hidden: maximin buys the floor and pays in the
+average.
+
+**Index 33 is the first competitive non-bishop army in six campaigns**: 9
+bishops, 6 pawns and 2 knights. Every champion before it was pure bishops
+plus pawns.
+
+Two predictions were registered and both were wrong. "Nothing will clear
+0.6369 decisively, and 0.70 would be surprising" -- index 57 screened at
+0.7075. Then "57 will likely drop on a bot column below 0.85" -- it dropped to
+0.9513, a real regression but nowhere near the threshold.
+
+### The mixture ships intact
+
+All nine support armies were played against all four real opponents. Worst
+columns: 0.5763, 0.6175, 0.6891, 0.5050, 0.5725, 0.6062, 0.6713, 0.6025,
+0.5637. **None below 0.5**, so v6 needs no hand-removal and keeps its Nash
+property over the pool -- unlike v4, which shipped with index 83 holding 9.1%
+of the weight while scoring 0.4481 against a real opponent. Screening up front
+costs nothing; removing afterwards cost the equilibrium.
+
 ## Being predictable
 
 The champion against the pool's best response to it, 400 pairs:

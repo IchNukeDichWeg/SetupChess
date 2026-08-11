@@ -74,57 +74,42 @@ HUNT_THEIR_POINTS = 12
 # inside the pool, so a target that is not a member gets abandoned on the first
 # placement.
 #
-# Both point at the v4 campaign. Chosen on the WORST CASE over the only three
-# armies anyone has ever actually played against us -- the bot's two and the
-# thirteen bishops a human drafted -- rather than on the twelve hand-written
-# archetypes, which nobody plays. All nine cells are 800 games, fairy-stockfish,
-# no piece ceiling:
+# Both point at the v6 campaign, index 57. Armies are judged on the WORST
+# COLUMN over the four armies anyone has ever actually played against us --
+# the bot's two, thirteen bishops from a human, and a fifteen-pawn wall from a
+# human -- never on the twelve hand-written archetypes, which nobody plays.
+# 800 games a cell, fairy-stockfish, no piece ceiling:
 #
-#        king   bot 08-05   bot 08-08   13 bishops   worst
-#   v2   e1     0.9172      0.4869      0.4700       0.4700
-#   v3   b1     0.9734      0.9641      0.5109       0.5109
-#   v4   f1     0.9006      0.9569      0.6247       0.6247
+#             bot 08-05  bot 08-08  13 bishops  wall     worst
+#   v2 champ  0.9172     0.4869     0.4700      -        0.4700
+#   v4 champ  0.9684     0.9850     0.6369      0.8912   0.6369
+#   v6 s57    0.9513     0.9884     0.6891      0.8959   0.6891   <- ships
+#   v6 s33    0.9931     0.9969     0.6713      0.9137   0.6713
 #
-# The target is index 63 of that campaign, NOT the argmax index 54 that the
-# solver crowned. Measured against the same three opponents, 63 DOMINATES 54:
+# THE TWO RULES DISAGREE HERE and the registered one wins. Worst column is
+# primary, dominance only breaks ties: 57 leads 33 by 0.0178 against a
+# combined margin of 0.0153, so this is not a tie and the criterion is not
+# being re-chosen after seeing the numbers. Note what that costs -- 33
+# DOMINATES the previous champion on all four columns and has the better mean
+# (0.8938 against 0.8812), while 57 gives up 0.0171 on bot 08-05. Maximin buys
+# the floor and pays for it in the average. Switch DEFAULT_TARGET to a frozen
+# index-33 champion if you would rather have the mean.
 #
-#        bot 08-05   bot 08-08   13 bishops   worst
-#   54   0.9006      0.9525      0.6247       0.6247
-#   63   0.9684      0.9850      0.6369       0.6369   <- ships
+# Index 33 is also the first competitive army in six campaigns that is NOT
+# pure bishops: 9 bishops, 6 pawns and 2 KNIGHTS.
 #
-# Better on all three, outside the interval on the first two and inside it on
-# the third. Index 40 ties 63 on the worst column (0.6372) and is far worse on
-# bot 08-05 (0.8431), so the tie is broken on dominance rather than on the
-# worst column alone, which cannot separate 0.6372 from 0.6369.
+# The whole mixture is certified, not just the target. All 9 support armies
+# were played against all 4 real opponents and none scores below 0.5; the
+# weakest worst is 0.5050 at index 54. That screen is checklist step 7 and it
+# exists because a support member was quietly LOSING to a real opponent for
+# the whole of v2 (index 83 of the v4 campaign, 0.4481).
 #
-# Index 54 IS the v4 row above; its bot 08-08 cell reads 0.9569 there and
-# 0.9525 here because they are two runs of the same 800 games. arena.py never
-# clears the engine hash, so a re-run is not bit-identical. Both are inside the
-# other's interval; see docs/MEASUREMENTS.md.
+# The archetype gate is a screen, never the decision: the champion with the
+# best gate score ever measured here (0.9425) is the one army that cannot beat
+# a real opponent, drawing 764 of 800 pairs against a bot we actually met.
 #
-# The solver preferred 54 because the equilibrium is solved over the POOL. The
-# pool is not the opponent distribution, which is the same lesson as --seed-bot
-# and the 13-bishop army. Weights still come from the solver; only the argmax
-# is overridden.
-#
-# All three are the SAME MATERIAL, 11 bishops + 6 pawns. v2 and v4 differ by
-# TWO PIECES: king e1 -> f1 and a bishop d1 -> g3. Nothing else moves. That is
-# the whole result -- those two squares take 0.4869 to 0.9569 against the bot
-# army we actually met, and 0.4700 to 0.6247 against 13 bishops. v3 is a
-# genuinely different arrangement (8 of 17 non-king pieces elsewhere).
-#
-# v2's archetype gate is the best of the three (0.9425) and it is the one army
-# here that cannot beat a real opponent -- it draws 764 of 800 pairs against
-# that same bot army. That is why the archetype gate is a screen and this grid
-# is the decision.
-#
-# v4 gives up ground against both bot armies (see docs/MEASUREMENTS.md, where
-# --seed-bot is rejected on exactly that) and buys much more against the army
-# that is actually close. Winning 0.90 instead of 0.97 against something you
-# beat either way costs less than 0.51 against something you do not.
-#
-# Switch back to expand_v3/champion_v3 if the bot is the only opponent you
-# expect, or to expand_fsf/champion_fsf for the archetype-shaped field.
+# Switch back to expand_v4/champion_v4b for the previous shipped army, or to
+# expand_fsf/champion_fsf for the archetype-shaped field.
 #
 # Full history of every number here, with its caveats: docs/MEASUREMENTS.md
 
@@ -164,27 +149,27 @@ OPTIONALITY = False
 # public repo -- so the targeting case is the realistic one. Turn it off with
 # --no-mix if you expect anonymous one-shot opponents.
 #
-# ONE ARMY WAS REMOVED FROM THE SAMPLED SUPPORT BY HAND. Index 83 of the v4
-# campaign held 9.1% of the weight and LOSES to a real opponent: 0.4481
-# +/- 0.0209 against the bot's 2026-08-05 army over 400 pairs, below 0.5 at
-# 95%. Every one of the 13 support members was screened against all three real
-# opponents to find it; nothing else fell below 0.56. campaigns/champion_v4b.json
-# carries the remaining 12, renormalised.
+# THE WHOLE MIXTURE IS SCREENED, not just the target. With MIX on, every
+# support army is one the drafter will actually play, so each is measured
+# against all four real opponents before the campaign ships. v6's nine:
 #
-# THIS IS NOT FREE, and the cost is real rather than theoretical. Index 83
-# earned its weight honestly: the mixture is a Nash equilibrium OVER THE POOL,
-# and dropping a support member makes the mix exploitable by some pool army.
-# The trade is a measured loss against an opponent that exists for a
-# theoretical loss against one that has never been seen. Restore it by pointing
-# DEFAULT_TARGET back at campaigns/champion_v4.json.
+#   idx   w      worst column over the four real opponents
+#   46    0.198  0.5763      67  0.189  0.6175      57  0.172  0.6891
+#   54    0.138  0.5050      30  0.123  0.5725      69  0.067  0.6062
+#   33    0.044  0.6713      40  0.035  0.6025      68  0.033  0.5637
 #
-# The principled fix is a campaign re-solved with the real opponents pinned as
-# columns, so the solver never gives weight to an army that loses to them. That
-# costs a campaign; this costs an edit. See docs/MEASUREMENTS.md.
+# NONE below 0.5, so v6 ships its equilibrium INTACT -- no hand-removal and no
+# renormalisation, and the mixture keeps the Nash property over its pool.
+#
+# That check is not decoration. The v4 campaign shipped with index 83 holding
+# 9.1% of the weight while scoring 0.4481 +/- 0.0209 against a real opponent,
+# so for the whole of v2 the drafter chose to play a losing army about one game
+# in eleven. Removing it by hand cost the equilibrium property; screening
+# up front costs nothing. See docs/MEASUREMENTS.md.
 MIX = True
 
-DEFAULT_POOL = "campaigns/expand_v4.json"
-DEFAULT_TARGET = "campaigns/champion_v4b.json"
+DEFAULT_POOL = "campaigns/expand_v6.json"
+DEFAULT_TARGET = "campaigns/champion_v6.json"
 
 
 def sample_target(champion_path, armies, rng):

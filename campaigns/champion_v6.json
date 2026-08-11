@@ -1,0 +1,98 @@
+{
+ "army": [
+  [
+   6,
+   4
+  ],
+  [
+   3,
+   9
+  ],
+  [
+   1,
+   14
+  ],
+  [
+   3,
+   8
+  ],
+  [
+   1,
+   15
+  ],
+  [
+   1,
+   11
+  ],
+  [
+   3,
+   0
+  ],
+  [
+   3,
+   1
+  ],
+  [
+   3,
+   2
+  ],
+  [
+   1,
+   12
+  ],
+  [
+   1,
+   22
+  ],
+  [
+   3,
+   6
+  ],
+  [
+   3,
+   3
+  ],
+  [
+   3,
+   17
+  ],
+  [
+   3,
+   19
+  ],
+  [
+   3,
+   20
+  ],
+  [
+   1,
+   21
+  ],
+  [
+   3,
+   10
+  ]
+ ],
+ "support": {
+  "30": 0.12304687499999929,
+  "33": 0.043945312499999944,
+  "40": 0.035156249999999944,
+  "46": 0.19824218750000003,
+  "54": 0.1376953125000003,
+  "57": 0.17187500000000003,
+  "67": 0.18945312500000078,
+  "68": 0.03320312500000009,
+  "69": 0.06738281249999972
+ },
+ "meta": {
+  "from": "campaigns/expand_v6.json",
+  "index": 57,
+  "weight": 0.17187500000000003,
+  "engine": "fairy-stockfish",
+  "max_pieces": 0,
+  "seeded": "13 bishops + the human wall + a strong army",
+  "gate": "4 armies from pool_real_opponents.json",
+  "chosen_by": "best worst column over the four real opponents, 0.6891 against the v2 champion's 0.6369",
+  "support_screened": "all 9 vs all 4 real opponents, none below 0.5, weakest worst 0.5050 (idx 54)"
+ }
+}
