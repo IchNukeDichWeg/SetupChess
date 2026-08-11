@@ -1138,6 +1138,21 @@ def test_expand_smoke(engine_path, tmpdir):
     with open(path) as f:
         if len(json.load(f)["rounds"]) < len(state["rounds"]):
             fail("resume lost rounds")
+    # --start-pool REPLACES the archetypes; --seed-army only adds. The whole
+    # bishops-or-basin experiment depends on that distinction.
+    import expand
+    import pool as _pool
+    _start = [_pool.ARCHETYPES["queen_spam"], _pool.ARCHETYPES["rook_battery"]]
+    _st = expand.new_state(2026, {}, False, None, _start)
+    if len(_st["armies"]) != 2:
+        fail("--start-pool did not replace the archetypes: %d armies"
+             % len(_st["armies"]))
+    _st = expand.new_state(2026, {}, False, [_pool.ARCHETYPES["minors"]], _start)
+    if len(_st["armies"]) != 3:
+        fail("--seed-army did not add on top of --start-pool")
+    if len(expand.new_state(2026, {})["armies"]) != len(_pool.ARCHETYPES):
+        fail("the default starting pool is no longer the archetypes")
+
     # --gate-pool swaps the gate field. It must be validated BEFORE the rounds
     # run, or a typo costs the whole campaign, and the gate file must record
     # which field produced it or two gates cannot be told apart.

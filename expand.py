@@ -34,7 +34,7 @@ import solve
 import stats
 
 
-def new_state(seed, meta, seed_bot=False, extra=None):
+def new_state(seed, meta, seed_bot=False, extra=None, start_pool=None):
     """Fresh campaign. `seed_bot` adds the bot's wall and PINS it.
 
     `extra` is a list of armies to add to the STARTING pool as ordinary
@@ -50,7 +50,14 @@ def new_state(seed, meta, seed_bot=False, extra=None):
     with nothing in the log to say so.
     """
     rng = random.Random(seed)
-    armies = poolmod.seed_pool(rng)
+    # start_pool REPLACES the archetypes rather than adding to them, which
+    # --seed-army cannot do. It exists to test whether bishops are the answer
+    # or just the basin: 241 of the 271 armies this search has ever bred sit in
+    # five bishop-heavy compositions, mutation from a bishop army makes bishop
+    # armies, and the screen only admits what beats an all-bishop support. Six
+    # campaigns agreeing on 11B+6P is weak evidence when all six started from
+    # the same pool with the same operator.
+    armies = list(start_pool) if start_pool else poolmod.seed_pool(rng)
     for army in (extra or []):
         if poolmod.army_key(army) not in {poolmod.army_key(a) for a in armies}:
             armies = armies + [army]
@@ -66,9 +73,9 @@ def new_state(seed, meta, seed_bot=False, extra=None):
             "cells": {}, "rounds": [], "seed": seed, "pinned": pinned}
 
 
-def load_state(path, seed, meta, seed_bot=False, extra=None):
+def load_state(path, seed, meta, seed_bot=False, extra=None, start_pool=None):
     if not os.path.exists(path):
-        return new_state(seed, meta, seed_bot, extra)
+        return new_state(seed, meta, seed_bot, extra, start_pool)
     with open(path) as f:
         state = json.load(f)
     state.setdefault("pinned", [])
@@ -330,6 +337,14 @@ def main():
     ap.add_argument("--max-minutes", type=float, default=0,
                     help="leave the round loop after this long and go to the "
                          "gate match; 0 for no limit")
+    ap.add_argument("--start-pool", metavar="JSON",
+                    help="JSON list of armies to use as the STARTING pool "
+                         "INSTEAD of the twelve archetypes, which --seed-army "
+                         "cannot do because it only adds. For testing whether "
+                         "a result is real or just the basin the search fell "
+                         "into: 241 of the 271 armies ever bred here are "
+                         "bishop-heavy, and every campaign started from the "
+                         "same archetypes with the same mutation operator")
     ap.add_argument("--seed-army", action="append", metavar="JSON",
                     help="JSON list of armies to add to the starting pool as "
                          "candidates. Repeatable. The search does not reach "
@@ -402,7 +417,17 @@ def main():
                 sys.exit("gate-pool army is illegal: %s" % why)
         print("gate field: %d armies from %s"
               % (len(gate_base), os.path.basename(args.gate_pool)))
-    state = load_state(args.state, args.seed, meta, args.seed_bot, extra)
+    start = None
+    if args.start_pool:
+        with open(args.start_pool) as f:
+            start = [poolmod.from_json(a) for a in json.load(f)]
+        for army in start:
+            ok, why = rules.validate_army(army)
+            if not ok:
+                sys.exit("start-pool army is illegal: %s" % why)
+        print("starting pool: %d armies from %s (the 12 archetypes are NOT used)"
+              % (len(start), os.path.basename(args.start_pool)))
+    state = load_state(args.state, args.seed, meta, args.seed_bot, extra, start)
     # A campaign written before these keys existed was built at their defaults,
     # so fill them in rather than refusing to resume every state file in git.
     for k, default in (("max_pieces", 32), ("seed_bot", False),
