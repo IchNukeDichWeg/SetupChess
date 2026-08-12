@@ -133,7 +133,13 @@ def load_matrix(path, max_holes, symmetric=True):
         state = json.load(f)
     # arena state files carry the setup count in meta; expand state files
     # carry the armies themselves and grow, so read whichever is there
-    n = state["meta"].get("n") or len(state["armies"])
+    n = state["meta"].get("n") or len(state.get("armies", []))
+    if not n:
+        # arena result files carry no "armies" key, so the old
+        # fallback raised KeyError instead of reporting an empty
+        # matrix. Derive the size from the cells themselves.
+        n = 1 + max((max(int(x) for x in k.split(",")[:2])
+                     for k in state.get("cells", {})), default=-1)
     acc = {}
     for key, v in state["cells"].items():
         if v is None:

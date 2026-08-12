@@ -100,6 +100,26 @@ def worker_init(engine_path, max_pieces=None):
     atexit.register(_kill_engine)
 
 
+def _drop_engine():
+    """Close the worker engine before forgetting it.
+
+    EngineTerminatedError means the process is already gone, but a plain
+    EngineError does NOT: python-chess raises it from its own protocol layer
+    and never touches the subprocess. Setting _ENGINE = None then leaked one
+    live engine per error, each holding a thread, an event loop and three pipe
+    fds, for the whole lifetime of a pool worker -- which for a campaign is the
+    whole campaign. Measured: three EngineErrors in one process took the child
+    count from 1 to 3.
+    """
+    global _ENGINE
+    eng, _ENGINE = _ENGINE, None
+    if eng is not None:
+        try:
+            eng.close()
+        except Exception:
+            pass
+
+
 def _worker_engine():
     """Restart the engine if it died mid-campaign rather than losing the run."""
     global _ENGINE
@@ -219,8 +239,7 @@ def play_cell(task):
     except Unplayable as e:
         return i, j, g, "unplayable", str(e)
     except (chess.engine.EngineError, chess.engine.EngineTerminatedError) as e:
-        global _ENGINE
-        _ENGINE = None
+        _drop_engine()
         return i, j, g, None, str(e)
     # both games scored from i's perspective, then averaged
     return i, j, g, (w + b) / 2.0, truncated
@@ -238,8 +257,7 @@ def play_match(task):
     except Unplayable as e:
         return tag, None, str(e)
     except (chess.engine.EngineError, chess.engine.EngineTerminatedError) as e:
-        global _ENGINE
-        _ENGINE = None
+        _drop_engine()
         return tag, None, str(e)
     return tag, list(scores), ""
 

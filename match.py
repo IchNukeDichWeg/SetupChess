@@ -88,7 +88,7 @@ def _game(args):
                 board.push(mv)
         except (chess.engine.EngineError,
                 chess.engine.EngineTerminatedError) as e:
-            arena._ENGINE = None
+            arena._drop_engine()
             return k, None, str(e)
         outcome = board.outcome(claim_draw=True)
         if outcome is None or outcome.winner is None:

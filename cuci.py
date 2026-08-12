@@ -111,8 +111,14 @@ def main():
                 s = "mate %d" % ((plies + 1) // 2 * (1 if score > 0 else -1))
             else:
                 s = "cp %d" % score
-            print("info depth %d score %s nodes %d pv %s"
-                  % (depth or 1, s, used, move.uci()), flush=True)
+            # `depth or 1` reported the REQUESTED depth, so every
+            # node-limited search claimed depth 1 no matter how deep it went.
+            # The core does not return its completed depth, so say what is
+            # actually known: the requested depth when one was given, and
+            # otherwise nothing false.
+            print("info%s score %s nodes %d pv %s"
+                  % ((" depth %d" % depth) if depth else "", s, used,
+                     move.uci()), flush=True)
             print("bestmove %s" % move.uci(), flush=True)
         elif cmd == "quit":
             return

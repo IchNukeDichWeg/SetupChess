@@ -438,7 +438,11 @@ def main():
             "ply_limit": arena.PLY_LIMIT,
             "max_pieces": args.max_pieces, "seed_bot": args.seed_bot,
             "seed_army": sorted(os.path.basename(p)
-                                for p in (args.seed_army or []))}
+                                for p in (args.seed_army or [])),
+            # --seed drives the per-round breeding rng, so a resume under a
+            # different one silently changes the stream while state["seed"]
+            # still records the original
+            "seed": args.seed}
     extra = []
     for path in (args.seed_army or []):
         with open(path) as f:
@@ -477,8 +481,11 @@ def main():
     state = load_state(args.state, args.seed, meta, args.seed_bot, extra, start)
     # A campaign written before these keys existed was built at their defaults,
     # so fill them in rather than refusing to resume every state file in git.
+    # backfill so a campaign written before a key existed still resumes. For
+    # `seed` that means a legacy file cannot have its seed verified -- it is
+    # taken on trust -- but refusing to resume every campaign in git is worse.
     for k, default in (("max_pieces", 32), ("seed_bot", False),
-                       ("seed_army", [])):
+                       ("seed_army", []), ("seed", args.seed)):
         state["meta"].setdefault(k, default)
     if state["meta"] != meta:
         sys.exit("state was built with different settings:\n  file: %r\n  now:  %r"
@@ -766,6 +773,18 @@ def main():
     if os.path.exists(gate_path):
         with open(gate_path) as f:
             prev = json.load(f)
+        # The gate file records gate_field and nothing ever compared it, and
+        # gate_pool is absent from `meta` so the settings guard cannot catch
+        # it either. Resuming an archetype gate under --gate-pool pooled pairs
+        # against the twelve archetypes with pairs against the real opponents
+        # into ONE stats.report -- the exact pair the docstring calls a screen
+        # and a decision.
+        prev_field = prev.get("gate_field")
+        if prev_field is not None and prev_field != gate_field:
+            sys.exit("this gate was played against %r and you asked for %r. "
+                     "Resuming would pool two different fields into one "
+                     "statistic; delete %s to replay the gate."
+                     % (prev_field, gate_field, gate_path))
         gate = {int(k): v for k, v in prev.get("by_index", {}).items()}
         if gate:
             print("\nresuming the gate match: %d pairs already recorded (%d "
