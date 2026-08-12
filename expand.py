@@ -665,6 +665,17 @@ def main():
             state["pinned"] = sorted(remap[i] for i in pinned)
             print("  pruned to %d setups" % len(survivors))
 
+        # THE HANDLER'S CLOSURE IS NOW STALE. _CHECKPOINT is bound inside
+        # run_pairs over the cells dict of that call, and the prune above has
+        # just rewritten state["armies"] and state["cells"] into a NEW index
+        # space. Left bound, a Ctrl-C during the gate match -- advertised as
+        # safe -- writes the PRE-prune cell table beside the POST-prune army
+        # list, so cells name armies that no longer exist while the handler
+        # prints "progress saved". Dropping it makes the handler fall back to
+        # the state already written to disk, which is correct and complete.
+        global _CHECKPOINT
+        _CHECKPOINT = None
+
         state["rounds"].append({
             "round": rnd, "admitted": len(admitted), "killed": len(killed),
             "pool": len(state["armies"]), "value": rep2["value"],
