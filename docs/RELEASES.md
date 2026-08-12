@@ -5,6 +5,83 @@ written down because anything living only in someone's head gets skipped.
 
 ---
 
+## v4 -- twenty-two bugs, and one of them meant a headline feature never ran
+
+No new campaign and no new army: v4 is the audit release. Two independent
+whole-repo audits were run against v3, every finding was re-verified here by
+running it rather than trusting the report, and twenty-two were real. One of
+them means a property this project advertised in three consecutive releases
+had never once executed.
+
+```
+Army     | UNCHANGED from v3: 11 bishops + 6 pawns, king e1
+         | fingerprint 66fd725f21948911, index 57 of the v6 campaign
+Grid     | UNCHANGED: 0.9513 / 0.9884 / 0.6891 / 0.8959, worst 0.6891
+Mixture  | 9 armies -- and now actually MIXED; see below
+Bench    | 541,501 nodes (was 404,905; two deliberate engine fixes)
+Referee  | fairy-stockfish 14.0.1, no piece ceiling
+Machine  | Mac14,9 arm64, macOS
+```
+
+### The one that matters
+
+**`--mix` never mixed.** `_retarget` ran on the empty board, where the
+opponent has revealed nothing, `_opponent_weights` returns the uniform prior,
+and the best response to a uniform prior is a CONSTANT -- so the sampled army
+was overwritten on the very first placement. Measured on the shipped pool:
+five distinct armies drawn over eight seeds, **one built**. The
+anti-exploitability property described at `play.py:MIX`, in the README and in
+v1, v2 and v3 had never fired. The old test stopped at `sample_target` and
+passed throughout; it now asserts what reaches the BOARD and fails on the
+un-fixed code.
+
+### What else was wrong
+
+- **Killed challengers' games were credited to admitted armies.** A killed
+  challenger keeps its scratch index while the pool grows by `len(admitted)`,
+  so its screen cells aliased onto an admitted army's new row --
+  nondeterministically, since `imap_unordered` decides who writes first.
+- **The drafter walked into setup checkmates.** Nothing asked "can they mate
+  me after this?". Against one pool army the shipped defaults lost BOTH
+  colours before a move was played; it now draws as White and wins as Black.
+- **`match.py` played every opponent from exactly one colour.** Opponent was
+  `k % len(field)` and colour `k % 2`, which lock whenever the field is even
+  -- 0 of 106 and 0 of 84 opponents were ever seen from both sides.
+- **The halfmove clock never reached C**, so `search.c`'s fifty-move branch
+  was dead code and the engine reported wins for positions one ply from a
+  declared draw.
+- **Quiescence had no terminal handling**, so depth 1 could not see mate in
+  one and a checked side could stand pat.
+- **`arena` resumes validated nothing** and could average two instruments into
+  one matrix. **`adapt.py` never read its required `--champion`**, correcting
+  "being predictable costs 30 Elo" to **14.7**. **A zero-variance sample**
+  reported `+inf` Elo and `CONTINUE`. **The queen table was left-right
+  asymmetric.** Plus fifteen more, each with a test.
+
+### Known limits
+
+- **Every campaign matrix in `campaigns/` is suspect and cannot be repaired.**
+  The aliasing corrupted 2 of 4 game records in affected cells; after the fill
+  tops them up the counts look normal, and the state files never recorded
+  which challenger indices were killed. The upper bound for v6 is 57 aliasing
+  challengers. **The shipped grid is unaffected** -- it comes from `arena`
+  runs on two-army pools that never touch that path.
+- **Re-targeting's +6.71 Elo is weaker than it reads.** It is on `match.py`'s
+  paired half-scale (about +13.4 arm-to-arm) AND was measured with opponent
+  and colour confounded, so the 3,000-game run sampled 106 positions replayed
+  28 times rather than 212. Not re-measured; treat the interval as optimistic.
+- **`HUNT_WHEN`'s justification is withdrawn.** The claim that the hunt "locks
+  out" two of four king-last styles rested on a test that reported a lockout
+  whenever no KING placement was offered -- also true once the king is down.
+  With that removed the hunt locks out none of them and COSTS a win on one.
+  The constant is left at 6 because changing it needs a real A/B, which is owed.
+- **The bench oracle moved twice**, both deliberate and both in the commit
+  that caused them. `perft(4)` is unchanged at 197281.
+- Still only four real opponents, and everything v3 listed as owed is still
+  owed except the items above.
+
+---
+
 ## v3 -- the column that constrained everything finally moved
 
 Every ranking in v2 was pinned by one number: 0.6369 against thirteen bishops,
@@ -235,6 +312,29 @@ Machine  | Mac14,9 arm64, macOS
   deterministic: those intervals carry chess-phase noise only.
 - **The 19-setup pool's +17.13 re-targeting figure predates the handoff fix**
   and has never been re-run.
+
+---
+
+## A correction that applies to every block above
+
+Two numbers in the older stats blocks were computed on superseded statistics
+and are left as published, because a release note records what was believed at
+the time:
+
+- **Gate margins and LLRs before v3 are per GAME**, not per pair. The gate
+  flattened each colour-swapped pair into two independent samples, which
+  breaks the iid assumption in the anti-conservative direction and inflated
+  the LLR by 19-40%. Corrected values: v1's gate is 0.9038 +/- 0.0159 with
+  LLR +34.926, v2's 0.9425 +/- 0.0121 with LLR +66.729. Means and verdicts are
+  unchanged.
+- **v1's fingerprint `ec385f649cf8af3e` is order-dependent** and cannot be
+  recomputed by `pool.fingerprint`, which is why that function exists. The
+  order-independent value for the same army is `59dc58be4abffd66`.
+- **The bench oracle has moved twice since v1** on deliberate engine fixes:
+  404,905 -> 409,886 (queen table mirrored) -> 541,501 (quiescence terminal
+  handling). Any bench figure in an older block is that block's, not today's.
+
+Full detail in `docs/MEASUREMENTS.md`.
 
 ---
 

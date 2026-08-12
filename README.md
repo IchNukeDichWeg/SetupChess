@@ -28,7 +28,7 @@ far than the error bars suggest.
 Python is the harness. There is a C move generator, used as a cross-check and
 perft oracle rather than to play anything.
 
-Current version **v1**; what shipped and what it does not know are in
+Current version **v4**; what shipped and what it does not know are in
 [docs/RELEASES.md](docs/RELEASES.md).
 
 ## What it found
@@ -77,14 +77,19 @@ Against the twelve hand-written archetypes, sampled uniformly:
 
 ```
 Games   | 800 (400 pairs), 0 unplayable
-Score   | 0.9425 +/- 0.0116
+Score   | 0.9425 +/- 0.0121   (per PAIR; see below)
 W/D/L   | 712 / 84 / 4
 Elo     | +485.85  [+451.79, +527.08]
-SPRT    | [0,4] LLR +72.357 -> ACCEPT H1
+SPRT    | [0,4] LLR +66.729 -> ACCEPT H1
 Pool    | 60 setups, exploitability 0 in every round
 TC      | 20,000 nodes fixed, 15% per-game jitter
 Machine | Mac14,9 arm64, macOS, fairy-stockfish 14.0.1
 ```
+
+The margin and the LLR are per PAIR. The gate used to flatten each
+colour-swapped pair into two independent games, which inflated the LLR by
+19-40% across the shipped campaigns; the mean is unaffected and the verdict
+is unchanged. See `docs/MEASUREMENTS.md`.
 
 Four losses in 800 games. Read that as "much better than hand-written
 guesses", not "strong": the archetype field includes deliberately bad armies
