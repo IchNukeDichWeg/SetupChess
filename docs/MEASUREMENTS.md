@@ -137,10 +137,18 @@ a human played, so its field contains **every real opponent ever observed**.
 
 ```
 campaign   seeded with                        gate vs the 12 archetypes
-v2         nothing                            0.9425 +/- 0.0116
-v3         13 bishops                         0.9038 +/- 0.0146
-v4         13 bishops + 2 real bot armies     0.9406 +/- 0.0117
+v2         nothing                            0.9425 +/- 0.0121
+v3         13 bishops                         0.9038 +/- 0.0159
+v4         13 bishops + 2 real bot armies     0.9406 +/- 0.0139
 ```
+
+Margins are PER PAIR. The gate used to flatten each colour-swapped pair into
+two independent games, which violates `stats.report`'s iid assumption in the
+anti-conservative direction: the LLRs were inflated 19-40% (v3 +41.4 against
++34.9, v4 +70.2 against +50.1, v6 +55.1 against +44.8). The means are
+unaffected and every shipped verdict still ACCEPTs H1 far past +2.944, so
+nothing here changes except the width -- but a marginal future gate would have
+accepted early. v4's interval still does not overlap v3's.
 
 All three rows are `fairy-stockfish`, `max_pieces 0`, 800 games, and each
 reproduces from its own gate file with `stats.report`. **The campaign named v2

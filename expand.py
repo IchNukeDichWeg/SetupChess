@@ -824,8 +824,26 @@ def main():
                                       / 60, skipped), flush=True)
         save_gate()
 
+    # PAIRS, NOT GAMES. Each entry in gate[k] is a colour-swapped pair played
+    # from the same position, so the two games are positively correlated and
+    # stats.report's iid assumption is violated in the ANTI-CONSERVATIVE
+    # direction. Measured on the shipped gates, flattening inflated the LLR by
+    # 19-40%: v3 +41.4 against +34.9, v4 +70.2 against +50.1, v6 +55.1 against
+    # +44.8. No shipped verdict flips -- all are far past +2.944 -- but a
+    # marginal future gate would accept H1 earlier than alpha=0.05 allows.
+    # The mean is identical either way; only the variance was wrong.
     per_game = [s for k in sorted(gate) if gate[k] for s in gate[k]]
-    if per_game:
+    per_pair = []
+    for k in sorted(gate):
+        v = gate[k] or []
+        for i in range(0, len(v) - 1, 2):
+            per_pair.append((v[i] + v[i + 1]) / 2.0)
+    if per_pair:
+        print(stats.report(per_pair, elo0=0.0, elo1=4.0))
+        print("(%d pairs = %d games; the statistic is per PAIR, because the "
+              "two colours of one position are correlated)"
+              % (len(per_pair), len(per_game)))
+    elif per_game:
         print(stats.report(per_game, elo0=0.0, elo1=4.0))
     else:
         print("no playable pairs; nothing measured")

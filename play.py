@@ -947,11 +947,22 @@ def main():
         sys.exit("our army is illegal: %s" % why)
 
     armies = matrix = None
-    if args.no_pool:
-        args.pool = None
+    # MIXING AND RE-TARGETING ARE SEPARATE FEATURES and --no-pool used to kill
+    # both: `armies` stayed None, and both sampling sites gate on it, so
+    # --no-pool (documented as "disable best-response re-targeting") silently
+    # reverted to the fixed champion every game with MIX notionally on and no
+    # message. That is exactly the exploitable pure play MIX exists to avoid,
+    # and it confounded every --no-pool A/B, which measured the two jointly.
+    # The armies list is still needed to SAMPLE from, so load it either way and
+    # withhold only the pool/matrix the Drafter re-targets with.
     if args.pool:
         armies, matrix = load_pool(args.pool)
-        print("best-response enabled over %d pool armies" % len(armies))
+        if args.no_pool:
+            matrix = None
+            print("re-targeting disabled; mixing still draws from %d pool "
+                  "armies" % len(armies))
+        else:
+            print("best-response enabled over %d pool armies" % len(armies))
 
     if args.live:
         if args.color == "both":
