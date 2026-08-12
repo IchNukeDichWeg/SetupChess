@@ -221,12 +221,60 @@ def play_match(task):
 
 
 def load_state(path):
+    """(cells, stored_meta). `stored_meta` is {} for a file that predates it."""
     if not os.path.exists(path):
-        return {}
+        return {}, {}
     with open(path) as f:
         state = json.load(f)
-    return {tuple(int(x) for x in k.split(",")): v
-            for k, v in state.get("cells", {}).items()}
+    if "cells" not in state:
+        sys.exit("%s has no 'cells' key, so it is not an arena results file. "
+                 "Refusing to overwrite it -- pointing --out at a campaign "
+                 "state would destroy its armies, rounds and seed." % path)
+    return ({tuple(int(x) for x in k.split(",")): v
+             for k, v in state["cells"].items()},
+            state.get("meta", {}))
+
+
+# Settings that change WHAT WAS PLAYED. A resume that differs on any of these
+# pools two instruments into one matrix, which is the thing CLAUDE.md section 5
+# forbids outright, and save_state then rewrites meta so the file claims every
+# cell came from the newest run. expand.py has had this guard all along.
+#
+# `armies` is in here because index identity is not implied by anything else:
+# seed_pool tops up from the rng, so a different --seed puts DIFFERENT armies
+# at the same index and every stored cell silently changes meaning.
+#
+# max_pieces is deliberately NOT in here. Raising it is the documented
+# workflow for ./cuci.py, it changes which cells are playable rather than how
+# a game is played, and the cells it unlocks are exactly the ones recorded as
+# unplayable. Those get retried instead of blocking the resume.
+_RESUME_KEYS = ("n", "nodes", "jitter", "pairs", "engine", "seed",
+                "ply_limit", "armies")
+
+
+def check_resume(stored, current, cells):
+    """Refuse a resume that would pool instruments; retry cells a wider
+    ceiling has just unlocked. Returns the cells to keep."""
+    if not stored:
+        return cells
+    for k in _RESUME_KEYS:
+        if k in stored and stored[k] != current[k]:
+            sys.exit("this results file was built with %s=%r and you asked "
+                     "for %r. Resuming would average two different "
+                     "instruments into one matrix; use a new --out."
+                     % (k, stored[k], current[k]))
+    missing = [k for k in _RESUME_KEYS if k not in stored]
+    if missing:
+        print("  note: this file predates the resume guard and carries no %s, "
+              "so those could not be verified" % ", ".join(missing))
+    if stored.get("max_pieces") != current["max_pieces"]:
+        freed = [k for k, v in cells.items() if v is None]
+        for k in freed:
+            del cells[k]
+        print("  --max-pieces changed %r -> %r: %d unplayable cell(s) cleared "
+              "for a retry" % (stored.get("max_pieces"),
+                               current["max_pieces"], len(freed)))
+    return cells
 
 
 def save_state(path, cells, meta):
@@ -282,15 +330,17 @@ def main():
         if not ok:
             sys.exit("army %d is illegal: %s" % (idx, why))
 
-    cells = load_state(args.out)
+    cells, stored = load_state(args.out)
+    meta = {"n": n, "nodes": args.nodes, "jitter": args.jitter,
+            "pairs": args.pairs, "engine": os.path.basename(args.engine),
+            "seed": args.seed, "ply_limit": PLY_LIMIT,
+            "max_pieces": args.max_pieces,
+            "armies": [poolmod.fingerprint(a) for a in armies]}
+    cells = check_resume(stored, meta, cells)
     tasks = [(i, j, g, (armies[i], armies[j]), args.nodes, args.jitter)
              for i in range(n) for j in range(n)
              for g in range(args.pairs) if (i, j, g) not in cells]
     workers = args.workers or os.cpu_count()
-    meta = {"n": n, "nodes": args.nodes, "jitter": args.jitter,
-            "pairs": args.pairs, "engine": os.path.basename(args.engine),
-            "seed": args.seed, "ply_limit": PLY_LIMIT,
-            "max_pieces": args.max_pieces}
 
     global _CHECKPOINT
     _CHECKPOINT = lambda: save_state(args.out, cells, meta)

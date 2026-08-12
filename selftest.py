@@ -963,7 +963,38 @@ def test_arena_smoke(engine_path, tmpdir):
     with open(out) as f:
         if json.load(f)["cells"] != state["cells"]:
             fail("resume rewrote existing cells")
-    print("PASS: arena end to end (4 cells played, resume replayed nothing)")
+    # A resume that changes the instrument must be refused, not averaged in.
+    # arena had no guard at all: it kept only `cells`, threw `meta` away, and
+    # save_state then rewrote meta so the file claimed every cell came from the
+    # newest run. Army identity is checked too, because seed_pool tops up from
+    # the rng: a different --seed puts different armies at the same index.
+    _base = {"n": 2, "nodes": 300, "jitter": 0.15, "pairs": 1,
+             "engine": "cuci.py", "seed": 2026, "ply_limit": 300,
+             "max_pieces": 32, "armies": ["aa", "bb"]}
+    if arena.check_resume(dict(_base), dict(_base), {(0, 1, 0): 0.5}) != {(0, 1, 0): 0.5}:
+        fail("a same-settings resume was altered")
+    for key, bad in (("engine", "stockfish"), ("nodes", 5000),
+                     ("armies", ["aa", "cc"]), ("seed", 7)):
+        cur = dict(_base)
+        cur[key] = bad
+        try:
+            arena.check_resume(dict(_base), cur, {})
+            fail("a resume with a different %s was allowed" % key)
+        except SystemExit:
+            pass
+    # ...but raising the piece ceiling is the documented cuci.py workflow, and
+    # it must RETRY the cells it unlocks rather than block or keep them None
+    cur = dict(_base)
+    cur["max_pieces"] = 0
+    kept = arena.check_resume(dict(_base), cur, {(0, 1, 0): 0.5, (1, 0, 0): None})
+    if (1, 0, 0) in kept or (0, 1, 0) not in kept:
+        fail("raising --max-pieces did not free the unplayable cells: %r" % kept)
+    if arena.check_resume({}, dict(_base), {(0, 1, 0): 0.5}) != {(0, 1, 0): 0.5}:
+        fail("a legacy file with no meta should resume with a note, not refuse")
+
+    print("PASS: arena end to end (4 cells played, resume replayed nothing, "
+          "a changed instrument is refused, and a raised piece ceiling frees "
+          "the cells it unlocks)")
 
 
 def test_solver():
