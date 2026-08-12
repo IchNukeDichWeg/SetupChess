@@ -276,8 +276,21 @@ class Drafter:
         return [r / total for r in raw]
 
     def _retarget(self, state):
-        """Swap the plan for the best still-reachable answer to their army."""
+        """Swap the plan for the best still-reachable answer to their army.
+
+        NOTHING TO REACT TO IS NOT THE SAME AS REACTING TO EVERYTHING. Before
+        the opponent has placed anything _opponent_weights returns the uniform
+        prior, and the best response to a uniform prior is a CONSTANT -- the
+        same army every game. Retargeting on that empty board silently
+        overwrote whatever sample_target had drawn, on the very first
+        placement, so --mix drew from the support and then always built one
+        army. Measured over seeds 0-7 on the v6 pool: 5 distinct armies drawn,
+        1 built. MIX is the anti-exploitability property this repo documents in
+        three release notes, and it had never once fired.
+        """
         if not self.pool or self.matrix is None:
+            return
+        if not self._revealed(state, not self.color):
             return
         ours = self._revealed(state, self.color)
         reachable = [i for i, a in enumerate(self.pool)

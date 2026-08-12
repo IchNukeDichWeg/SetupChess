@@ -375,8 +375,49 @@ def test_mix_default():
         want = play.MIX if not argv else False
         if parsed.mix != want:
             fail("argv %r gave mix=%r, expected %r" % (argv, parsed.mix, want))
+    # DRAWING is not PLAYING. This test used to stop at sample_target, and the
+    # drafter threw the draw away on its first placement: _retarget ran on the
+    # empty board, where opponent weights are uniform and the best response is
+    # a constant, so every seed built the same army. Assert what reaches the
+    # board, not what the sampler returned.
+    shipped_pool, shipped_matrix = play.load_pool(play.DEFAULT_POOL)
+    built = set()
+    for s in range(12):
+        tgt = play.sample_target(play.DEFAULT_TARGET, shipped_pool,
+                                 random.Random(s))
+        d = play.Drafter(tgt, chess.WHITE, pool=shipped_pool,
+                         matrix=shipped_matrix)
+        d.choose(rules.SetupState())
+        built.add(tuple(sorted(d.target)))
+    if len(built) < 2:
+        fail("the drafter BUILT only %d distinct army over 12 seeds: mixing "
+             "is drawn and then discarded before the first placement" % len(built))
+
+    # ...and re-targeting must still fire once they have revealed something,
+    # or the fix above would have bought mixing by deleting a measured feature
+    d = play.Drafter(rules.mirror_army(play.load_army(play.DEFAULT_TARGET)),
+                     chess.BLACK, pool=shipped_pool, matrix=shipped_matrix)
+    st = rules.SetupState()
+    shown = 0
+    for pt, sq in shipped_pool[13]:
+        if shown >= 6:
+            break
+        if st.turn == chess.WHITE and st.board.piece_at(sq) is None:
+            st.place(pt, sq)
+            shown += 1
+        elif st.turn == chess.BLACK:
+            for p2, s2 in st.legal_placements():
+                if (p2, s2) not in d.target:
+                    st.place(p2, s2)
+                    break
+    d._retarget(st)
+    if not d.retargets:
+        fail("re-targeting never fired after the opponent revealed 6 pieces")
+
     print("PASS: mixing is on by default, draws %d distinct legal in-pool "
-          "armies from the support, and --no-mix turns it off" % len(drawn))
+          "armies from the support, BUILDS %d distinct armies through the "
+          "drafter, re-targeting still fires once they reveal, and --no-mix "
+          "turns it off" % (len(drawn), len(built)))
 
 
 def test_ply_limit_reported():
