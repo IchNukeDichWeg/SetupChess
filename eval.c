@@ -64,11 +64,17 @@ static const int PST[NPIECES][64] = {
       -5,  0,  0,  0,  0,  0,  0, -5,
        5, 10, 10, 10, 10, 10, 10,  5,
        0,  0,  0,  0,  0,  0,  0,  0},
-    /* queen */
+    /* queen. LEFT-RIGHT MIRRORED, deliberately. The classic simplified-eval
+     * table is asymmetric on three ranks and was copied with that intact:
+     * c2 scored 5 against f2 0, b3 5 against g3 0, a4 0 against h4 -5. Six
+     * squares in all, measured through cengine.evaluate at 925 against 920.
+     * The selftest's symmetry check is a COLOUR mirror, so it passed straight
+     * over it. With up to four queens inside 39 points the phantom queenside
+     * preference reached about 20 cp. */
     {-20,-10,-10, -5, -5,-10,-10,-20,
-     -10,  0,  5,  0,  0,  0,  0,-10,
-     -10,  5,  5,  5,  5,  5,  0,-10,
-       0,  0,  5,  5,  5,  5,  0, -5,
+     -10,  0,  0,  0,  0,  0,  0,-10,
+     -10,  0,  5,  5,  5,  5,  0,-10,
+      -5,  0,  5,  5,  5,  5,  0, -5,
       -5,  0,  5,  5,  5,  5,  0, -5,
      -10,  0,  5,  5,  5,  5,  0,-10,
      -10,  0,  0,  0,  0,  0,  0,-10,

@@ -1559,7 +1559,7 @@ def test_match_smoke(engine_path, tmpdir):
 # or the eval changes and must not otherwise. Update it in the SAME commit as
 # any deliberate change, and treat a surprise move as a bug.
 BENCH_DEPTH = 5
-BENCH_NODES = 404905
+BENCH_NODES = 409886
 
 
 def test_search(rng):
@@ -1617,6 +1617,26 @@ def test_search(rng):
     mv, _, _ = cengine.search(wall, nodes=20000)
     if mv is None or mv not in wall.legal_moves:
         fail("search failed on the 42-piece position Stockfish crashes on")
+
+    # LEFT-RIGHT symmetry, which the colour mirror above cannot see. The queen
+    # table shipped asymmetric on three ranks (c2 5 against f2 0, b3 against
+    # g3, a4 against h4) and evaluate() differed by 5 cp on six squares.
+    for _f in range(4):
+        for _r in range(8):
+            _a, _b = chess.square(_f, _r), chess.square(7 - _f, _r)
+            if _a in (chess.E1, chess.E8) or _b in (chess.E1, chess.E8):
+                continue
+            _bd = []
+            for _sq in (_a, _b):
+                _x = chess.Board(None)
+                _x.set_piece_at(_sq, chess.Piece(chess.QUEEN, chess.WHITE))
+                _x.set_piece_at(chess.E1, chess.Piece(chess.KING, chess.WHITE))
+                _x.set_piece_at(chess.E8, chess.Piece(chess.KING, chess.BLACK))
+                _bd.append(cengine.evaluate(_x))
+            if _bd[0] != _bd[1]:
+                fail("queen eval is left-right asymmetric: %s=%d %s=%d"
+                     % (chess.square_name(_a), _bd[0],
+                        chess.square_name(_b), _bd[1]))
 
     # The halfmove clock has to REACH the C struct, or search.c's fifty-move
     # branch is dead code: MAX_PLY is 64, so a counter starting at 0 can never
