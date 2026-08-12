@@ -730,7 +730,11 @@ def live(ours, color, engine, nodes, fallback=None, pool=None, matrix=None,
         print("using the %s" % note, flush=True)
 
     limit = chess.engine.Limit(nodes=nodes)
-    while not board.is_game_over(claim_draw=True) and board.ply() < 400:
+    # arena, match and duel all adjudicate at arena.PLY_LIMIT; this used to
+    # hardcode 400, so the same position could be a draw in one harness and
+    # decided in another and no output said which cap applied.
+    while (not board.is_game_over(claim_draw=True)
+           and board.ply() < arena.PLY_LIMIT):
         if board.turn == color:
             mv = picked.play(board, limit).move
             if mv is None:
@@ -798,7 +802,8 @@ def play_out(state, engine, nodes, log=None, fallback=None, max_pieces=None):
     why = note
     board = chess.Board(fen)
     limit = chess.engine.Limit(nodes=nodes)
-    while not board.is_game_over(claim_draw=True) and board.ply() < 400:
+    while (not board.is_game_over(claim_draw=True)
+           and board.ply() < arena.PLY_LIMIT):
         move = engine.play(board, limit).move
         if move is None:
             break
@@ -806,6 +811,9 @@ def play_out(state, engine, nodes, log=None, fallback=None, max_pieces=None):
             log.append(board.san(move))
         board.push(move)
     outcome = board.outcome(claim_draw=True)
+    if outcome is None:
+        # stopped at the ply cap: scored 0.5 like arena does, but SAID so
+        why = (why + "; " if why else "") + "hit the %d-ply limit" % arena.PLY_LIMIT
     return (outcome.result() if outcome else "1/2-1/2"), fen, why
 
 

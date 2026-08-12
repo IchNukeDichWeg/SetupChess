@@ -66,7 +66,23 @@ def new_state(seed, meta, seed_bot=False, extra=None, start_pool=None):
         # the armies the bot has actually been OBSERVED playing, not the
         # modelled BOT_WALL -- two live games refuted the model's piece
         # preference, and every --seed-bot campaign before this faced a fiction
+        # DEDUP, and pin the copy that is already there. The `extra` loop above
+        # dedups on army_key and this one used to append unconditionally, so a
+        # bot army reachable through --start-pool or --seed-army ended up in
+        # the pool TWICE: once pinned as an opponent and once unpinned as one
+        # of ours. our_strategies strips only the pinned index, so the unpinned
+        # copy of the bot's own draft could take the whole equilibrium weight
+        # and become both the sole breeding parent and the entire gate mix --
+        # exactly what our_strategies exists to prevent. Measured on a
+        # 6-army state: duplicate pairs (0,4) and (1,5), weights {1: 0.765,
+        # 4: 0.219, 5: 0.016}, and our_strategies returned {1: 1.0}.
+        seen = {poolmod.army_key(a): i for i, a in enumerate(armies)}
         for army in poolmod.BOT_OBSERVED.values():
+            key = poolmod.army_key(army)
+            if key in seen:
+                pinned.append(seen[key])
+                continue
+            seen[key] = len(armies)
             pinned.append(len(armies))
             armies = armies + [army]
     return {"meta": meta, "armies": [poolmod.to_json(a) for a in armies],
