@@ -70,9 +70,19 @@ def main():
     state = rules.SetupState()
     drafter = play.Drafter(target, us, pool=armies, matrix=matrix)
     for tok in args.moves:
+        raw = tok
         tok = tok.lstrip("@")
-        pt = chess.PIECE_SYMBOLS.index(tok[0].lower())
-        sq = chess.parse_square(tok[1:3].lower())
+        # The place() call below already exits cleanly on an ILLEGAL placement;
+        # parsing sat outside that and died with a raw traceback on a mistyped
+        # one. This tool runs under chess.com's ~20 second forfeit clock (see
+        # the docstring), so a traceback instead of one line of correction
+        # costs the game.
+        try:
+            pt = chess.PIECE_SYMBOLS.index(tok[0].lower())
+            sq = chess.parse_square(tok[1:3].lower())
+        except (ValueError, IndexError):
+            sys.exit("bad token %r: expected @<piece><square>, e.g. @Qd1 "
+                     "(pieces PNBRQK, squares a1-h8)" % raw)
         try:
             state.place(pt, sq)
         except ValueError as e:

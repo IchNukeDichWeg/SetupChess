@@ -22,6 +22,7 @@ stdin, one `@Qd1` token per line, for driving a real game elsewhere.
 
 import argparse
 import json
+import os
 import random
 import sys
 import time
@@ -182,6 +183,14 @@ def sample_target(champion_path, armies, rng):
     The weights come from the campaign that produced the champion, so this
     plays the solver's actual answer rather than its argmax. See MIX.
     """
+    # --target accepts an ARCHETYPE NAME as well as a path (load_army handles
+    # both, and --target's own help documents the names), but this opened it
+    # unconditionally, so every archetype name crashed at startup with
+    # FileNotFoundError whenever MIX was on -- which is the default. Mixing
+    # simply does not apply to a hand-named army: there is no support to draw
+    # from, so fall through to the fixed target.
+    if not os.path.exists(champion_path):
+        return None
     with open(champion_path) as f:
         support = json.load(f).get("support") or {}
     support = {int(k): v for k, v in support.items() if int(k) < len(armies)}

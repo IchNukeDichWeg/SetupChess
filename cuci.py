@@ -54,28 +54,46 @@ def main():
         elif cmd == "ucinewgame":
             board = chess.Board()
         elif cmd == "position":
-            if "startpos" in parts:
-                board = chess.Board()
-                rest = parts[parts.index("startpos") + 1:]
-            elif "fen" in parts:
-                i = parts.index("fen")
-                end = parts.index("moves") if "moves" in parts else len(parts)
-                board = chess.Board(" ".join(parts[i + 1:end]))
-                rest = parts[end:]
-            else:
+            # The module docstring promises "Unknown commands are ignored
+            # rather than fatal, which is what a UCI host expects", but a
+            # MALFORMED ARGUMENT to a known command was fatal: a bad FEN or a
+            # bad move token killed the process mid-session, and the host saw
+            # EngineTerminatedError. In-repo callers only ever send FENs from
+            # rules.setup_fen, so this costs an external or hand-driven host.
+            try:
+                if "startpos" in parts:
+                    nb = chess.Board()
+                    rest = parts[parts.index("startpos") + 1:]
+                elif "fen" in parts:
+                    i = parts.index("fen")
+                    end = parts.index("moves") if "moves" in parts else len(parts)
+                    nb = chess.Board(" ".join(parts[i + 1:end]))
+                    rest = parts[end:]
+                else:
+                    continue
+                if rest and rest[0] == "moves":
+                    for tok in rest[1:]:
+                        nb.push(chess.Move.from_uci(tok))
+            except ValueError as e:
+                # keep the previous position rather than dying on it
+                print("info string ignoring malformed position: %s" % e,
+                      flush=True)
                 continue
-            if rest and rest[0] == "moves":
-                for tok in rest[1:]:
-                    board.push(chess.Move.from_uci(tok))
+            board = nb
         elif cmd == "go":
             depth = nodes = movetime = 0
-            for i, tok in enumerate(parts):
-                if tok == "depth" and i + 1 < len(parts):
-                    depth = int(parts[i + 1])
-                elif tok == "nodes" and i + 1 < len(parts):
-                    nodes = int(parts[i + 1])
-                elif tok == "movetime" and i + 1 < len(parts):
-                    movetime = int(parts[i + 1]) / 1000.0
+            try:                       # `go depth x` used to kill the process
+                for i, tok in enumerate(parts):
+                    if tok == "depth" and i + 1 < len(parts):
+                        depth = int(parts[i + 1])
+                    elif tok == "nodes" and i + 1 < len(parts):
+                        nodes = int(parts[i + 1])
+                    elif tok == "movetime" and i + 1 < len(parts):
+                        movetime = int(parts[i + 1]) / 1000.0
+            except ValueError as e:
+                print("info string ignoring malformed go argument: %s" % e,
+                      flush=True)
+                depth = nodes = movetime = 0
             move, score, used = bestmove(board, depth, nodes, movetime)
             if move is None:
                 print("bestmove 0000", flush=True)

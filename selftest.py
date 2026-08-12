@@ -1635,6 +1635,21 @@ def test_uci(tmpdir):
             fail("cuci.py failed on the 42-piece position")
     finally:
         eng.quit()
+    # A malformed argument to a KNOWN command used to kill the process, which
+    # the host sees as EngineTerminatedError, contradicting cuci's own promise
+    # that unknown input is ignored rather than fatal.
+    for bad in ("position fen not-a-fen 0 1\ngo depth 2\n",
+                "position startpos moves e2e4 zzzz\ngo nodes 300\n",
+                "position startpos\ngo depth x\n"):
+        r = subprocess.run([sys.executable, "cuci.py"],
+                           input="uci\n" + bad + "quit\n",
+                           capture_output=True, text=True)
+        if r.returncode != 0:
+            fail("cuci.py died (exit %d) on malformed input %r:\n%s"
+                 % (r.returncode, bad, r.stderr[-400:]))
+        if "bestmove" not in r.stdout:
+            fail("cuci.py stopped answering after malformed input %r" % bad)
+
     print("PASS: cuci.py speaks UCI, plays 12 legal plies and the 42-piece "
           "position")
 
