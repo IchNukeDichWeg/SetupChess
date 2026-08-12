@@ -65,7 +65,8 @@ def new_state(seed, meta, seed_bot=False, extra=None, start_pool=None):
     if seed_bot:
         # the armies the bot has actually been OBSERVED playing, not the
         # modelled BOT_WALL -- two live games refuted the model's piece
-        # preference, and every --seed-bot campaign before this faced a fiction
+        # preference, and every --seed-bot campaign before this faced a fiction.
+        #
         # DEDUP, and pin the copy that is already there. The `extra` loop above
         # dedups on army_key and this one used to append unconditionally, so a
         # bot army reachable through --start-pool or --seed-army ended up in
@@ -187,9 +188,15 @@ def run_pairs(tasks, pool, cells, label, on_save=None):
             if on_save:
                 on_save(cells)
             rate = done / max(1e-9, time.time() - start)
+            # flush, because watchdog.py treats silence on this pipe as a
+            # stall. Popen(stdout=PIPE) makes the child block-buffer at 128 KB,
+            # so an unflushed progress line means a HEALTHY cell-fill run emits
+            # nothing for thousands of lines and gets killed as stalled, then
+            # declared "broken, not stalled" after three restarts. This is the
+            # every-25-pairs line the 300s default is built around.
             print("    %s %d/%d, %.2f pairs/s, eta %.1f min"
                   % (label, done, len(tasks), rate,
-                     (len(tasks) - done) / max(rate, 1e-9) / 60))
+                     (len(tasks) - done) / max(rate, 1e-9) / 60), flush=True)
     if on_save:
         on_save(cells)
     return unplayable, errors

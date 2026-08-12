@@ -91,9 +91,20 @@ def stop(proc, reason):
         proc.send_signal(signal.SIGINT)
     except OSError:
         pass
+    # A SECOND CTRL-C MUST NOT ESCAPE THIS. The wait was unguarded and stop()
+    # is called from run_once's `except KeyboardInterrupt`, so a second
+    # interrupt during the 15s grace window propagated straight out and skipped
+    # everything below: no proc.kill(), no wait, no descendant sweep. Measured
+    # against a job that ignores the first SIGINT, two Ctrl-Cs 1.0s apart left
+    # the job parent AND its grandchild alive while the watchdog exited 130,
+    # contradicting the docstring's "Ctrl-C stops the watchdog AND the job".
+    # Pressing it again after 15 quiet seconds is the natural reaction.
     deadline = time.time() + GRACE
     while time.time() < deadline and proc.poll() is None:
-        time.sleep(0.2)
+        try:
+            time.sleep(0.2)
+        except KeyboardInterrupt:
+            break
     if proc.poll() is None:
         try:
             proc.kill()
@@ -119,8 +130,16 @@ def run_once(command, silence):
 
     code is the job's exit status, or None if the watchdog stopped it.
     """
+    # PYTHONUNBUFFERED, because silence on this pipe is the ONLY stall signal
+    # and Popen(stdout=PIPE) makes a Python child block-buffer at 128 KB. Any
+    # job whose progress prints are not explicitly flushed then looks stalled
+    # while it is working perfectly: measured, a child printing an unflushed
+    # line every 1.5s under --silence 4 was killed at 4s, restarted twice and
+    # declared broken. The same child with PYTHONUNBUFFERED=1 exits 0.
+    env = dict(os.environ, PYTHONUNBUFFERED="1")
     proc = subprocess.Popen(command, stdout=subprocess.PIPE,
-                            stderr=subprocess.STDOUT, text=True, bufsize=1)
+                            stderr=subprocess.STDOUT, text=True, bufsize=1,
+                            env=env)
     last = [time.time()]
     saw = [False]
 
@@ -170,8 +189,9 @@ def main_for_test(command, silence=DEFAULT_SILENCE, max_restarts=100):
             return code
         fruitless = 0 if saw else fruitless + 1
         if fruitless >= MAX_FRUITLESS:
-            print("[watchdog] %d restarts in a row produced no output at all; "
-                  "this is broken, not stalled" % fruitless, flush=True)
+            print("[watchdog] %d consecutive runs produced no output at "
+                  "all (%d of them restarts); this is broken, not stalled"
+                  % (fruitless, max(0, fruitless - 1)), flush=True)
             return 1
         restarts += 1
         if restarts > max_restarts:
