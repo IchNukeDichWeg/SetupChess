@@ -1179,6 +1179,26 @@ def test_expand_smoke(engine_path, tmpdir):
     with open(path) as f:
         if len(json.load(f)["rounds"]) < len(state["rounds"]):
             fail("resume lost rounds")
+    # A killed challenger keeps its scratch index, and the pool grows by
+    # len(admitted), so the old `i2 < len(armies)` test let a dead mutant's
+    # screen game land on an admitted army's brand-new row -- permanently,
+    # because cell_tasks never re-plays an occupied cell.
+    import expand as _ex
+    _first, _adm = 10, {12, 13}
+    _remap = {o: _first + k for k, o in enumerate(sorted(_adm))}
+    _scratch = {(10, 0, 0): 0.10, (11, 0, 0): 0.20,      # killed
+                (12, 0, 0): 0.95, (13, 0, 0): 0.90}      # admitted
+    _out = _ex.carry_screen_cells(_scratch, _remap, _first, 12, {})
+    if _out.get((10, 0, 0)) != 0.95 or _out.get((11, 0, 0)) != 0.90:
+        fail("a killed challenger's screen game was credited to an admitted "
+             "army: %r" % dict(sorted(_out.items())))
+    if len(_out) != 2:
+        fail("killed challengers' cells leaked into the pool: %r" % _out)
+    # cells that are not challengers at all must pass through untouched
+    _out2 = _ex.carry_screen_cells({(0, 1, 0): 0.4}, _remap, _first, 12, {})
+    if _out2 != {(0, 1, 0): 0.4}:
+        fail("an ordinary pool cell was dropped by the carry: %r" % _out2)
+
     # --start-pool REPLACES the archetypes; --seed-army only adds. The whole
     # bishops-or-basin experiment depends on that distinction.
     import expand

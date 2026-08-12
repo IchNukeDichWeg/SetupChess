@@ -552,6 +552,56 @@ property over the pool -- unlike v4, which shipped with index 83 holding 9.1%
 of the weight while scoring 0.4481 against a real opponent. Screening up front
 costs nothing; removing afterwards cost the equilibrium.
 
+## Two shipped bugs found by audit, and what they do and do not invalidate
+
+### `--mix` never mixed
+
+`MIX` is documented in `play.py`, the README and all three release notes as
+the anti-exploitability property this project is built around. It had never
+fired. `_retarget` ran on the EMPTY board, where the opponent has revealed
+nothing, `_opponent_weights` returns the uniform prior, and the best response
+to a uniform prior is a **constant** -- so the sampled army was overwritten on
+the very first placement. Measured on the shipped v6 pool over seeds 0-7:
+**five distinct armies drawn, one built.**
+
+Fixed: re-targeting waits until the opponent has revealed a placement.
+Verified both ways -- 12 seeds now build 6 distinct armies, and re-targeting
+still fires after six opponent pieces, so the +6.71 Elo feature is intact.
+
+**What this invalidates.** Nothing measured. Every harness here scores against
+a fixed field, where mixing is documented as costing about -32 Elo, so no
+number in this file was produced with mixing live. What it invalidates is the
+CLAIM, repeated in three releases, that the shipped drafter was unpredictable.
+It was not; it played one army.
+
+### Killed challengers' screen games were credited to admitted armies
+
+`expand.py` carried screen cells into the pool matrix with only an
+`i2 < len(armies)` guard. A killed challenger keeps its scratch index, the
+pool has just grown by `len(admitted)`, so any killed index inside
+`[first, first + len(admitted))` **aliases onto an admitted army's new row**.
+The admitted challenger's own cell is then dropped by the already-occupied
+test, and `cell_tasks` never re-plays an occupied cell. Nondeterministic on
+top, because `scratch` is filled by `imap_unordered`.
+
+Fixed in `carry_screen_cells`, which drops any scratch cell belonging to a
+challenger that is not in `remap`; `selftest.py` reproduces the exact
+aliasing scenario.
+
+**The blast radius, stated honestly.** It cannot be repaired retroactively:
+affected cells hold 2 corrupt game records out of 4 after the fill tops them
+up, so the game counts look normal (every cell in every shipped campaign sits
+at exactly the fill depth) and the state files never record which challenger
+indices were killed. Upper bound for v6 is 57 aliasing challengers over 16
+rounds. **So every campaign matrix in `campaigns/` is suspect, and so is any
+equilibrium support solved from one.**
+
+**What it does NOT touch: the numbers that decide what ships.** Those come
+from `arena.py` runs on two-army pools at 400 pairs -- `conf_v6s57_*.json` and
+the rest of the real-opponent grid -- which never go through this path. The
+campaign matrix only decides which armies get PROPOSED; the four-column grid
+decides which one wins, and that grid is clean.
+
 ## Being predictable
 
 The champion against the pool's best response to it, 400 pairs:

@@ -226,6 +226,30 @@ def cell_tasks(armies, pairs, cells, indices_a, indices_b, nodes, jitter):
 # better against the pool and worse against the pin. See docs/MEASUREMENTS.md.
 
 
+def carry_screen_cells(scratch, remap, first, n_armies, cells):
+    """Move the ADMITTED challengers' screen cells into the pool index space.
+
+    A killed challenger keeps its scratch index, and the pool has just grown by
+    len(admitted), so a bare `i2 < n_armies` test is not a guard: any killed
+    index inside [first, first + len(admitted)) ALIASES onto an admitted army's
+    brand-new row. Its games then get credited to an army that never played
+    them, the admitted challenger's own cell is dropped by the
+    already-occupied test, and cell_tasks never re-plays an occupied cell, so
+    the wrong number is permanent and feeds every later solve, breed and prune.
+
+    Nondeterministic, too: `scratch` is filled by imap_unordered, so which
+    value wins depends on completion order and two runs of one campaign can
+    disagree with nothing in the log.
+    """
+    for (i, j, g), v in scratch.items():
+        if (i >= first and i not in remap) or (j >= first and j not in remap):
+            continue                      # killed challenger; its index is now someone else's
+        i2, j2 = remap.get(i, i), remap.get(j, j)
+        if i2 < n_armies and j2 < n_armies and (i2, j2, g) not in cells:
+            cells[(i2, j2, g)] = v
+    return cells
+
+
 def screen_blind(vals, admitted, margin):
     """Did the screen fail to resolve anything, rather than reject everything?
 
@@ -599,11 +623,8 @@ def main():
         remap = {old: first + k for k, old in enumerate(sorted(admitted))}
         armies = armies + [ext[i] for i in sorted(admitted)]
         state["armies"].extend(poolmod.to_json(ext[i]) for i in sorted(admitted))
-        cells = cells_of(state)
-        for (i, j, g), v in scratch.items():
-            i2, j2 = remap.get(i, i), remap.get(j, j)
-            if i2 < len(armies) and j2 < len(armies) and (i2, j2, g) not in cells:
-                cells[(i2, j2, g)] = v
+        cells = carry_screen_cells(scratch, remap, first, len(armies),
+                                   cells_of(state))
         put_cells(state, cells)
         save_state(args.state, state)
         admitted = sorted(remap.values())
