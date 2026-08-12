@@ -579,7 +579,18 @@ def main():
         tasks = cell_tasks(ext, args.screen_pairs, scratch,
                            new_idx, opponents, args.nodes, args.jitter)
         run_pairs(tasks, pool, scratch, "screen")
-        scored = screen_scores(scratch, len(ext), new_idx, weights)
+        # OURS ONLY. Handing the raw weights here blends a pinned opponent's
+        # equilibrium weight into the "against the support" score, which is
+        # exactly the weighted average recorded above as having destroyed the
+        # filter. A pinned wall that draws everything can hold most of the
+        # weight, and then a challenger that beats the wall and loses to every
+        # army of ours clears the margin: measured on a 5-army state with the
+        # pin at weight 0.60, a challenger scoring 0.95 against the pin and
+        # 0.10 against all of ours was ADMITTED at 0.610 where our_strategies
+        # weights score it 0.100 and kill it. Both other consumers of `weights`
+        # strip the pins first; this one did not.
+        scored = screen_scores(scratch, len(ext), new_idx,
+                               our_strategies(weights, pinned))
         # unweighted mean against the pinned opponents, judged separately
         pin_scored = (screen_scores(scratch, len(ext), new_idx,
                                     {i: 1.0 for i in pinned})

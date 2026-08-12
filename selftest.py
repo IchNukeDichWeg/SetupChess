@@ -1210,6 +1210,23 @@ def test_expand_smoke(engine_path, tmpdir):
     with open(path) as f:
         if len(json.load(f)["rounds"]) < len(state["rounds"]):
             fail("resume lost rounds")
+    # The screen must weight OUR armies only. Blending a pinned opponent's
+    # equilibrium weight in is the weighted average expand.py's own comment
+    # records as having destroyed the filter: a challenger that beats the pin
+    # and loses to everything of ours cleared the margin.
+    import expand as _e2
+    _w = {0: 0.13, 1: 0.14, 2: 0.13, 4: 0.60}
+    _cells = {}
+    for _j, _v in ((0, 0.10), (1, 0.10), (2, 0.10), (4, 0.95)):
+        _cells[(5, _j, 0)] = _v
+        _cells[(_j, 5, 0)] = 1.0 - _v
+    _bad = _e2.screen_scores(_cells, 6, [5], _w)[5]
+    _good = _e2.screen_scores(_cells, 6, [5],
+                              _e2.our_strategies(_w, [4]))[5]
+    if not (_bad > 0.5 >= _good):
+        fail("the pinned-weight screen case no longer demonstrates: raw %.3f, "
+             "stripped %.3f" % (_bad, _good))
+
     # A killed challenger keeps its scratch index, and the pool grows by
     # len(admitted), so the old `i2 < len(armies)` test let a dead mutant's
     # screen game land on an admitted army's brand-new row -- permanently,
