@@ -80,6 +80,13 @@ def from_board(board):
                   PIECE_TO_C[piece.piece_type], sq)
     ep = board.ep_square if board.ep_square is not None else NO_SQ
     l.pos_finish(ctypes.byref(p), 0 if board.turn == chess.WHITE else 1, ep)
+    # pos_clear zeroes halfmove and pos_finish takes only (side, ep), so every
+    # search root used to sit at 0 and search.c:127's `halfmove >= 100` could
+    # never fire -- MAX_PLY is 64, so the counter cannot reach 100 from zero
+    # inside one search. The C fifty-move rule was dead code, while all four
+    # drivers adjudicate with claim_draw=True. Net effect: the engine returned
+    # a winning score for a position that was about to be declared drawn.
+    p.halfmove = board.halfmove_clock
     return p
 
 

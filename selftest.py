@@ -1549,6 +1549,25 @@ def test_search(rng):
     if mv is None or mv not in wall.legal_moves:
         fail("search failed on the 42-piece position Stockfish crashes on")
 
+    # The halfmove clock has to REACH the C struct, or search.c's fifty-move
+    # branch is dead code: MAX_PLY is 64, so a counter starting at 0 can never
+    # reach 100 inside one search. All four drivers adjudicate with
+    # claim_draw=True, so the engine used to report a won score for a position
+    # one ply from being declared drawn.
+    near = chess.Board("8/8/8/4k3/8/8/8/3QK3 w - - 99 60")
+    if cengine.from_board(near).halfmove != 99:
+        fail("from_board dropped the halfmove clock; the C fifty-move rule "
+             "cannot fire")
+    _, near_score, _ = cengine.search(near, depth=6)
+    if near_score != 0:
+        fail("one ply from the fifty-move draw the search scored %d, not 0"
+             % near_score)
+    fresh = chess.Board("8/8/8/4k3/8/8/8/3QK3 w - - 0 60")
+    _, fresh_score, _ = cengine.search(fresh, depth=6)
+    if fresh_score <= 500:
+        fail("the same position with a fresh clock scored %d; the fifty-move "
+             "guard is firing when it should not" % fresh_score)
+
     # bench signature
     champ = play.load_army("campaigns/champion_v2.json")
     bench_pos = chess.Board(rules.setup_fen(champ, champ))
