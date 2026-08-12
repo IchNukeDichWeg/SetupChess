@@ -651,6 +651,37 @@ the rest of the real-opponent grid -- which never go through this path. The
 campaign matrix only decides which armies get PROPOSED; the four-column grid
 decides which one wins, and that grid is clean.
 
+## The king hunt's justification is withdrawn
+
+`HUNT_WHEN`'s comment claimed the hunt "locks out" two of four king-last
+styles. That rested on a selftest helper which returned `"lockout"` whenever
+no KING placement was offered -- which is also true once the king is already
+on the board. On the `rank3` style the black king was sitting on **a7 with 6
+legal placements left** and the suite scored it a lockout.
+
+With the artifact removed:
+
+```
+style        hunt off   HUNT_WHEN=6   HUNT_WHEN=8
+dense        complete   complete      complete
+queen_spam   1-0        1-0           1-0
+rank3        complete   complete      complete
+heavy        1-0        complete      complete
+```
+
+The hunt locks out **none** of them, and on `heavy` it **costs a win** the
+baseline had. "Neither loses a win the baseline had" was false.
+
+What survives: the lockout is a real rule -- ending setup without a king loses
+outright -- and it is now actually SCORED. `rules.place()` had no terminal
+state for it, so `done()` returned False for a kingless side, `complete` never
+became True, and the designed win deadlocked: the turn was handed back forever
+to a side with no legal placement, `Drafter.choose` raised, `handoff_fen`
+raised, and `match.py` discarded a won game as an engine error.
+
+**`HUNT_WHEN` is left at 6.** Changing it needs an A/B over the real-opponent
+field, not a second guess off four hand-written styles. That is owed.
+
 ## Being predictable
 
 The champion against the pool's best response to it, 400 pairs:

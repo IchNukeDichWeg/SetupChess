@@ -266,6 +266,23 @@ class SetupState:
             if self.mates(placer):
                 self.result = "1-0" if placer == chess.WHITE else "0-1"
                 return
+        # LOCKED OUT OF A KING. docs/RULES.md records ending setup without a
+        # king as an outright loss ("failed to set up his king" in the shipped
+        # client), and HUNT_WHEN exists precisely to force it -- but nothing
+        # ever SCORED it. done() returns False for a kingless side, so
+        # `complete` never became True, the turn was handed back forever to a
+        # side with no legal placement, and the designed win deadlocked:
+        # Drafter.choose raised ValueError, handoff_fen raised "setup not
+        # complete", live() rejected every further token, and match.py caught
+        # the ValueError and discarded a WON game as an engine error.
+        #
+        # Checked for both sides: the placer can also spend its last points
+        # without a king, which is the same loss by the same rule.
+        for side in (opp, placer):
+            if self.board.king(side) is None and not self._placements(side):
+                self.result = "0-1" if side == chess.WHITE else "1-0"
+                return
+
         # Strict alternation, always. A side with nothing left to place PASSES
         # rather than being skipped, which is exactly what the server records:
         # a live game showed "11. @Bf3 P / 12. @Bg2 P / ..." with White

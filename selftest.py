@@ -1374,24 +1374,34 @@ def test_drafter():
                 legal = set(st.legal_placements())
                 mv = next((x for x in plan[bi:] if x in legal), None)
                 if mv is None:
+                    # NOT a lockout just because no KING placement is offered:
+                    # once the king is down there never is one. This used to
+                    # return "lockout" there and the suite pinned the false
+                    # claim -- on the rank3 style the black king was already on
+                    # a7 with 6 legal placements left. A genuine lockout now
+                    # surfaces as st.result, because rules.place() scores it.
+                    if not legal:
+                        return "stuck"
                     kings = [x for x in legal if x[0] == chess.KING]
-                    if not kings:
-                        return "lockout"
-                    mv = kings[0]
+                    mv = (kings[0] if kings
+                          else min(legal, key=lambda t: rules.PIECE_COST[t[0]]))
                 else:
                     bi = plan.index(mv) + 1
             st.place(*mv)
         return st.result or "survived"
 
     got = {k: run(_army(v)) for k, v in styles.items()}
+    # THE TRUTH, once the false lockout verdict is gone: the hunt locks out
+    # nothing here. It wins queen_spam, which the baseline also wins, and on
+    # `heavy` it COSTS a win the baseline had (1-0 with the hunt off,
+    # completed setup at HUNT_WHEN 6 and 8 alike).
     want = {"dense": "survived", "queen_spam": "1-0",
-            "rank3": "lockout", "heavy": "lockout"}
+            "rank3": "survived", "heavy": "survived"}
     if got != want:
         fail("king hunt changed outcomes: %r, want %r" % (got, want))
-    # with the hunt disabled, heavy is a mate rather than a lockout: the hunt
-    # is what converts it, and neither loses a win the baseline had
     if run(_army(styles["heavy"]), hunt_when=-1) != "1-0":
-        fail("baseline no longer mates the heavy style")
+        fail("the hunt-off baseline no longer wins the heavy style; the "
+             "regression this pins is that the HUNT LOSES that win")
     # The drafter must not WALK INTO a setup mate. _mate_in_one only ever asked
     # "can I mate them?"; against pool army 14 of the v6 campaign the shipped
     # defaults lost BOTH colours to a setup checkmate.
@@ -1414,9 +1424,10 @@ def test_drafter():
                      "playing %s: %s" % (chess.COLOR_NAMES[_col], _st.result))
 
     print("PASS: drafter realises its target for both colours, takes a setup "
-          "mate over the plan, blocks a forced check, and locks out %d of %d "
-          "king-last styles" % (sum(1 for v in got.values() if v == "lockout"),
-                                len(got)))
+          "mate over the plan, blocks a forced check, and wins %d of %d "
+          "king-last styles (the hunt locks out NONE of them, and costs "
+          "the win on heavy)" % (sum(1 for v in got.values() if v == "1-0"),
+                                 len(got)))
 
 
 def test_play_smoke(engine_path, tmpdir):

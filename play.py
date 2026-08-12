@@ -42,15 +42,24 @@ import stats
 # of the budget first, then places it while there is still room to manoeuvre.
 KING_AT_POINTS_LEFT = 12
 
-# Hunt an unplaced enemy king once its safe squares are this few. 6 measured
-# strictly better than 8: both win the same three of four king-last styles,
-# but at 8 the drafter abandoned 5 of its 14 target pieces chasing a dense
-# opponent that was never in danger, and at 6 it builds all 14. Ending setup
-# without a king is an outright loss, not a checkmate ("failed to set up his
-# king" in the shipped client), so covering every empty square in their zone
-# wins on its own. Measured against a 23/24-coverage army: sparse armies that
-# hold the king back get locked out, dense ones survive because their own
-# sixteen pieces block every ray to the back rank.
+# Hunt an unplaced enemy king once its safe squares are this few.
+#
+# ITS JUSTIFICATION IS WITHDRAWN, and the constant is left at 6 because
+# changing it needs a real measurement rather than a second guess. The comment
+# here used to claim the hunt "locks out" two of four king-last styles, which
+# rested on a selftest that returned "lockout" whenever no KING placement was
+# offered -- also true once the king is already down. On the rank3 style the
+# black king was sitting on a7 with 6 legal placements left.
+#
+# With that artifact removed the hunt locks out NONE of the four styles, and
+# on the `heavy` style it COSTS a win: hunt off gives 1-0, HUNT_WHEN 6 and 8
+# both give a completed setup. So "neither loses a win the baseline had" was
+# false. What survives is that a lockout is a real rule -- ending setup
+# without a king loses outright, and rules.place() now scores it -- and that
+# the hunt wins queen_spam, which the baseline wins too.
+#
+# OWED: a proper A/B of hunt on against hunt off over the real-opponent field.
+# Four hand-written styles are not a measurement.
 HUNT_WHEN = 6
 
 # ...but only once they can no longer buy their way out. Hunting a king that
