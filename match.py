@@ -210,11 +210,23 @@ def main():
              sum(1 for d in diffs if d < 0)))
     print("Diff:    %+.4f +/- %.4f" % (sum(diffs) / len(diffs),
                                        1.96 * st["se"] * 2))
-    print("Elo:     %+.2f  [%+.2f, %+.2f]"
+    # THE AXIS HAS TO BE NAMED. `mapped` has mean 0.5 + (ON - OFF)/2, so this
+    # Elo is of a HALF-sized edge, not the gap between the arms: measured over
+    # three simulated arm pairs at 400k games each, printed/arm-vs-arm came out
+    # 0.495, 0.500, 0.499. Both quantities are legitimate, but the repo quotes
+    # these outputs next to field-Elo figures, so printing one unlabelled
+    # number understates every A/B here by about 2x. The SPRT band inherits the
+    # same factor: [0,4] paired is about [0,8] between the arms.
+    print("Elo:     %+.2f  [%+.2f, %+.2f]   (PAIRED half-scale)"
           % (stats.elo(st["mean"]), stats.elo(max(st["lo"], 1e-9)),
              stats.elo(min(st["hi"], 1 - 1e-9))))
+    print("Arm Elo: %+.2f  [%+.2f, %+.2f]   (ON minus OFF; derived, x2)"
+          % (2 * stats.elo(st["mean"]),
+             2 * stats.elo(max(st["lo"], 1e-9)),
+             2 * stats.elo(min(st["hi"], 1 - 1e-9))))
     llr = stats.sprt_llr(mapped)
-    print("SPRT:    [0,4] LLR %+.3f -> %s" % (llr, stats.sprt_verdict(llr)))
+    print("SPRT:    [0,4] paired == [0,8] arm-vs-arm, LLR %+.3f -> %s"
+          % (llr, stats.sprt_verdict(llr)))
     if skipped:
         print("%d games skipped (engine could not take the position)" % skipped)
 

@@ -43,6 +43,16 @@ everywhere.**
 The two bold rows are the honest ones. The Stockfish rows are on the censored
 matrix and are not a fair before-and-after with them.
 
+**All of these are on `match.py`'s PAIRED HALF-SCALE.** It maps the paired
+difference through `(d + 1) / 2`, so the reported Elo is of a half-sized edge
+rather than the gap between the arms; measured over three simulated arm pairs
+at 400k games each, the ratio is 0.495 / 0.500 / 0.499. So re-targeting's
+**+6.71 paired is about +13.4 between the arms**, and the `[0,4]` SPRT band is
+about `[0,8]` on that axis. Both quantities are legitimate; the defect was
+printing one unlabelled number next to field-Elo figures. `match.py` now
+prints both axes and names them. The verdict signs and the zero point were
+never affected.
+
 ### "Re-targeting grows with the pool" is withdrawn
 
 On the censored matrix the effect looked like it scaled: +17.13 on 19 setups,
