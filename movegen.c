@@ -101,6 +101,12 @@ int attacked(const Position *p, int sq, int by)
 
 int in_check(const Position *p, int color)
 {
+    /* init_tables() like every sibling entry point. Without it a process
+     * whose FIRST C call is in_check() read all-zero KNIGHT_ATT/KING_ATT and
+     * returned false for a real knight check, becoming correct only after
+     * some other call warmed the tables. No in-repo caller hits it cold, but
+     * the bound public API was wrong for any new harness that does. */
+    init_tables();
     U64 k = p->pieces[color][KING];
     if (!k) return 0;
     return attacked(p, lsb(k), !color);

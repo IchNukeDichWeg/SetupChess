@@ -1618,6 +1618,19 @@ def test_search(rng):
     if mv is None or mv not in wall.legal_moves:
         fail("search failed on the 42-piece position Stockfish crashes on")
 
+    # in_check is a bound public entry point and must init its own tables:
+    # a process whose FIRST C call was in_check() read all-zero attack tables
+    # and returned false for a real knight check.
+    _r = subprocess.run(
+        [sys.executable, "-c",
+         "import chess, cengine;"
+         "b = chess.Board('4k3/8/8/8/8/5n2/8/4K3 w - - 0 1');"
+         "print(cengine.in_check(b))"],
+        capture_output=True, text=True)
+    if _r.stdout.strip() != "True":
+        fail("in_check on a cold process returned %r for a knight check"
+             % _r.stdout.strip())
+
     # Quiescence must handle TERMINAL nodes: negamax dispatches depth<=0
     # straight into it, so without this a horizon mate scored as material and
     # `go depth 1` could not see mate in one. selftest drives 1000 setup FENs

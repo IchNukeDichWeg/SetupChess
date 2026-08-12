@@ -205,7 +205,20 @@ def breed(parents, rng, crossover_rate=0.35, max_steps=3):
     # most edits are single-step; the tail is what escapes a local optimum
     steps = rng.choices(range(1, max_steps + 1),
                         weights=[2 ** -k for k in range(max_steps)])[0]
-    return mutate(rng.choice(parents), rng, steps)
+    # NOVELTY, which only the crossover branch above used to enforce. mutate()
+    # can return the parent verbatim -- _mutate_king re-picks the king's own
+    # square and _mutate_swap often has no affordable different type -- and
+    # expand.py drops duplicate challengers without retrying, so every no-op
+    # burned one of --challengers 24. Measured at the production
+    # crossover_rate 0.35: 4.97% of breeds came back as an army already in the
+    # pool. Bounded retries, because for some parents no single edit is legal.
+    parent = rng.choice(parents)
+    seen = {army_key(a) for a in parents}
+    for _ in range(8):
+        out = mutate(parent, rng, steps)
+        if army_key(out) not in seen:
+            return out
+    return out
 
 
 def army_key(army):
