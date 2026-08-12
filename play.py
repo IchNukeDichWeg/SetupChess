@@ -447,6 +447,51 @@ class Drafter:
                 return (pt, sq)
         return None
 
+    def _safe_placements(self, state, legal):
+        """`legal` minus placements that let THEM mate us in reply.
+
+        _mate_in_one only ever asked "can I mate them?"; nothing asked "can
+        they mate me after this?", and the drafter lost setups outright as a
+        result. Against pool army 14 of the v6 campaign the shipped defaults
+        lost BOTH colours to a setup checkmate; of 37 legal placements in the
+        losing position, 15 allowed no mate in reply, so one ply of lookahead
+        is the whole fix.
+
+        Returns `legal` unchanged when every placement loses -- there is
+        nothing to choose between then, and an empty set would break every
+        caller below.
+        """
+        # No king on the board, nothing to mate: state.mates() needs us to be
+        # in check, and a side without a king never is. The king goes down late
+        # (KING_AT_POINTS_LEFT), so this skips the scan for most of the draft
+        # and takes a full draft from 0.90s back to 0.06s.
+        if state.board.king(self.color) is None:
+            return legal
+        opp = not self.color
+        safe = []
+        for pt, sq in legal:
+            state.board.set_piece_at(sq, chess.Piece(pt, self.color))
+            state.points[self.color] -= rules.PIECE_COST[pt]
+            state.turn = opp
+            doomed = False
+            try:
+                for opt, osq in state.legal_placements():
+                    state.board.set_piece_at(osq, chess.Piece(opt, opp))
+                    state.points[opp] -= rules.PIECE_COST[opt]
+                    mates = state.mates(opp)
+                    state.points[opp] += rules.PIECE_COST[opt]
+                    state.board.remove_piece_at(osq)
+                    if mates:
+                        doomed = True
+                        break
+            finally:
+                state.turn = self.color
+                state.points[self.color] += rules.PIECE_COST[pt]
+                state.board.remove_piece_at(sq)
+            if not doomed:
+                safe.append((pt, sq))
+        return safe or legal
+
     def _king_square(self, state, legal):
         """Safest legal king square: prefer the target's, else fewest attackers."""
         opts = [(pt, sq) for pt, sq in legal if pt == chess.KING]
@@ -477,6 +522,11 @@ class Drafter:
         mate = self._mate_in_one(state, legal)
         if mate:
             return mate
+
+        # Winning beats not-losing, so this comes AFTER the mate search: never
+        # decline a mate because the reply filter dislikes the square.
+        legal = self._safe_placements(state, legal)
+        legal_set = set(legal)
 
         self._retarget(state)
 

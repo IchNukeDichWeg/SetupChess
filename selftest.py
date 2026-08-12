@@ -1375,6 +1375,27 @@ def test_drafter():
     # is what converts it, and neither loses a win the baseline had
     if run(_army(styles["heavy"]), hunt_when=-1) != "1-0":
         fail("baseline no longer mates the heavy style")
+    # The drafter must not WALK INTO a setup mate. _mate_in_one only ever asked
+    # "can I mate them?"; against pool army 14 of the v6 campaign the shipped
+    # defaults lost BOTH colours to a setup checkmate.
+    with open("campaigns/expand_v6.json") as f:
+        _v6 = [pool.from_json(a) for a in json.load(f)["armies"]]
+    _armies, _matrix = play.load_pool("campaigns/expand_v6.json")
+    _tgt = play.load_army("campaigns/champion_v6.json")
+    for _col in (chess.WHITE, chess.BLACK):
+        _us = play.Drafter(_tgt if _col == chess.WHITE
+                           else rules.mirror_army(_tgt),
+                           _col, pool=_armies, matrix=_matrix)
+        _them = play.Drafter(_v6[14] if _col == chess.BLACK
+                             else rules.mirror_army(_v6[14]), not _col)
+        _d = {_col: _us, not _col: _them}
+        _st = play.draft(_d[chess.WHITE], _d[chess.BLACK])
+        if _st.result:
+            _we_won = (_st.result == "1-0") == (_col == chess.WHITE)
+            if not _we_won:
+                fail("the drafter allowed a setup mate against pool army 14 "
+                     "playing %s: %s" % (chess.COLOR_NAMES[_col], _st.result))
+
     print("PASS: drafter realises its target for both colours, takes a setup "
           "mate over the plan, blocks a forced check, and locks out %d of %d "
           "king-last styles" % (sum(1 for v in got.values() if v == "lockout"),
