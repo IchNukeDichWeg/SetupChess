@@ -1,2 +1,7 @@
 __pycache__/
 lib/
+
+# Audit reports live outside the repo: they are point-in-time findings about a
+# specific commit, they go stale the moment a fix lands, and the fixes carry
+# their own evidence in the commit message and the test that pins them.
+improvements*.md
