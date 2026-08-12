@@ -157,6 +157,7 @@ def main():
         os.replace(args.out + ".tmp", args.out)
 
     if tasks:
+        arena.preflight_engine(args.engine_a, args.engine_b)
         with mp.Pool(workers, initializer=worker_init,
                      initargs=(args.engine_a, args.engine_b)) as p:
             for i, (k, scores, info) in enumerate(p.imap_unordered(_pair, tasks), 1):

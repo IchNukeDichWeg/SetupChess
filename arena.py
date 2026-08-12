@@ -65,6 +65,30 @@ def _kill_engine(*_args):
     os._exit(0)
 
 
+def preflight_engine(*paths):
+    """Open each engine once in the PARENT and fail loudly if it will not run.
+
+    mp.Pool repopulates any worker that dies in its initializer, forever, and
+    worker_init has no error handling: a mistyped --engine printed 20,000
+    traceback lines in 25 seconds and never exited. Every harness that builds a
+    Pool should call this first, so a typo is a one-line error instead of a
+    spin that only Ctrl-C ends. duel.py and match.py inherit the same hazard.
+    """
+    for path in paths:
+        if not path:
+            continue
+        try:
+            eng = chess.engine.SimpleEngine.popen_uci(path)
+        except Exception as e:
+            sys.exit("cannot start engine %r: %s\n"
+                     "(a Pool respawns workers that die in their initializer "
+                     "forever, so this is refused up front)" % (path, e))
+        try:
+            eng.quit()
+        except Exception:
+            pass
+
+
 def worker_init(engine_path, max_pieces=None):
     global _ENGINE, _ENGINE_PATH, MAX_PIECES
     if max_pieces is not None:
@@ -330,6 +354,7 @@ def main():
         if not ok:
             sys.exit("army %d is illegal: %s" % (idx, why))
 
+    preflight_engine(args.engine)
     cells, stored = load_state(args.out)
     meta = {"n": n, "nodes": args.nodes, "jitter": args.jitter,
             "pairs": args.pairs, "engine": os.path.basename(args.engine),

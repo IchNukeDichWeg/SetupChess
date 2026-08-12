@@ -183,6 +183,7 @@ def main():
         os.replace(args.out + ".tmp", args.out)
 
     if tasks:
+        arena.preflight_engine(args.engine)
         with mp.Pool(workers, initializer=arena.worker_init,
                      initargs=(args.engine, args.max_pieces)) as p:
             for i, (k, scores, info) in enumerate(
