@@ -146,7 +146,16 @@ def main():
         if k in done:
             continue
         theirs = field[k % len(field)]
-        color = chess.WHITE if k % 2 == 0 else chess.BLACK
+        # OPPONENT AND COLOUR MUST NOT SHARE A PERIOD. With `k % 2` the two
+        # cycles lock whenever len(field) is even, which it is for every
+        # shipped campaign: each opponent is then played from exactly ONE
+        # colour for the whole run. Enumerated, 0 of 106 opponents on the v3
+        # field and 0 of 84 on v6 were ever seen from both sides. The drafters
+        # carry no RNG, so k and k+len(field) draft the identical handoff FEN,
+        # and a 3,000-game run sampled 106 distinct positions replayed 28 times
+        # instead of 212. Advancing the colour once per full pass decouples
+        # them for any field size.
+        color = chess.WHITE if (k // len(field)) % 2 == 0 else chess.BLACK
         tasks.append((k, ours, theirs, color, args.nodes, args.jitter,
                       pool_armies, matrix, args.test))
     rng.shuffle(tasks)

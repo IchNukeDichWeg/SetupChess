@@ -43,6 +43,18 @@ everywhere.**
 The two bold rows are the honest ones. The Stockfish rows are on the censored
 matrix and are not a fair before-and-after with them.
 
+**Every row above was measured with opponent and colour CONFOUNDED.**
+`match.py` picked the opponent as `k % len(field)` and the colour as `k % 2`,
+so whenever the field size is even -- which it is for every shipped campaign
+-- the two cycles lock and each opponent is played from exactly one colour.
+Enumerated: **0 of 106 opponents on the v3 field and 0 of 84 on v6** were ever
+seen from both sides. The drafters carry no RNG, so `k` and `k + len(field)`
+draft the identical handoff FEN, and the 3,000-game re-targeting run sampled
+106 distinct positions replayed 28 times each rather than 212. The effective
+sample was half the headline and the colour balance was not a balance at all.
+Fixed by advancing the colour once per full pass. **The re-targeting figures
+are not re-measured**, so treat their intervals as optimistic.
+
 **All of these are on `match.py`'s PAIRED HALF-SCALE.** It maps the paired
 difference through `(d + 1) / 2`, so the reported Elo is of a half-sized edge
 rather than the gap between the arms; measured over three simulated arm pairs
