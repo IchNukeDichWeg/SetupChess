@@ -1559,7 +1559,7 @@ def test_match_smoke(engine_path, tmpdir):
 # or the eval changes and must not otherwise. Update it in the SAME commit as
 # any deliberate change, and treat a surprise move as a bug.
 BENCH_DEPTH = 5
-BENCH_NODES = 409886
+BENCH_NODES = 541501
 
 
 def test_search(rng):
@@ -1617,6 +1617,19 @@ def test_search(rng):
     mv, _, _ = cengine.search(wall, nodes=20000)
     if mv is None or mv not in wall.legal_moves:
         fail("search failed on the 42-piece position Stockfish crashes on")
+
+    # Quiescence must handle TERMINAL nodes: negamax dispatches depth<=0
+    # straight into it, so without this a horizon mate scored as material and
+    # `go depth 1` could not see mate in one. selftest drives 1000 setup FENs
+    # at depth 1, so this is the depth that matters here.
+    _m1 = chess.Board("6k1/5ppp/8/8/8/8/8/R5K1 w - - 0 1")
+    _mv, _sc, _ = cengine.search(_m1, depth=1)
+    if _mv != chess.Move.from_uci("a1a8") or _sc < 29000:
+        fail("depth 1 missed mate in one: %s at %d" % (_mv, _sc))
+    _sm = chess.Board("7k/5Q2/6K1/8/8/8/8/8 b - - 0 1")
+    if cengine.search(_sm, depth=1)[1] != 0:
+        fail("a stalemate at the horizon scored %d, not 0"
+             % cengine.search(_sm, depth=1)[1])
 
     # LEFT-RIGHT symmetry, which the colour mirror above cannot see. The queen
     # table shipped asymmetric on three ranks (c2 5 against f2 0, b3 against

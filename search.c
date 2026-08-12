@@ -83,25 +83,39 @@ static void sort_moves(const Position *p, Move *list, int n, Move first)
     }
 }
 
-static int quiesce(Position *p, int alpha, int beta, Search *s)
+static int quiesce(Position *p, int ply, int alpha, int beta, Search *s)
 {
     if (s->limit && s->nodes >= s->limit) {
         s->stop = 1;
         return evaluate(p);
     }
     s->nodes++;
-    int stand = evaluate(p);
-    if (stand >= beta) return beta;
-    if (stand > alpha) alpha = stand;
 
+    /* TERMINAL NODES FIRST. negamax dispatches depth<=0 straight here, before
+     * its own mate/stalemate test, so without this a horizon checkmate scored
+     * as the mated side's MATERIAL and a stalemate as material instead of 0:
+     * `6k1/5ppp/8/8/8/8/8/R5K1 w - - 0 1` at depth 1 answered a1d1 +185 while
+     * a1a8 is mate. Scored on negamax's scale so the two agree. */
     Move list[MAX_MOVES];
     int n = gen_legal(p, list);
+    int checked = in_check(p, p->side);
+    if (n == 0) return checked ? -MATE + ply : 0;
+
+    /* A CHECKED SIDE MAY NOT STAND PAT: it has to answer the check, so the
+     * static score is not a lower bound on what it can achieve. Search every
+     * evasion rather than only the captures. */
+    if (!checked) {
+        int stand = evaluate(p);
+        if (stand >= beta) return beta;
+        if (stand > alpha) alpha = stand;
+    }
+
     sort_moves(p, list, n, 0);
     for (int i = 0; i < n; i++) {
-        if (!is_capture(p, list[i]) && !MV_PROMO(list[i])) continue;
+        if (!checked && !is_capture(p, list[i]) && !MV_PROMO(list[i])) continue;
         Undo u;
         make_move(p, list[i], &u);
-        int score = -quiesce(p, -beta, -alpha, s);
+        int score = -quiesce(p, ply + 1, -beta, -alpha, s);
         unmake_move(p, list[i], &u);
         if (s->stop) return alpha;
         if (score >= beta) return beta;
@@ -117,7 +131,7 @@ static int negamax(Position *p, int depth, int ply, int alpha, int beta,
         s->stop = 1;
         return 0;
     }
-    if (depth <= 0) return quiesce(p, alpha, beta, s);
+    if (depth <= 0) return quiesce(p, ply, alpha, beta, s);
     s->nodes++;
 
     Move list[MAX_MOVES];
