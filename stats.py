@@ -50,9 +50,15 @@ def elo_with_ci(scores):
     st = score_stats(scores)
     if st is None:
         return None
+    # The MEAN needs the same clamp as the bounds. Without it a clean sweep
+    # printed "Elo: +inf [+3600.00, +3600.00]" -- an infinity inside a
+    # finite-looking interval. Small perfect scores are ordinary here (0.9884
+    # against a bot army is one bad game away from 1.0), so this is reachable
+    # from any smoke run, not a pathological input.
+    mid = min(max(st["mean"], 1e-9), 1 - 1e-9)
     lo = min(max(st["lo"], 1e-9), 1 - 1e-9)
     hi = min(max(st["hi"], 1e-9), 1 - 1e-9)
-    return elo(st["mean"]), elo(lo), elo(hi), st
+    return elo(mid), elo(lo), elo(hi), st
 
 
 def sprt_llr(scores, elo0=0.0, elo1=4.0):
@@ -67,7 +73,13 @@ def sprt_llr(scores, elo0=0.0, elo1=4.0):
         return 0.0
     var = st["se"] ** 2 * st["n"]
     if var <= 0:
-        return 0.0
+        # A ZERO-VARIANCE SAMPLE IS THE STRONGEST EVIDENCE, NOT THE WEAKEST.
+        # Returning 0.0 made a 20-0 sweep read as "LLR +0.000 -> CONTINUE",
+        # so a sequential test driving on that verdict never stops. Every
+        # score is identical here, so fall back to the variance of a single
+        # Bernoulli trial at that score, floored so the ratio stays finite.
+        # Direction and magnitude then behave like any other decisive sample.
+        var = max(st["mean"] * (1.0 - st["mean"]), 1.0 / (4.0 * st["n"]))
     mu0, mu1 = score_of(elo0), score_of(elo1)
     return st["n"] * (mu1 - mu0) * (st["mean"] - (mu0 + mu1) / 2.0) / var
 

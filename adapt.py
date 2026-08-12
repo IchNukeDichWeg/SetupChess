@@ -67,15 +67,22 @@ def shrink_cells(cells, n, k):
     return out
 
 
-def simulate(m, policy, rounds, rng, weights=None):
+def simulate(m, policy, rounds, rng, weights=None, pure_idx=None):
     """Repeated play against fictitious play. Returns our score each round.
 
-    `policy` is "pure" (always the highest-weight army) or "mix" (drawn from
-    `weights` each round). The opponent starts uninformed and from round 1 on
-    plays the best response to everything it has seen us play.
+    `policy` is "pure" (always `pure_idx`, the army we actually ship) or "mix"
+    (drawn from `weights` each round). The opponent starts uninformed and from
+    round 1 on plays the best response to everything it has seen us play.
+
+    `pure_idx` matters: this used to take the highest-EQUILIBRIUM-WEIGHT row,
+    which stopped being the shipped army the moment armies started being
+    chosen on the real-opponent grid instead of the solver's argmax. On v6 the
+    argmax is pool 46 and the shipped champion is 57, so "being predictable
+    costs X Elo" described an army a predictable player does not play.
     """
     n = len(m)
-    pure = max(range(n), key=lambda i: weights[i])
+    pure = pure_idx if pure_idx is not None else max(range(n),
+                                                     key=lambda i: weights[i])
     seen = [0.0] * n
     out = []
     for r in range(rounds):
@@ -122,6 +129,23 @@ def main():
     m, keep, rep = solve.prepare(raw, args.max_holes)
     x, value = solve.nash(m)
 
+    # --champion is REQUIRED and was never read: the pure curve simulated the
+    # argmax-weight row instead of the army that ships.
+    with open(args.champion) as f:
+        champ = poolmod.army_key(poolmod.from_json(json.load(f)["army"]))
+    keys = [poolmod.army_key(poolmod.from_json(a)) for a in state["armies"]]
+    if champ not in keys:
+        raise SystemExit("the champion is not a member of --state's pool; "
+                         "re-targeting would abandon it on the first placement")
+    pool_idx = keys.index(champ)
+    if pool_idx not in keep:
+        raise SystemExit("the champion's row was dropped for holes; raise "
+                         "--max-holes or fill its row")
+    pure_idx = keep.index(pool_idx)
+    print("pure strategy = the SHIPPED champion, pool index %d (weight %.4f); "
+          "the argmax-weight row is pool index %d"
+          % (pool_idx, x[pure_idx], keep[max(range(len(m)), key=lambda i: x[i])]))
+
     print("pool %d setups, equilibrium value %.4f, exploitability %.4f"
           % (len(m), value, solve.exploitability(m, x)))
     print("%d rounds x %d trials, opponent plays fictitious play, shrink %.1f\n"
@@ -131,7 +155,7 @@ def main():
     curves = {}
     for policy in ("pure", "mix"):
         rng = random.Random(args.seed)
-        runs = [simulate(m, policy, args.rounds, rng, list(x))
+        runs = [simulate(m, policy, args.rounds, rng, list(x), pure_idx)
                 for _ in range(args.trials)]
         curves[policy] = [sum(r[i] for r in runs) / len(runs)
                           for i in range(args.rounds)]

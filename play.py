@@ -144,7 +144,11 @@ OPTIONALITY = False
 # and stays solved forever while a mixture holds the equilibrium value.
 #
 # So the trade is roughly -32 Elo against a field that is not targeting you
-# against roughly +36 against one that is. It is on because online placements
+# against +14.7 against one that is (adapt.py on v6, 40x40). That second
+# number USED to read +36, which was adapt.py simulating the argmax-weight row
+# because it never read its own required --champion; the shipped army is
+# chosen on the real-opponent grid instead and is less exposed than the argmax
+# was. The trade is therefore tighter than it looked. It is on because placements
 # are visible, opponents play you repeatedly, and this army is published in a
 # public repo -- so the targeting case is the realistic one. Turn it off with
 # --no-mix if you expect anonymous one-shot opponents.

@@ -552,7 +552,34 @@ property over the pool -- unlike v4, which shipped with index 83 holding 9.1%
 of the weight while scoring 0.4481 against a real opponent. Screening up front
 costs nothing; removing afterwards cost the equilibrium.
 
-## Two shipped bugs found by audit, and what they do and do not invalidate
+## Three shipped bugs found by audit, and what they do and do not invalidate
+
+### `adapt.py` never read its own required `--champion`
+
+`--champion` is `required=True` and appeared nowhere after argparse: a
+nonexistent path ran to completion. The pure curve took the highest
+EQUILIBRIUM-WEIGHT row instead, which stopped being the shipped army the
+moment armies started being chosen on the real-opponent grid rather than the
+solver's argmax. On v6 the argmax is pool 46 and the shipped champion is 57.
+
+Corrected number: **being predictable costs 14.7 Elo**, not the ~30 previously
+reported, because the argmax row is more exposed than the army that ships.
+`adapt.py` now resolves the champion's row, refuses a champion outside the
+pool or dropped for holes, and prints both indices so the two can never be
+confused again.
+
+### Zero-variance samples reported `+inf` Elo and `CONTINUE`
+
+`stats.report([1.0]*20)` printed `Elo: +inf [+3600.00, +3600.00]` and
+`SPRT: LLR +0.000 -> CONTINUE`: the strongest possible evidence for H1 read as
+no evidence at all, so a sequential test driving on that verdict never stops.
+`elo_with_ci` clamped the bounds but not the mean, and `sprt_llr` returned 0.0
+whenever the sample variance was zero. Both fixed; a 20-0 sweep now reports
+`+3600.00` and `ACCEPT H1`, a 20-0 loss `ACCEPT H0`, and 20 draws still
+`CONTINUE`, which is the one case where zero variance really does mean no
+evidence.
+
+## Two more shipped bugs, and what they do and do not invalidate
 
 ### `--mix` never mixed
 
