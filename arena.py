@@ -410,8 +410,13 @@ def main():
 
     m = matrix_from_cells(cells, n)
     diag = [m[i][i] for i in range(n) if m[i][i] is not None]
+    # i != j, or the DIAGONAL contributes 2*m[i][i] and owns the extremes:
+    # a self-play cell is 0.5 by construction, so including it makes the gate
+    # report the thing it is not testing. Measured on
+    # campaigns/matrix_own_core.json the gate printed max 1.312 where the true
+    # off-diagonal max is 1.188.
     sym = [m[i][j] + m[j][i] for i in range(n) for j in range(n)
-           if m[i][j] is not None and m[j][i] is not None]
+           if i != j and m[i][j] is not None and m[j][i] is not None]
     print("wrote %s" % args.out)
     if diag:
         print("P[i][i] mean %.4f (want 0.50), min %.3f max %.3f"

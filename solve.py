@@ -58,14 +58,20 @@ def best_response(matrix, opponent):
     return i, float(scores[i])
 
 
-def exploitability(matrix, x):
+def exploitability(matrix, x, value=None):
     """How far below the equilibrium value a best-responding opponent pushes.
 
     0.0 means unexploitable within the pool; higher is worse.
+
+    `value` defaults to 0.5, which is right for the antisymmetrised matrix the
+    default path builds and where this is therefore identically zero. It is
+    NOT right for a raw matrix: on [[0.8, 0.3], [0.2, 0.9]] the game value is
+    0.55 and hardcoding 0.5 returned -0.0500, a negative exploitability. Pass
+    the solved value when the matrix is not antisymmetric.
     """
     p = np.asarray(matrix, dtype=float)
     guaranteed = float(np.min(np.asarray(x, dtype=float) @ p))
-    return 0.5 - guaranteed
+    return (0.5 if value is None else value) - guaranteed
 
 
 def antisymmetrize(full):

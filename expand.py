@@ -510,13 +510,18 @@ def main():
         run_pairs(todo, pool, cells_of(state), "seed", persist)
 
     loop_start = time.time()
+    rounds_at_start = len(state["rounds"])   # for the --max-minutes message
     for rnd in range(len(state["rounds"]), args.rounds):
         # Leaving the loop is not failure: the gate match still runs and the
         # process still exits 0, so a chained command carries on.
         if args.max_minutes and (time.time() - loop_start) / 60.0 >= args.max_minutes:
-            print("\nreached the %g minute budget after %d rounds; going to "
-                  "the gate match" % (args.max_minutes,
-                                      rnd - len(state["rounds"])))
+            # rounds run IN THIS PROCESS. `rnd - len(state["rounds"])` was 0
+            # at every check, because the round just appended is already in
+            # state["rounds"] by the time this runs, so it always said
+            # "after 0 rounds".
+            print("\nreached the %g minute budget after %d round(s) this run; "
+                  "going to the gate match"
+                  % (args.max_minutes, rnd - rounds_at_start + 1))
             break
         if args.stop_at_max and len(state["armies"]) >= args.max_pool:
             print("\npool is full at %d setups; further rounds only prune and "

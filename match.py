@@ -168,8 +168,16 @@ def main():
     # SIGTERM as well as SIGINT: `kill <pid>` sends SIGTERM, and unhandled it
     # orphans every engine instead of shutting them down.
     def _leave(*_args):
+        # CHECKPOINT FIRST. arena's handler does; this one exited straight
+        # away, so every finished game since the last periodic save was
+        # discarded and replayed on resume -- and a run interrupted before the
+        # first periodic save left no state file at all.
+        try:
+            save()
+        except Exception:
+            pass
         arena.stop_pool()
-        print("\ninterrupted", flush=True)
+        print("\ninterrupted -- progress saved; re-run to resume", flush=True)
         os._exit(130)
 
     for _sig in (signal.SIGINT, signal.SIGTERM):

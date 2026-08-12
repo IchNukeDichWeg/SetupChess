@@ -159,7 +159,9 @@ def main():
                 for _ in range(args.trials)]
         curves[policy] = [sum(r[i] for r in runs) / len(runs)
                           for i in range(args.rounds)]
-    marks = [0, 1, 2, 4, 9, 19, 49, 99, args.rounds - 1]
+    # dedup: --rounds in {1,2,3,5,10,20,50,100} otherwise prints its
+    # final row twice
+    marks = sorted({0, 1, 2, 4, 9, 19, 49, 99, args.rounds - 1})
     for r in [i for i in marks if i < args.rounds]:
         p, x_ = curves["pure"][r], curves["mix"][r]
         print("%-6d %-14.4f %-14.4f %+.4f" % (r + 1, p, x_, x_ - p))

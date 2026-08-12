@@ -25,11 +25,19 @@ DEFAULT_NODES = 20000
 
 def bestmove(board, depth, nodes, movetime):
     # movetime is honoured crudely: the core has no clock, so a time budget is
-    # converted to a node budget at a measured ~1.4 Mnps for this search.
+    # converted to a node budget.
+    #
+    # UNITS. `movetime` arrives here in SECONDS (the parser divides the UCI
+    # milliseconds by 1000), and the old constant 1400 was nodes per
+    # MILLISECOND, so every time budget bought 1000x too few nodes: `go
+    # movetime 5000` searched 7,000 nodes and returned in about 2ms. Measured
+    # throughput of this core on this machine is 2.33 Mnps; 1.4e6 is kept as
+    # the conservative figure, since overshooting a clock loses games and
+    # undershooting only wastes time.
     # ponytail: replace with a real clock check inside the search when time
     # management starts costing games.
     if movetime and not nodes:
-        nodes = max(1000, int(movetime * 1400))
+        nodes = max(1000, int(movetime * 1_400_000))
     if not depth and not nodes:
         nodes = DEFAULT_NODES
     move, score, used = cengine.search(board, depth=depth or 64,
