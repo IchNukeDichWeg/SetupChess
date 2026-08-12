@@ -184,6 +184,20 @@ def main_for_test(command, silence=DEFAULT_SILENCE, max_restarts=100):
                   % (restarts, (time.time() - started) / 60.0), flush=True)
             return 0
         if code is not None:
+            # Popen reports a signal death as a NEGATIVE code, and
+            # sys.exit(-11) leaves the shell 245 rather than the conventional
+            # 128+signal. Report the signal by name and exit the way a shell
+            # would: a self-SIGSEGVing child printed "exited with -11" and the
+            # watchdog exited 245, where running it directly gives 139.
+            if code < 0:
+                import signal as _sig
+                try:
+                    nm = _sig.Signals(-code).name
+                except ValueError:
+                    nm = "signal %d" % -code
+                print("[watchdog] job was killed by %s; not restarting" % nm,
+                      flush=True)
+                return 128 - code
             print("[watchdog] job exited with %d; not restarting" % code,
                   flush=True)
             return code

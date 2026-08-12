@@ -728,9 +728,15 @@ def main():
             "exploitability": rep2["exploitability"],
             "support": {str(k): v for k, v in sorted(weights2.items())}})
         save_state(args.state, state)
-        print("  round %d done: pool %d, support %d, exploitability %.4f"
+        # dropped/filled belong in the campaign record: rows thrown out for
+        # holes and cells imputed at 0.5 were invisible here even though
+        # solve.py prints both, so a campaign could quietly be solving over a
+        # heavily imputed matrix with nothing in the log to say so.
+        print("  round %d done: pool %d, support %d, exploitability %.4f, "
+              "%d row(s) dropped for holes, %d cell(s) imputed"
               % (rnd, len(state["armies"]), len(weights2),
-                 rep2["exploitability"]))
+                 rep2["exploitability"], rep2.get("dropped", 0),
+                 rep2.get("filled", 0)))
 
     # Gate 4: the solved mix against the hand-written archetypes, played as a
     # real match. Re-using matrix cells would report a tight CI over games

@@ -36,7 +36,9 @@ ARCHETYPES = {
     # the ordinary chess army, which is exactly 39 points by construction
     "classic": _army("e1", {P: "a2 b2 c2 d2 e2 f2 g2 h2", N: "b1 g1",
                             B: "c1 f1", R: "a1 h1", Q: "d1"}),
-    # same material, king tucked and rooks already connected
+    # same material, king tucked. NOT "rooks connected", which the
+    # comment used to claim: rank 1 is R N B R B N K Q, so a knight and
+    # a bishop sit between a1 and d1. The army is legal at exactly 39.
     "classic_castled": _army("g1", {P: "a2 b2 c2 d2 e2 f2 g2 h2", N: "b1 f1",
                                     B: "c1 e1", R: "a1 d1", Q: "h1"}),
     # 16 pawns is the maximum wall; the rest buys one heavy battery

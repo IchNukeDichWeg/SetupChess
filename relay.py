@@ -111,9 +111,13 @@ def main():
     print("  our points left after this: %d"
           % (state.points[us] - rules.PIECE_COST[pt]))
     print("  their points left:          %d" % state.points[not us])
-    reach = sum(1 for a in armies
-                if drafter._revealed(state, us) <= set(a))
-    print("  pool armies still reachable: %d of %d" % (reach, len(armies)))
+    # counted AFTER the placement, because it prints under two lines that say
+    # "after this". It used to read the pre-placement board and disagree with
+    # its own heading.
+    after = set(drafter._revealed(state, us)) | {(pt, sq)}
+    reach = sum(1 for a in armies if after <= set(a))
+    print("  pool armies still reachable after this: %d of %d"
+          % (reach, len(armies)))
 
 
 if __name__ == "__main__":

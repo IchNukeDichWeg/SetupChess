@@ -21,6 +21,8 @@ import cengine
 NAME = "SetupCore"
 AUTHOR = "IchNukeDichWeg"
 DEFAULT_NODES = 20000
+MATE = 30000        # search.c MATE
+MAX_PLY = 64        # search.c MAX_PLY
 
 
 def bestmove(board, depth, nodes, movetime):
@@ -106,8 +108,11 @@ def main():
             if move is None:
                 print("bestmove 0000", flush=True)
                 continue
-            if abs(score) > 29000:
-                plies = 30000 - abs(score)
+            # derived, not hardcoded: search.c's MATE is 30000 and MAX_PLY 64,
+            # so changing either in the C file used to break this report
+            # silently. cengine exposes them for exactly this reason.
+            if abs(score) > MATE - MAX_PLY:
+                plies = MATE - abs(score)
                 s = "mate %d" % ((plies + 1) // 2 * (1 if score > 0 else -1))
             else:
                 s = "cp %d" % score

@@ -102,9 +102,14 @@ def report(scores, elo0=0.0, elo1=4.0, label=""):
         return "%s: no games" % (label or "result")
     e, lo, hi, st = got
     llr = sprt_llr(scores, elo0, elo1)
-    wins = sum(1 for s in scores if s == 1.0)
+    # Buckets, not exact float equality. Any score that is not exactly
+    # 1.0/0.5/0.0 used to vanish from the tally: report([0.25,0.75,0.5,1.0,0.0])
+    # printed "Games: 5" over "W/D/L: 1 / 1 / 1". Averaged PAIR scores are
+    # exactly that shape, and the gate statistic is now per pair, so this is
+    # reachable rather than hypothetical.
+    wins = sum(1 for s in scores if s > 0.5)
     draws = sum(1 for s in scores if s == 0.5)
-    losses = sum(1 for s in scores if s == 0.0)
+    losses = sum(1 for s in scores if s < 0.5)
     return "\n".join([
         "%sGames:   %d" % (label and label + "\n" or "", st["n"]),
         "Score:   %.4f +/- %.4f" % (st["mean"], 1.96 * st["se"]),
