@@ -20,9 +20,11 @@ it likes:
     for depth, (pt, sq), score in psearch.search(state, chess.WHITE):
         print(depth, chess.square_name(sq), score)
 
-The leaf is a static exchange evaluation, which is the cheapest thing that
-sees the mechanism above. Material does not appear in it: both sides spend the
-same 39 points, so committed-plus-remaining is a constant and cancels.
+The leaf has two terms: a static exchange evaluation, which is the cheapest
+thing that sees the mechanism above, and agreement with the solved equilibrium,
+which is what stops the search playing arbitrarily while the board is empty.
+Raw material does not appear -- both sides spend the same 39 points, so
+committed-plus-remaining is a constant and cancels.
 """
 
 import chess
@@ -46,6 +48,89 @@ MATE_SCORE = 100000
 # that a human finds.
 BEAM_WIDTH = 12
 MAX_DEPTH = 6
+
+# Centipawns for a full unit of plan agreement. UNCALIBRATED: set so the army
+# term and the exchange term can outvote each other, since an army term that
+# dominates just reproduces the plan-following drafter and an exchange term
+# that dominates hangs nothing and builds junk. Calibrate by A/B once drafted
+# setups are measurable, not by taste.
+ARMY_SCALE = 600.0
+
+_PLAN = None
+
+
+def support_plan(pool_path=None, gate_path=None):
+    """[(frozenset of (piece, own-perspective square), weight)] for the armies
+    carrying equilibrium weight.
+
+    This is where seven campaigns of army measurement finally get used instead
+    of re-run. The exchange leaf alone is blind on an empty board -- nothing
+    attacks anything, every placement ties, and the search returns whatever
+    sorted first.
+
+    Squares are in OWN perspective (Black mirrored), matching play.Drafter, so
+    one plan serves both colours.
+    """
+    import json
+    import os
+
+    import play
+
+    pool_path = pool_path or play.DEFAULT_POOL
+    armies, _ = play.load_pool(pool_path)
+
+    weights = {}
+    gate_path = gate_path or pool_path + ".gate"
+    if os.path.exists(gate_path):
+        try:
+            with open(gate_path) as fh:
+                weights = {int(k): float(v)
+                           for k, v in json.load(fh).get("support", {}).items()}
+        except (ValueError, KeyError):
+            weights = {}
+    if not weights:
+        weights = {i: 1.0 / len(armies) for i in range(len(armies))}
+
+    total = sum(weights.values()) or 1.0
+    return [(frozenset(armies[i]), w / total)
+            for i, w in sorted(weights.items()) if w and i < len(armies)]
+
+
+def default_plan():
+    """Lazily loaded module plan, so importing psearch stays cheap."""
+    global _PLAN
+    if _PLAN is None:
+        try:
+            _PLAN = support_plan()
+        except (OSError, ValueError, KeyError):
+            _PLAN = []      # no pool on disk: exchanges only, still correct
+    return _PLAN
+
+
+def agreement(board, color, plan):
+    """Fraction of `color`'s placed pieces that an equilibrium army would share.
+
+    The expected overlap against an army drawn from the solved mixture, in
+    [0, 1]. Three properties earn it the job over the obvious alternatives:
+
+      * TEMPO-NEUTRAL. It is a fraction, not a running total, so a side is not
+        scored ahead merely for having placed more pieces. A summed weight
+        table swung the root score by ~900 every ply and made the search chase
+        whichever leaf happened to place last.
+      * NO FREE-PIECE ARTIFACT. Crediting quality per point spent made the
+        king, which costs 0, look like infinite value: the search opened with
+        Ke1 and thrashed between depths.
+      * SMOOTH OFF-PLAN. A strict "is this army still reachable" test collapses
+        to zero the moment one piece goes off-book and then gives no gradient
+        at all. Overlap keeps grading a position after it leaves the pool.
+    """
+    placed = frozenset(
+        (p.piece_type, sq if p.color == chess.WHITE else chess.square_mirror(sq))
+        for sq, p in board.piece_map().items() if p.color == color)
+    if not placed or not plan:
+        return 0.0
+    n = float(len(placed))
+    return sum(w * len(placed & army) for army, w in plan) / n
 
 
 def see(board, sq, side):
@@ -102,12 +187,15 @@ def _worst_exchange(board, victim_color):
     return best
 
 
-def leaf(state, us):
+def leaf(state, us, plan=None):
     """Static score of a setup position, in centipawns, from `us`.
 
-    Only exchanges appear here. Both sides get the same 39 points, so material
-    committed plus material still affordable is a constant for each side and
-    cancels out of any difference.
+    Two terms. EXCHANGES: what either side can win by capturing at handoff.
+    Raw material does not appear -- both sides get the same 39 points, so
+    committed plus still-affordable is a constant per side and cancels.
+    ARMY QUALITY: how much measured equilibrium weight sits on the squares each
+    side has actually used, which is what stops the search from playing
+    arbitrarily while the board is still empty.
 
     ponytail: the WORST single exchange per side, not the sum of all of them.
     Only one capture can actually be played first, so summing would double-count
@@ -115,7 +203,15 @@ def leaf(state, us):
     leaves two hanging pieces rather than one -- fix by scoring the top two if
     that shows up in real games.
     """
-    return _worst_exchange(state.board, not us) - _worst_exchange(state.board, us)
+    board = state.board
+    score = _worst_exchange(board, not us) - _worst_exchange(board, us)
+
+    if plan is None:
+        plan = default_plan()
+    if plan:
+        score += int(ARMY_SCALE * (agreement(board, us, plan)
+                                   - agreement(board, not us, plan)))
+    return score
 
 
 def _terminal(state, us):
@@ -145,14 +241,14 @@ def _unmake(state, sq, snap):
      state.result) = snap
 
 
-def _ordered(state, us, width):
+def _ordered(state, us, width, plan):
     """The `width` most promising placements, best first, by a 1-ply score."""
     scored = []
     for pt, sq in state.legal_placements():
         snap = _make(state, pt, sq)
         s = _terminal(state, us)
         if s is None:
-            s = leaf(state, us)
+            s = leaf(state, us, plan)
         _unmake(state, sq, snap)
         scored.append((s, pt, sq))
     # The side to move wants its own score high; `us` is fixed, so the opponent
@@ -161,23 +257,23 @@ def _ordered(state, us, width):
     return [(pt, sq) for _, pt, sq in scored[:width]]
 
 
-def _ab(state, us, depth, alpha, beta, width):
+def _ab(state, us, depth, alpha, beta, width, plan):
     s = _terminal(state, us)
     if s is not None:
         return s
     if depth == 0 or state.complete:
-        return leaf(state, us)
+        return leaf(state, us, plan)
 
-    moves = _ordered(state, us, width)
+    moves = _ordered(state, us, width, plan)
     if not moves:
-        return leaf(state, us)
+        return leaf(state, us, plan)
 
     maximising = state.turn == us
     best = -MATE_SCORE * 2 if maximising else MATE_SCORE * 2
     for pt, sq in moves:
         snap = _make(state, pt, sq)
         try:
-            v = _ab(state, us, depth - 1, alpha, beta, width)
+            v = _ab(state, us, depth - 1, alpha, beta, width, plan)
         finally:
             _unmake(state, sq, snap)
         if maximising:
@@ -195,7 +291,7 @@ def _ab(state, us, depth, alpha, beta, width):
     return best
 
 
-def search(state, us, max_depth=MAX_DEPTH, width=BEAM_WIDTH):
+def search(state, us, max_depth=MAX_DEPTH, width=BEAM_WIDTH, plan=None):
     """Yield (depth, (piece_type, square), score) once per completed depth.
 
     A generator so the caller owns the budget: break out on a clock, after a
@@ -205,7 +301,9 @@ def search(state, us, max_depth=MAX_DEPTH, width=BEAM_WIDTH):
     """
     if state.turn != us:
         raise ValueError("not %s to place" % chess.COLOR_NAMES[us])
-    root = _ordered(state, us, width)
+    if plan is None:
+        plan = default_plan()
+    root = _ordered(state, us, width, plan)
     if not root:
         raise ValueError("no legal placement for %s" % chess.COLOR_NAMES[us])
 
@@ -215,7 +313,7 @@ def search(state, us, max_depth=MAX_DEPTH, width=BEAM_WIDTH):
         for pt, sq in root:
             snap = _make(state, pt, sq)
             try:
-                v = _ab(state, us, depth - 1, alpha, MATE_SCORE * 2, width)
+                v = _ab(state, us, depth - 1, alpha, MATE_SCORE * 2, width, plan)
             finally:
                 _unmake(state, sq, snap)
             if v > best_score:
@@ -230,15 +328,18 @@ def search(state, us, max_depth=MAX_DEPTH, width=BEAM_WIDTH):
             return
 
 
-def best(state, us, max_depth=MAX_DEPTH, width=BEAM_WIDTH):
+def best(state, us, max_depth=MAX_DEPTH, width=BEAM_WIDTH, plan=None):
     """Deepest placement within the budget. Convenience over search()."""
     move = None
-    for _, move, _ in search(state, us, max_depth, width):
+    for _, move, _ in search(state, us, max_depth, width, plan):
         pass
     return move
 
 
 def _selfcheck():
+    # Exchange assertions run with an EMPTY table: they pin the SEE arithmetic,
+    # and a pool-derived army term would drown the numbers they check.
+    bare = []
     b = chess.Board(None)
 
     # One attacker on a defended bishop is not a win; the second one is.
@@ -272,7 +373,7 @@ def _selfcheck():
     hung = [sq for sq, p in st.board.piece_map().items()
             if p.color == chess.BLACK]
     assert hung, "black bishop did not land"
-    move = best(st, chess.WHITE, max_depth=2, width=8)
+    move = best(st, chess.WHITE, max_depth=2, width=8, plan=bare)
     snap = _make(st, *move)
     assert _worst_exchange(st.board, chess.WHITE) == 0, \
         "search hung material on %s" % chess.square_name(move[1])
@@ -281,7 +382,8 @@ def _selfcheck():
     # Iterative deepening reports every depth in order and never regresses to
     # an illegal move.
     st2 = rules.SetupState()
-    seen = [d for d, mv, _ in search(st2, chess.WHITE, max_depth=3, width=6)
+    seen = [d for d, mv, _ in search(st2, chess.WHITE, max_depth=3, width=6,
+                                     plan=bare)
             if mv in set(st2.legal_placements())]
     assert seen == [1, 2, 3], seen
 
