@@ -761,9 +761,30 @@ DRAFTED, plan vs plan          0.3800 +/- 0.0235   200
 
 That finding is untouched -- plan mode does build the nominal armies, verified
 piece by piece -- and it is the one that matters: playing the placement phase
-turns a comfortable win into a loss. **Whether searching the placement game
-beats following a plan is now UNMEASURED**, and needs `search:plan`, which
-holds the opponent fixed while only our side's policy changes.
+turns a comfortable win into a loss.
+
+Re-run properly with `search:plan`, which holds the opponent fixed while only
+our side's policy changes, the searching drafter scores **0.0437**. Worse than
+following the plan, not better, and by a wide margin.
+
+### But read the error bars on all of these as fiction
+
+Both drafters are DETERMINISTIC and carry no RNG. So a drafted cell produces
+exactly ONE handoff position -- verified, eight drafts of the same matchup gave
+one distinct FEN -- and every "pair-game" in it replays that single position
+with only the 15% node jitter varying. The reported +/- is the referee's noise,
+not the drafting's, and the effective sample for anything about DRAFTING is 1.
+
+That means 0.0437 does not say "the search builds bad armies". It says this one
+line is lost. It also caps the headline: 0.6891 stamped against 0.3800 drafted
+compares two specific positions, which is a real difference between two
+specific positions and NOT a law about drafting in general. The direction is
+believable because the mechanism is understood; the magnitude and the sigma
+are not transferable.
+
+`campaigns/pool_drafted_field.json` exists for the honest version: five armies,
+so 20 distinct drafted positions per run instead of one. Nothing has been run
+on it yet.
 
 What this invalidates: the four-column grid, every campaign matrix, and the
 maximin argument that shipped v6 -- all of them rank armies under the stamped
