@@ -1816,6 +1816,7 @@ def main():
     test_psearch()
     test_draft()
     test_rules_placement_fastpath()
+    test_book()
     print("OK: all selftests passed")
 
 
@@ -1899,6 +1900,27 @@ def test_rules_placement_fastpath():
     assert in_check, "no in-check state generated: the probe path went untested"
     print("PASS: _placements fast path matches exhaustive over %d state/colour "
           "pairs (%d in check)" % (compared, in_check))
+
+
+def test_book():
+    """Opening book: key identity, round trip, and a generated entry is legal."""
+    import book
+    book._selfcheck()
+
+    # Generate a real one-entry book and confirm it answers the position it
+    # was generated for. Turn 0 is the same position in every game, which is
+    # the entry that matters most: it runs under the ~20s forfeit clock.
+    import chess, rules, psearch
+    st = rules.SetupState()
+    mv = psearch.best(st, chess.WHITE, max_depth=1, width=4)
+    bk = {book.key(st): [int(mv[0]), int(mv[1])]}
+    assert book.lookup(bk, st) == mv
+    assert mv in set(st.legal_placements())
+    # and it must MISS once a piece is down
+    st.place(*mv)
+    st.turn = chess.WHITE
+    assert book.lookup(bk, st) is None, "book hit a position it does not cover"
+    print("PASS: opening book keys, round-trips and answers only what it covers")
 
 if __name__ == "__main__":
     main()

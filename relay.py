@@ -73,6 +73,10 @@ def main():
                     help="maximum search depth (default %d)" % psearch_max_depth())
     ap.add_argument("--width", type=int, default=8,
                     help="beam width per ply (default 8)")
+    ap.add_argument("--book", default=None,
+                    help="precomputed placements from book.py. A hit answers "
+                         "instantly, which matters most on the FIRST placement "
+                         "-- the same position every game, under a ~20s clock.")
     ap.add_argument("moves", nargs="*", help="every placement so far, in order")
     args = ap.parse_args()
 
@@ -122,6 +126,19 @@ def main():
         print("not our turn -- waiting for their placement")
         print("their legal replies: %d" % len(state.legal_placements()))
         return
+
+    if args.book:
+        import book as bookmod
+        hit = bookmod.lookup(bookmod.load(args.book), state)
+        if hit:
+            pt, sq = hit
+            print("  book hit (searched offline, no clock spent)")
+            print("PLACE @%s%s" % (chess.piece_symbol(pt).upper(),
+                                   chess.square_name(sq)))
+            print("  our points left after this: %d"
+                  % (state.points[us] - rules.PIECE_COST[pt]))
+            print("  their points left:          %d" % state.points[not us])
+            return
 
     if args.search:
         # Iterative deepening under a wall clock: print each depth as it lands

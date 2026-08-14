@@ -730,8 +730,21 @@ mislabelling them would be the easiest mistake here:
 
 **The searching drafter recovers half the gap**, 0.3800 to 0.5038, which is
 the first evidence that answering the opponent is worth anything. It is not a
-clean win: at depth 1 the search still left 600cp hanging in a sampled setup,
-and depth is what it cannot afford yet.
+clean win: at depth 1 the search still left 600cp hanging in a sampled setup.
+
+**Depth is not the missing ingredient.** Depth 2 scores 0.5188 +/- 0.0222
+against depth 1's 0.5038 +/- 0.0266 -- overlapping, for eight times the cost
+(4.08s per setup against 0.48s). So the bottleneck is the LEAF, not how far
+ahead it looks, and the useful work is in what the eval understands rather
+than in making the search faster. That also retires the plan to buy depth with
+the 4x speedup already banked.
+
+One asymmetry worth naming: under `search:search` the pair check gives
+P[i][j]+P[j][i] = 1.0175, not the exact 1.0000 that `plan:plan` gives. That is
+real rather than noise. Plan drafting builds the same army whichever colour it
+has, so a colour swap mirrors the position exactly; a searching drafter's army
+genuinely depends on who placed first, and White always does. The effect is
+1.8%, small enough to ignore for now and wrong to antisymmetrise away.
 
 What this invalidates: the four-column grid, every campaign matrix, and the
 maximin argument that shipped v6 -- all of them rank armies under the stamped
