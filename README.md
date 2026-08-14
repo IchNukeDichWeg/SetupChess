@@ -37,8 +37,12 @@ far than the error bars suggest.
 > When the placement phase is actually played out (`draft.py`), the shipped
 > champion's score against its worst column goes from **0.6891 +/- 0.0106 to
 > 0.3800 +/- 0.0235**. A comfortable win becomes a loss, about twelve sigma.
-> A drafter that *searches* the placement game (`psearch.py`) recovers half of
-> it, to 0.5038 +/- 0.0266.
+>
+> Whether *searching* the placement game (`psearch.py`) beats following a plan
+> is *not yet measured*. An earlier claim here that it recovered half the gap
+> was withdrawn: it was run with both sides searching, and a searching drafter
+> builds from the position rather than from its nominal army, so the pool was
+> ignored and the matrix measured the search against its own mirror.
 >
 > So the four-column grid, every campaign matrix, and the maximin argument
 > that selected the current champion all rank armies **under a model of the

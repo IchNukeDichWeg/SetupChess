@@ -728,23 +728,42 @@ mislabelling them would be the easiest mistake here:
   White by convention. Pair antisymmetry still holds exactly (1.0000) under
   matched modes, so this cancels within a pair and is not the explanation.
 
-**The searching drafter recovers half the gap**, 0.3800 to 0.5038, which is
-the first evidence that answering the opponent is worth anything. It is not a
-clean win: at depth 1 the search still left 600cp hanging in a sampled setup.
+**A withdrawn claim, and why it was wrong.** This section first reported that
+a searching drafter recovered half the gap, 0.3800 to 0.5038, with depth 2 at
+0.5188. Both numbers were run with `--draft search:search`, and they do not
+mean what they were written to mean.
 
-**Depth is not the missing ingredient.** Depth 2 scores 0.5188 +/- 0.0222
-against depth 1's 0.5038 +/- 0.0266 -- overlapping, for eight times the cost
-(4.08s per setup against 0.48s). So the bottleneck is the LEAF, not how far
-ahead it looks, and the useful work is in what the eval understands rather
-than in making the search faster. That also retires the plan to buy depth with
-the 4x speedup already banked.
+A searching drafter builds from the POSITION, not from its nominal army. With
+both sides searching, the pool never enters the calculation: champion vs 13
+bishops, 13 bishops vs champion, and v2 vs v2 all drafted the identical pair of
+armies (`87ddeab4` and `d7cfe0c8`). The matrix measured the search against its
+own mirror, which sits near 0.5 by construction and differs from it only by
+placement tempo, since White places first.
 
-One asymmetry worth naming: under `search:search` the pair check gives
-P[i][j]+P[j][i] = 1.0175, not the exact 1.0000 that `plan:plan` gives. That is
-real rather than noise. Plan drafting builds the same army whichever colour it
-has, so a colour swap mirrors the position exactly; a searching drafter's army
-genuinely depends on who placed first, and White always does. The effect is
-1.8%, small enough to ignore for now and wrong to antisymmetrise away.
+It surfaced because a `--pst-scale 1.0` run returned 0.5000 +/- 0.0000 with
+every single cell identical -- the two near-mirrored armies reach a position
+the referee draws every time. The blind-matrix guard fired. Without it the run
+would have been recorded as "the piece-square term makes no difference", which
+is a conclusion about nothing.
+
+Compounding it, `--draft` attached modes to COLOUR rather than to army, so the
+colour-swapped second game of a pair swapped strategies too. Both are fixed:
+modes follow the army, and `search:search` now warns that it ignores the pool.
+
+So the honest state is one comparison, not three:
+
+```
+model                          score           pair-games
+stamped, from the shipped grid 0.6891 +/- 0.0106   400
+stamped, re-run here           0.7026 +/- 0.0277    95
+DRAFTED, plan vs plan          0.3800 +/- 0.0235   200
+```
+
+That finding is untouched -- plan mode does build the nominal armies, verified
+piece by piece -- and it is the one that matters: playing the placement phase
+turns a comfortable win into a loss. **Whether searching the placement game
+beats following a plan is now UNMEASURED**, and needs `search:plan`, which
+holds the opponent fixed while only our side's policy changes.
 
 What this invalidates: the four-column grid, every campaign matrix, and the
 maximin argument that shipped v6 -- all of them rank armies under the stamped
