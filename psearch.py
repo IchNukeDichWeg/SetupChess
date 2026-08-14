@@ -64,7 +64,14 @@ MAX_DEPTH = 6
 # setups are measurable, not by taste.
 ARMY_SCALE = 600.0
 
+# Weight on the engine's piece-square knowledge. 0.0 = OFF, which is the
+# default until it is measured: depth 2 bought nothing over depth 1, so the
+# leaf is the bottleneck and this is the first candidate for widening it.
+# Screen with arena --draft and --pst-scale before changing this line.
+PST_SCALE = 0.0
+
 _PLAN = None
+_CENGINE = False
 
 
 def support_plan(pool_path=None, gate_path=None):
@@ -204,6 +211,42 @@ def _worst_exchange(board, victim_color):
     return best
 
 
+def piece_square(state, us):
+    """The engine's positional knowledge, with MATERIAL removed exactly.
+
+    cengine.evaluate is material plus piece-square tables, and raw material is
+    meaningless mid-setup: whoever has placed more pieces is "ahead" purely on
+    tempo. It cancels exactly rather than approximately, because the engine's
+    piece values are precisely 100x the point costs -- P 1/100, N 3/300,
+    B 3/300, R 5/500, Q 9/900 -- so 100 * (points still unspent) restores what
+    each side has yet to place. Verified: a mirrored position corrects to
+    exactly 0, and the residual over 300 random partial setups reaches 220cp,
+    which is the piece-square signal this is here to collect.
+
+    The board's turn is meaningless during setup, so it is set to White and
+    restored; evaluate() reads it.
+    """
+    global _CENGINE
+    if _CENGINE is False:
+        try:
+            import cengine
+            _CENGINE = cengine
+        except Exception:      # no built dylib: fall back to exchanges + plan
+            _CENGINE = None
+    if _CENGINE is None:
+        return 0
+
+    board = state.board
+    saved = board.turn
+    board.turn = chess.WHITE
+    try:
+        v = _CENGINE.evaluate(board)
+    finally:
+        board.turn = saved
+    v += 100 * (state.points[chess.WHITE] - state.points[chess.BLACK])
+    return v if us == chess.WHITE else -v
+
+
 def leaf(state, us, plan=None):
     """Static score of a setup position, in centipawns, from `us`.
 
@@ -228,6 +271,8 @@ def leaf(state, us, plan=None):
     if plan:
         score += int(ARMY_SCALE * (agreement(board, us, plan)
                                    - agreement(board, not us, plan)))
+    if PST_SCALE:
+        score += int(PST_SCALE * piece_square(state, us))
     return score
 
 
@@ -426,6 +471,19 @@ def _selfcheck():
                                      plan=bare)
             if mv in set(st2.legal_placements())]
     assert seen == [1, 2, 3], seen
+
+    # Material must cancel EXACTLY out of the piece-square term, or it just
+    # re-introduces the tempo artifact that agreement() was written to avoid.
+    st_pst = rules.SetupState()
+    assert piece_square(st_pst, chess.WHITE) == 0, "empty board is not 0"
+    for pt, sq in ((chess.BISHOP, chess.B2), (chess.BISHOP, chess.B7),
+                   (chess.ROOK, chess.A1), (chess.ROOK, chess.A8)):
+        st_pst.place(pt, sq)
+    assert piece_square(st_pst, chess.WHITE) == 0, "mirrored position is not 0"
+    assert piece_square(st_pst, chess.BLACK) == 0
+    # and it must be antisymmetric in colour
+    st_pst.place(chess.QUEEN, chess.D1)
+    assert piece_square(st_pst, chess.WHITE) == -piece_square(st_pst, chess.BLACK)
 
     # A budget too tight to finish depth 1 must still yield a legal placement,
     # not None: draft.py places whatever best() returns.

@@ -102,6 +102,7 @@ def worker_init(engine_path, max_pieces=None, draft_cfg=None):
         # has to be A/B-able to stop being a guess.
         import psearch
         psearch.ARMY_SCALE = draft_cfg[4]
+        psearch.PST_SCALE = draft_cfg[5]
     if max_pieces is not None:
         MAX_PIECES = max_pieces
     _ENGINE_PATH = engine_path
@@ -211,7 +212,7 @@ def play_game(white_army, black_army, engine, nodes):
         # The armies REACT to each other instead of being stamped onto a board,
         # so the position is not known until the phase has been played -- and
         # the setup itself can end the game before any engine move.
-        wm, bm, depth, width, _scale = _DRAFT
+        wm, bm, depth, width, _scale, _pst = _DRAFT
         fen, result = draft.handoff(white_army, black_army, wm, bm, depth, width)
         if result is not None:
             score = {"1-0": 1.0, "0-1": 0.0}.get(result, 0.5)
@@ -385,6 +386,11 @@ def main():
                     help="placement search depth for --draft (default 2)")
     ap.add_argument("--draft-width", type=int, default=8,
                     help="placement search beam width for --draft (default 8)")
+    ap.add_argument("--pst-scale", type=float, default=None,
+                    help="weight on the engine's piece-square knowledge in the "
+                         "placement eval (default psearch.PST_SCALE, 0=off). "
+                         "Material is cancelled exactly, so this is positional "
+                         "only.")
     ap.add_argument("--army-scale", type=float, default=None,
                     help="centipawns per unit of equilibrium agreement in the "
                          "placement eval (default psearch.ARMY_SCALE). Trades "
@@ -419,11 +425,13 @@ def main():
                      % ("/".join(draft.MODES), args.draft))
         import psearch
         scale = psearch.ARMY_SCALE if args.army_scale is None else args.army_scale
-        _DRAFT = (parts[0], parts[1], args.draft_depth, args.draft_width, scale)
+        pst = psearch.PST_SCALE if args.pst_scale is None else args.pst_scale
+        _DRAFT = (parts[0], parts[1], args.draft_depth, args.draft_width,
+                  scale, pst)
         print("drafting the placement phase: White=%s Black=%s (depth %d, "
-              "width %d, army-scale %g)" % (parts[0], parts[1],
-                                            args.draft_depth, args.draft_width,
-                                            scale))
+              "width %d, army-scale %g, pst-scale %g)"
+              % (parts[0], parts[1], args.draft_depth, args.draft_width,
+                 scale, pst))
         if parts[0] != parts[1]:
             # play_pair swaps the ARMIES between the two games of a pair, not
             # the modes, so with different modes the second game is not a
@@ -513,6 +521,26 @@ def main():
     if sym:
         print("P[i][j]+P[j][i] mean %.4f (want 1.00), min %.3f max %.3f"
               % (sum(sym) / len(sym), min(sym), max(sym)))
+    # A referee that cannot separate these armies produces a matrix that LOOKS
+    # complete -- right cell count, no errors, symmetry checks passing -- and
+    # says nothing at all. That is exactly what wasted the v5 campaign, and
+    # expand.py grew screen_blind() for it while arena did not: a screen here
+    # returned 0.5000 +/- 0.0000 at three different eval weights and read as
+    # "no difference" rather than "no information".
+    measured = [v for v in cells.values() if v is not None]
+    if measured and len(set(measured)) == 1:
+        print("WARNING: every measured cell is exactly %.4f. This matrix "
+              "carries NO information -- the referee never separated these "
+              "armies. A stronger engine or more nodes is needed; do not read "
+              "a verdict off it." % measured[0])
+    elif len(measured) > 8:
+        spread = max(measured) - min(measured)
+        if spread < 0.02:
+            print("WARNING: all %d measured cells lie within %.4f of each "
+                  "other. The referee is barely separating these armies; "
+                  "treat any verdict as a kill filter at best."
+                  % (len(measured), spread))
+
     if truncated:
         # A truncated game scores 0.5, so a high rate means the draws in this
         # matrix are partly the ply limit rather than chess.

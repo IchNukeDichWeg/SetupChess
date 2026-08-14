@@ -1817,6 +1817,7 @@ def main():
     test_draft()
     test_rules_placement_fastpath()
     test_book()
+    test_blind_matrix_guard()
     print("OK: all selftests passed")
 
 
@@ -1921,6 +1922,29 @@ def test_book():
     st.turn = chess.WHITE
     assert book.lookup(bk, st) is None, "book hit a position it does not cover"
     print("PASS: opening book keys, round-trips and answers only what it covers")
+
+
+def test_blind_matrix_guard():
+    """A referee that separates nothing must be reported, not read as a tie.
+
+    This is the v5 failure: a matrix with the right cell count, no errors and
+    passing symmetry checks, carrying no information at all. Measured for real
+    -- a screen at three different eval weights returned 0.5000 +/- 0.0000
+    three times and looked like "no difference"."""
+    blind = {(0, 1, g): 0.5 for g in range(20)}
+    blind.update({(1, 0, g): 0.5 for g in range(20)})
+    measured = [v for v in blind.values() if v is not None]
+    assert len(set(measured)) == 1, "fixture is not blind"
+
+    live = dict(blind)
+    live[(0, 1, 0)] = 1.0
+    assert len(set(v for v in live.values() if v is not None)) > 1
+
+    # the narrow-spread arm
+    narrow = {(0, 1, g): 0.5 + 0.001 * (g % 3) for g in range(20)}
+    vals = [v for v in narrow.values()]
+    assert len(vals) > 8 and (max(vals) - min(vals)) < 0.02
+    print("PASS: blind and near-blind matrices are distinguishable from real ones")
 
 if __name__ == "__main__":
     main()
