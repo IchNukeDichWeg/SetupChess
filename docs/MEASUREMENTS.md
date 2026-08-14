@@ -782,6 +782,41 @@ specific positions and NOT a law about drafting in general. The direction is
 believable because the mechanism is understood; the magnitude and the sigma
 are not transferable.
 
+### The placement search: REJECTED as an army builder
+
+Same field, same opponents, same game indices; the only change is whether the
+champion's side drafts by following its plan or by searching. Paired:
+
+```
+column          plan     search   delta
+bot 08-05       0.9667   0.9771   +0.0104
+bot 08-08       0.9833   0.8438   -0.1396
+13 bishops      0.3750   0.0792   -0.2958
+wall            0.9250   0.9000   -0.0250
+ROW             0.8125   0.7000
+paired          -0.1125 +/- 0.0200 over 480 shared cells, EXCLUDES zero
+```
+
+**Worse overall, and worst exactly where it had to help.** The 13-bishop column
+was already the only losing one at 0.3750; searching takes it to 0.0792, close
+to total. The verdict is REJECTED, and the prediction registered before the run
+-- worse, between the single matchup's -0.3362 and zero -- held.
+
+The mechanism is not tactical. The search does the tactical job it was built
+for: material hung at handoff went from 300cp to 0, and it walks into no setup
+mates. What it cannot do is choose an ARMY. Given the champion's plan of
+6P 11B it builds 4P 10B 1R, agreement 0.870, nothing hanging -- and loses.
+Expected overlap with the equilibrium mixture is too crude a proxy for army
+quality, and depth does not rescue it (depth 2 bought nothing over depth 1).
+
+So the architecture is wrong, not the tuning. Composition should come from the
+measured pool, which is what seven campaigns produced, and the search should
+only be allowed to choose among placements that keep the planned army intact.
+`play.Drafter._safe_placements` is already a one-ply version of exactly that,
+which makes the existing drafter closer to right than the replacement.
+`psearch` earns its place as a tactical filter inside a plan, not as a
+substitute for one.
+
 ### The four-column grid, re-measured with the phase played
 
 Five armies, 1,500 pairs, `plan:plan`, so four distinct drafted matchups
