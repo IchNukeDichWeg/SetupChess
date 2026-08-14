@@ -202,7 +202,10 @@ def main():
                     done[k] = list(scores)
                 if i % 25 == 0 or i == len(tasks):
                     save()
-                    print("  %d/%d, %d skipped" % (i, len(tasks), skipped))
+                    # flush: block-buffered when redirected, so a
+                    # logged run looks wedged (see arena.py)
+                    print("  %d/%d, %d skipped" % (i, len(tasks), skipped),
+                          flush=True)
         save()
 
     order = sorted(done)

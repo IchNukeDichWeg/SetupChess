@@ -175,7 +175,10 @@ def main():
                     done[k] = scores
                 if i % 20 == 0 or i == len(tasks):
                     save()
-                    print("  %d/%d, %d skipped" % (i, len(tasks), skipped))
+                    # flush: block-buffered when redirected, so a
+                    # logged run looks wedged (see arena.py)
+                    print("  %d/%d, %d skipped" % (i, len(tasks), skipped),
+                          flush=True)
         save()
 
     per_game = [s for k in sorted(done) for s in done[k]]

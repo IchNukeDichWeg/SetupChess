@@ -96,6 +96,12 @@ def preflight_engine(*paths):
 def worker_init(engine_path, max_pieces=None, draft_cfg=None):
     global _ENGINE, _ENGINE_PATH, MAX_PIECES, _DRAFT
     _DRAFT = draft_cfg
+    if draft_cfg:
+        # Visible, set from an explicit --army-scale rather than inherited from
+        # anywhere: this is the one free parameter in the placement eval and it
+        # has to be A/B-able to stop being a guess.
+        import psearch
+        psearch.ARMY_SCALE = draft_cfg[4]
     if max_pieces is not None:
         MAX_PIECES = max_pieces
     _ENGINE_PATH = engine_path
@@ -205,7 +211,7 @@ def play_game(white_army, black_army, engine, nodes):
         # The armies REACT to each other instead of being stamped onto a board,
         # so the position is not known until the phase has been played -- and
         # the setup itself can end the game before any engine move.
-        wm, bm, depth, width = _DRAFT
+        wm, bm, depth, width, _scale = _DRAFT
         fen, result = draft.handoff(white_army, black_army, wm, bm, depth, width)
         if result is not None:
             score = {"1-0": 1.0, "0-1": 0.0}.get(result, 0.5)
@@ -379,6 +385,11 @@ def main():
                     help="placement search depth for --draft (default 2)")
     ap.add_argument("--draft-width", type=int, default=8,
                     help="placement search beam width for --draft (default 8)")
+    ap.add_argument("--army-scale", type=float, default=None,
+                    help="centipawns per unit of equilibrium agreement in the "
+                         "placement eval (default psearch.ARMY_SCALE). Trades "
+                         "off building a measured-good army against not "
+                         "hanging material; UNCALIBRATED, so A/B it.")
     ap.add_argument("--max-pieces", type=int, default=rules.ENGINE_MAX_PIECES,
                     help="piece ceiling for the engine; 0 for none, which is "
                          "correct for ./cuci.py (default: %(default)s)")
@@ -406,10 +417,13 @@ def main():
         if len(parts) != 2 or any(m not in draft.MODES for m in parts):
             sys.exit("--draft wants WHITE:BLACK with modes from %s, got %r"
                      % ("/".join(draft.MODES), args.draft))
-        _DRAFT = (parts[0], parts[1], args.draft_depth, args.draft_width)
+        import psearch
+        scale = psearch.ARMY_SCALE if args.army_scale is None else args.army_scale
+        _DRAFT = (parts[0], parts[1], args.draft_depth, args.draft_width, scale)
         print("drafting the placement phase: White=%s Black=%s (depth %d, "
-              "width %d)" % (parts[0], parts[1], args.draft_depth,
-                             args.draft_width))
+              "width %d, army-scale %g)" % (parts[0], parts[1],
+                                            args.draft_depth, args.draft_width,
+                                            scale))
         if parts[0] != parts[1]:
             # play_pair swaps the ARMIES between the two games of a pair, not
             # the modes, so with different modes the second game is not a
@@ -472,9 +486,15 @@ def main():
             if done % 25 == 0 or done == len(tasks):
                 save_state(args.out, cells, meta)
                 rate = done / max(1e-9, time.time() - start)
+                # flush: stdout is BLOCK buffered when redirected to a file,
+                # so a run logged with `> log` showed nothing for many minutes
+                # and looked wedged. It was progressing the whole time; the
+                # lines were sitting in an 8KB buffer. expand.py already had
+                # this fix and arena did not.
                 print("  %d/%d pairs, %.2f pairs/s, eta %.1f min, %d errors"
                       % (done, len(tasks), rate,
-                         (len(tasks) - done) / max(rate, 1e-9) / 60, errors))
+                         (len(tasks) - done) / max(rate, 1e-9) / 60, errors),
+                      flush=True)
     save_state(args.out, cells, meta)
 
     m = matrix_from_cells(cells, n)
