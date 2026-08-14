@@ -38,11 +38,17 @@ far than the error bars suggest.
 > champion's score against its worst column goes from **0.6891 +/- 0.0106 to
 > 0.3800 +/- 0.0235**. A comfortable win becomes a loss, about twelve sigma.
 >
-> Whether *searching* the placement game (`psearch.py`) beats following a plan
-> is *not yet measured*. An earlier claim here that it recovered half the gap
-> was withdrawn: it was run with both sides searching, and a searching drafter
-> builds from the position rather than from its nominal army, so the pool was
-> ignored and the matrix measured the search against its own mirror.
+> Measured across a four-opponent field, the collapse is **one column**, not
+> the whole grid: the champion holds against both bot armies and the pawn wall
+> and loses only to the 13-bishop army a human actually beat us with. That is
+> also the column maximin selected v6 on, at 0.6891; played out it is 0.3750,
+> below 0.5, so the shipped army does not beat its worst opponent.
+>
+> **Searching the placement game is REJECTED**: -0.1125 +/- 0.0200 paired
+> against simply following the plan, and worst on the column that mattered
+> (0.3750 -> 0.0792). It does its tactical job -- hung material goes 300cp to
+> 0 -- but it cannot choose an army. Composition belongs to the measured pool;
+> the search's place is as a filter inside a plan, not a substitute for one.
 >
 > So the four-column grid, every campaign matrix, and the maximin argument
 > that selected the current champion all rank armies **under a model of the
