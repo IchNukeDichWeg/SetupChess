@@ -690,6 +690,57 @@ raised, and `match.py` discarded a won game as an engine error.
 **`HUNT_WHEN` is left at 6.** Changing it needs an A/B over the real-opponent
 field, not a second guess off four hand-written styles. That is owed.
 
+## The basin experiment: bishops are the answer BECAUSE massed bishops exist
+
+v7 asked whether six campaigns agreeing on eleven bishops meant "best army"
+or just "same starting pool". It started from 14 armies with at most 5
+bishops each, on the fixed machinery, gated on the four real opponents.
+
+**The pool did not come back to bishops.** 2 of 61 armies hold 8 or more
+(earlier pools: ~90%), 60 of 61 hold a queen or a knight, and the final
+support is `6P 2N 6B 1Q` at two-thirds weight. So the agreement WAS
+start-dependent: there is a second, self-consistent equilibrium region built
+around queens, and the double oracle is happy to live in it.
+
+Then the four-column confirmation, 400 pairs a cell:
+
+```
+                    bot 08-05   bot 08-08   13 bishops   wall     worst
+v6 s57 (ships)      0.9513      0.9884      0.6891       0.8959   0.6891
+v7 s57 (1Q 2N 6B)   0.9975      0.9966      0.2384       0.9569   0.2384
+v7 s59 (9B 9P 1N)   0.9981      0.9988      0.5428       0.9166   0.5428
+```
+
+**The queen army dominates the shipped champion on three of four columns**
+-- including 0.9975 and 0.9966 against the bot's queen armies, the best bot
+cells ever measured -- **and then loses 0.2384 to thirteen bishops**, the
+worst cell on the grid by a wide margin. v7's start pool contained no massed
+bishops, so its equilibrium never had to answer them, and it cannot.
+
+This resolves the basin question with a mechanism rather than a vote count:
+
+- **Massed bishops beat queen armies, hugely and consistently.** The bot's
+  three-queen armies lose 0.95+ to bishop armies; v7's one-queen support
+  loses 0.76 to thirteen bishops. It is the most lopsided relationship in
+  the game.
+- **So whichever pool CONTAINS massed bishops ends up ruled by them**, which
+  is why six bishop-containing campaigns agreed, and why a bishop-free
+  campaign settles somewhere else.
+- **The answer is field-dependent, and the field contains bishops.** A human
+  actually played thirteen bishops at us. Against a world with no massed
+  bishops, v7 s57 would be the better army -- it dominates everywhere else.
+  Against the world as observed, the worst-column rule keeps v6 s57, and by
+  a mile.
+
+The registered prediction (neither clears 0.6891, ~15% on a displacement)
+held. The fixed-code/new-start confound registered before the run never
+needed resolving: the outcome is not "different numbers for the same armies"
+but a different region entirely, and its failure mode is measured.
+
+"The answer is still bishops" now carries this asterisk permanently: bishops
+win because the opponent field includes massed bishops, not because nothing
+else can play chess.
+
 ## Being predictable
 
 The champion against the pool's best response to it, 400 pairs:
