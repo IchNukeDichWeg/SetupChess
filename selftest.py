@@ -1813,8 +1813,37 @@ def main():
     test_play_smoke(args.engine, args.scratch or tempfile.gettempdir())
     test_match_smoke(args.engine, args.scratch or tempfile.gettempdir())
     test_duel_smoke(args.engine, args.scratch or tempfile.gettempdir())
+    test_psearch()
     print("OK: all selftests passed")
 
+
+
+def test_psearch():
+    """The placement search: exchange arithmetic and the double-stack it exists
+    for. psearch owns the detailed assertions; this runs them with everything
+    else so a change to rules.SetupState cannot break the search silently."""
+    import psearch
+    psearch._selfcheck()
+
+    # The search must beat the plan-follower at the one thing it was built for:
+    # not leaving material for the opponent to take at handoff.
+    import chess, rules, play
+    def hung(use_search):
+        st = rules.SetupState()
+        tgt = play.load_army("campaigns/champion_v6.json")
+        dw, db = play.Drafter(tgt, chess.WHITE), play.Drafter(tgt, chess.BLACK)
+        for _ in range(100):
+            if st.complete or st.result or not st.legal_placements():
+                break
+            if st.turn == chess.WHITE and use_search:
+                mv = psearch.best(st, chess.WHITE, max_depth=2, width=8)
+            else:
+                mv = (dw if st.turn == chess.WHITE else db).choose(st)
+            st.place(*mv)
+        return psearch._worst_exchange(st.board, chess.WHITE)
+    assert hung(True) <= hung(False), "search hung more than the plan-follower"
+    print("PASS: placement search scores exchanges and does not hang more "
+          "material than the plan-follower")
 
 if __name__ == "__main__":
     main()
