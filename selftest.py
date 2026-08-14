@@ -1815,6 +1815,7 @@ def main():
     test_duel_smoke(args.engine, args.scratch or tempfile.gettempdir())
     test_psearch()
     test_draft()
+    test_rules_placement_fastpath()
     print("OK: all selftests passed")
 
 
@@ -1852,6 +1853,52 @@ def test_draft():
     import draft
     draft._selfcheck()
     print("PASS: placement phase can be played out by both strategies")
+
+
+def test_rules_placement_fastpath():
+    """_placements skips the per-candidate legality probe when it cannot
+    matter. Differential against an exhaustive reference over random states,
+    because this is a correctness shortcut in the rules and an eyeball on the
+    argument is not evidence."""
+    import random
+
+    def reference(state, color):
+        out = []
+        has_king = state.board.king(color) is not None
+        types = rules.BUYABLE if has_king else rules.BUYABLE + (chess.KING,)
+        for pt in types:
+            if rules.PIECE_COST[pt] > state.points[color]:
+                continue
+            for sq in rules.placement_squares(pt, color):
+                if state.board.piece_at(sq):
+                    continue
+                state.board.set_piece_at(sq, chess.Piece(pt, color))
+                ok = not state.in_check(color)
+                state.board.remove_piece_at(sq)
+                if ok:
+                    out.append((pt, sq))
+        return out
+
+    rng = random.Random(7)
+    compared = in_check = 0
+    for _ in range(120):
+        st = rules.SetupState()
+        for _ in range(rng.randrange(0, 30)):
+            if st.complete or st.result:
+                break
+            legal = st.legal_placements()
+            if not legal:
+                break
+            st.place(*rng.choice(legal))
+        for color in (chess.WHITE, chess.BLACK):
+            if st.board.king(color) is not None and st.in_check(color):
+                in_check += 1
+            assert sorted(st._placements(color)) == sorted(reference(st, color)), \
+                "fast path disagrees for %s" % chess.COLOR_NAMES[color]
+            compared += 1
+    assert in_check, "no in-check state generated: the probe path went untested"
+    print("PASS: _placements fast path matches exhaustive over %d state/colour "
+          "pairs (%d in check)" % (compared, in_check))
 
 if __name__ == "__main__":
     main()

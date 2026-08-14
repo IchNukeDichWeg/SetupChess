@@ -217,15 +217,30 @@ class SetupState:
         # `is None`, not truthiness: a king on a1 is square 0
         has_king = self.board.king(color) is not None
         types = BUYABLE if has_king else BUYABLE + (chess.KING,)
+        # Adding a piece of our OWN colour to an empty square can only block
+        # lines to our own king; it can never open one, because nothing is
+        # removed and there are no captures in the placement phase. So a
+        # non-king placement cannot create a check that was not already there,
+        # and the per-candidate legality probe is only needed when we are
+        # already in check or when the piece being placed IS the king (which
+        # defines where check is measured). That takes the probe from once per
+        # candidate -- about 130 set/remove/in_check triples -- to once per
+        # call. Differentially tested against the exhaustive version over
+        # random states in selftest.test_rules_placement_fastpath.
+        probe_all = has_king and self.in_check(color)
         for pt in types:
             if PIECE_COST[pt] > self.points[color]:
                 continue
+            probe = probe_all or pt == chess.KING
             for sq in placement_squares(pt, color):
                 if self.board.piece_at(sq):
                     continue
-                self.board.set_piece_at(sq, chess.Piece(pt, color))
-                ok = not self.in_check(color)
-                self.board.remove_piece_at(sq)
+                if probe:
+                    self.board.set_piece_at(sq, chess.Piece(pt, color))
+                    ok = not self.in_check(color)
+                    self.board.remove_piece_at(sq)
+                else:
+                    ok = True
                 if ok:
                     if first_only:
                         return [(pt, sq)]
