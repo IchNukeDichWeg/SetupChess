@@ -13,10 +13,20 @@ positions at each of our decision points:
     our turn 3   39                       ~37%
     our turn 7   53                       ~13%
 
-So a book pays completely at turn 0, well for two or three turns after, and
-then the opponent's branching washes it out. That is the whole justification
-for BOOK_TURNS being small: entries past it cost a deep search each and are
-almost never read again.
+That table is measured against opponents drawn from the pool, and it is
+OPTIMISTIC. Playing a fresh search-drafted setup against the shipped 101-entry
+book, only 1 of 28 placements was a hit: the opponent's placement is
+unconstrained, so after their first move the game leaves anything we sampled
+almost at once.
+
+So the honest claim is narrow and still worth having. Turn 0 as White is the
+same position in every game we will ever play, it is booked with certainty,
+and it is the one placement that runs against chess.com's ~20 second forfeit
+window. Everything past it is opportunistic. BOOK_TURNS is small because
+entries beyond the first few cost a deep search each and are rarely read.
+
+Widening this means keying on OUR placements and ignoring theirs, which is the
+ponytail note at the bottom -- not generating more entries at this key.
 
 Generating is a long job -- one deep search per position -- so it writes
 incrementally and resumes from whatever is already in the file.
@@ -85,13 +95,20 @@ def load(path):
         return json.load(fh)
 
 
-def collect(pool_path, games, turns, seed=0):
+def collect(pool_path, games, turns, seed=0, mode="plan", depth=1, width=6):
     """Positions we actually face, in the order they are first reached.
 
     Sampled from real drafted play against varied opponents rather than
     enumerated: enumeration is hopeless (136 legal placements at the root, so
     18k positions at ply 2 and 2.5M at ply 3), and most of that tree is
     positions no opponent ever builds toward.
+
+    `mode` must match how the book will be USED. Collecting from plan-drafted
+    games and then reading the book from a searching drafter under-covers
+    badly: the searcher opens Pe2 where the plan drafter does not, so its very
+    next position is off-book. Measured -- a plan-collected book hit White's
+    turn 0 and missed Black's reply to the searcher's own opening move.
+    "search" is slower to collect but covers what the searcher actually meets.
     """
     armies, _ = play.load_pool(pool_path)
     rng = random.Random(seed)
@@ -120,7 +137,11 @@ def collect(pool_path, games, turns, seed=0):
                         seen.add(k)
                         order.append(k)
                     mine_turn += 1
-                state.place(*drafters[state.turn].choose(state))
+                if mode == "search" and state.turn == us:
+                    state.place(*psearch.best(state, us, max_depth=depth,
+                                              width=width))
+                else:
+                    state.place(*drafters[state.turn].choose(state))
     return order
 
 
@@ -138,6 +159,11 @@ def main():
                     help="search depth per entry; offline, so deeper than live")
     ap.add_argument("--width", type=int, default=16,
                     help="beam width per entry; wider than live (default 16)")
+    ap.add_argument("--collect-mode", choices=("plan", "search"), default="plan",
+                    help="how OUR side plays while collecting positions. Must "
+                         "match how the book will be used: a plan-collected "
+                         "book under-covers a searching drafter, because the "
+                         "searcher opens differently and goes off-book at once.")
     ap.add_argument("--seed", type=int, default=0)
     args = ap.parse_args()
 
@@ -145,9 +171,11 @@ def main():
     if book:
         print("resuming: %d entries already in %s" % (len(book), args.out))
 
-    print("collecting positions from %d games x 2 colours, %d turns deep..."
-          % (args.games, args.turns), flush=True)
-    positions = collect(args.pool, args.games, args.turns, args.seed)
+    print("collecting positions from %d games x 2 colours, %d turns deep, "
+          "our side playing '%s'..."
+          % (args.games, args.turns, args.collect_mode), flush=True)
+    positions = collect(args.pool, args.games, args.turns, args.seed,
+                        args.collect_mode, args.depth, args.width)
     todo = [k for k in positions if k not in book]
     print("%d distinct positions, %d already booked, %d to search"
           % (len(positions), len(positions) - len(todo), len(todo)), flush=True)
