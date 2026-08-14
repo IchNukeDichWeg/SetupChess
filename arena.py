@@ -29,6 +29,7 @@ import chess
 import chess.engine
 
 import pool as poolmod
+import draft
 import rules
 
 # 300 plies is well past where a decided Setup Chess game resolves; a game
@@ -37,6 +38,9 @@ PLY_LIMIT = 300
 
 _ENGINE = None
 _ENGINE_PATH = None
+# ('white mode', 'black mode', depth, width), or None for the stamped-FEN
+# model. See draft.py: None means the two armies never react to each other.
+_DRAFT = None
 # Piece ceiling for whichever engine the workers are running. Stockfish's by
 # default; our own core takes 0 (no ceiling), which is the whole point of it.
 MAX_PIECES = rules.ENGINE_MAX_PIECES
@@ -89,8 +93,9 @@ def preflight_engine(*paths):
             pass
 
 
-def worker_init(engine_path, max_pieces=None):
-    global _ENGINE, _ENGINE_PATH, MAX_PIECES
+def worker_init(engine_path, max_pieces=None, draft_cfg=None):
+    global _ENGINE, _ENGINE_PATH, MAX_PIECES, _DRAFT
+    _DRAFT = draft_cfg
     if max_pieces is not None:
         MAX_PIECES = max_pieces
     _ENGINE_PATH = engine_path
@@ -194,7 +199,17 @@ def play_game(white_army, black_army, engine, nodes):
     unfinished game and a terrible thing to leave unreported, so the truncation
     is counted and printed at the end of a run.
     """
-    fen = rules.setup_fen(white_army, black_army)
+    if _DRAFT is None:
+        fen = rules.setup_fen(white_army, black_army)
+    else:
+        # The armies REACT to each other instead of being stamped onto a board,
+        # so the position is not known until the phase has been played -- and
+        # the setup itself can end the game before any engine move.
+        wm, bm, depth, width = _DRAFT
+        fen, result = draft.handoff(white_army, black_army, wm, bm, depth, width)
+        if result is not None:
+            score = {"1-0": 1.0, "0-1": 0.0}.get(result, 0.5)
+            return score, 0, False
     ok, why = rules.engine_safe(fen, MAX_PIECES)
     if not ok:
         raise Unplayable("%s (%s)" % (why, fen))
@@ -218,10 +233,11 @@ def play_pair(ai, aj, nodes, jitter, i, j, g):
     Raises Unplayable before any game starts, so a cell that the engine
     cannot take is recorded once rather than half-played.
     """
-    for w, b in ((ai, aj), (aj, ai)):
-        ok, why = rules.engine_safe(rules.setup_fen(w, b), MAX_PIECES)
-        if not ok:
-            raise Unplayable(why)
+    if _DRAFT is None:
+        for w, b in ((ai, aj), (aj, ai)):
+            ok, why = rules.engine_safe(rules.setup_fen(w, b), MAX_PIECES)
+            if not ok:
+                raise Unplayable(why)
     engine = _worker_engine()
     w, ply_w, cut_w = play_game(ai, aj, engine,
                                 game_nodes(nodes, jitter, i, j, g, 0))
@@ -291,7 +307,7 @@ def load_state(path):
 # a game is played, and the cells it unlocks are exactly the ones recorded as
 # unplayable. Those get retried instead of blocking the resume.
 _RESUME_KEYS = ("n", "nodes", "jitter", "pairs", "engine", "seed",
-                "ply_limit", "armies")
+                "ply_limit", "armies", "draft")
 
 
 def check_resume(stored, current, cells):
@@ -353,6 +369,16 @@ def main():
     ap.add_argument("--pairs", type=int, default=1,
                     help="game pairs per cell; each pair is 2 games")
     ap.add_argument("--workers", type=int, default=0, help="0 = all cores")
+    ap.add_argument("--draft", metavar="WHITE:BLACK",
+                    help="play the PLACEMENT phase instead of stamping two "
+                         "finished armies onto a board, e.g. 'search:plan'. "
+                         "Modes: %s. Without this every cell measures armies "
+                         "that never reacted to each other (see draft.py)."
+                         % "/".join(draft.MODES))
+    ap.add_argument("--draft-depth", type=int, default=2,
+                    help="placement search depth for --draft (default 2)")
+    ap.add_argument("--draft-width", type=int, default=8,
+                    help="placement search beam width for --draft (default 8)")
     ap.add_argument("--max-pieces", type=int, default=rules.ENGINE_MAX_PIECES,
                     help="piece ceiling for the engine; 0 for none, which is "
                          "correct for ./cuci.py (default: %(default)s)")
@@ -374,10 +400,35 @@ def main():
 
     preflight_engine(args.engine)
     cells, stored = load_state(args.out)
+    global _DRAFT
+    if args.draft:
+        parts = args.draft.split(":")
+        if len(parts) != 2 or any(m not in draft.MODES for m in parts):
+            sys.exit("--draft wants WHITE:BLACK with modes from %s, got %r"
+                     % ("/".join(draft.MODES), args.draft))
+        _DRAFT = (parts[0], parts[1], args.draft_depth, args.draft_width)
+        print("drafting the placement phase: White=%s Black=%s (depth %d, "
+              "width %d)" % (parts[0], parts[1], args.draft_depth,
+                             args.draft_width))
+        if parts[0] != parts[1]:
+            # play_pair swaps the ARMIES between the two games of a pair, not
+            # the modes, so with different modes the second game is not a
+            # colour swap of the first -- it is a different matchup. The
+            # antisymmetry diagnostic below is meaningless then (measured:
+            # search:plan gave P[i][j]+P[j][i] = 1.083 where plan:plan gave
+            # exactly 1.000), and the matrix cannot be antisymmetrised.
+            print("  WARNING: modes differ, so a colour-swapped pair also "
+                  "swaps strategies. The P[i][j]+P[j][i] check below does NOT "
+                  "apply and this matrix must not be antisymmetrised. Use the "
+                  "same mode on both sides to measure armies.")
+
     meta = {"n": n, "nodes": args.nodes, "jitter": args.jitter,
             "pairs": args.pairs, "engine": os.path.basename(args.engine),
             "seed": args.seed, "ply_limit": PLY_LIMIT,
             "max_pieces": args.max_pieces,
+            # in _RESUME_KEYS: a drafted cell and a stamped cell measure
+            # different games and must never pool into one matrix
+            "draft": list(_DRAFT) if _DRAFT else None,
             "armies": [poolmod.fingerprint(a) for a in armies]}
     cells = check_resume(stored, meta, cells)
     tasks = [(i, j, g, (armies[i], armies[j]), args.nodes, args.jitter)
@@ -400,7 +451,7 @@ def main():
     done = errors = unplayable = truncated = 0
     reasons = {}
     with mp.Pool(workers, initializer=worker_init,
-                 initargs=(args.engine, args.max_pieces)) as p:
+                 initargs=(args.engine, args.max_pieces, _DRAFT)) as p:
         for i, j, g, score, info in p.imap_unordered(play_cell, tasks):
             done += 1
             if score == "unplayable":

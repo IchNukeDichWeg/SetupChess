@@ -1814,6 +1814,7 @@ def main():
     test_match_smoke(args.engine, args.scratch or tempfile.gettempdir())
     test_duel_smoke(args.engine, args.scratch or tempfile.gettempdir())
     test_psearch()
+    test_draft()
     print("OK: all selftests passed")
 
 
@@ -1844,6 +1845,13 @@ def test_psearch():
     assert hung(True) <= hung(False), "search hung more than the plan-follower"
     print("PASS: placement search scores exchanges and does not hang more "
           "material than the plan-follower")
+
+
+def test_draft():
+    """Drafted setups: every mode pairing finishes and yields a legal army."""
+    import draft
+    draft._selfcheck()
+    print("PASS: placement phase can be played out by both strategies")
 
 if __name__ == "__main__":
     main()

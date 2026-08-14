@@ -192,7 +192,7 @@ class SetupState:
         """
         if self.board.king(color) is None:
             return False
-        return self.points[color] == 0 or not self._placements(color)
+        return self.points[color] == 0 or not self._placements(color, True)
 
     @property
     def complete(self):
@@ -203,7 +203,16 @@ class SetupState:
         k = self.board.king(color)
         return k is not None and self.board.is_attacked_by(not color, k)
 
-    def _placements(self, color):
+    def _placements(self, color, first_only=False):
+        """Legal placements for `color`. With `first_only`, stops at the first
+        one and returns it alone.
+
+        Four of the five callers only ask whether ANY placement exists, but
+        every one of them was enumerating the whole list -- roughly 130
+        set_piece_at/remove_piece_at pairs per call. That is the single
+        dominant cost of the placement search in psearch.py, where place() runs
+        at every node: profiled at 2.32s of a 2.87s depth-2 search.
+        """
         out = []
         # `is None`, not truthiness: a king on a1 is square 0
         has_king = self.board.king(color) is not None
@@ -218,6 +227,8 @@ class SetupState:
                 ok = not self.in_check(color)
                 self.board.remove_piece_at(sq)
                 if ok:
+                    if first_only:
+                        return [(pt, sq)]
                     out.append((pt, sq))
         return out
 
@@ -244,7 +255,7 @@ class SetupState:
         the reason itself, and it applies to both colours.
         """
         opp = not placer
-        if not self.in_check(opp) or self._placements(opp):
+        if not self.in_check(opp) or self._placements(opp, True):
             return False
         return not self.done(placer)
 
@@ -260,7 +271,7 @@ class SetupState:
         self.board.set_piece_at(sq, chess.Piece(pt, placer))
         self.points[placer] -= PIECE_COST[pt]
         if self.in_check(opp):
-            if self._placements(opp):
+            if self._placements(opp, True):
                 self.turn = opp  # forced to answer the check
                 return
             if self.mates(placer):
@@ -279,7 +290,7 @@ class SetupState:
         # Checked for both sides: the placer can also spend its last points
         # without a king, which is the same loss by the same rule.
         for side in (opp, placer):
-            if self.board.king(side) is None and not self._placements(side):
+            if self.board.king(side) is None and not self._placements(side, True):
                 self.result = "0-1" if side == chess.WHITE else "1-0"
                 return
 

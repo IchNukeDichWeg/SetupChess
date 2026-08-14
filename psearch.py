@@ -176,12 +176,21 @@ def see(board, sq, side):
 
 
 def _worst_exchange(board, victim_color):
-    """Best single capture sequence available AGAINST `victim_color`."""
+    """Best single capture sequence available AGAINST `victim_color`.
+
+    The attacker test before see() is what makes the search affordable: see()
+    copies the board, and in a setup position most pieces are not attacked at
+    all, so the copy was being paid dozens of times per leaf for a guaranteed
+    zero. attackers() is a bitboard intersection.
+    """
+    attacker = not victim_color
     best = 0
     for sq, piece in board.piece_map().items():
         if piece.color != victim_color:
             continue
-        v = see(board, sq, not victim_color)
+        if not board.attackers_mask(attacker, sq):
+            continue
+        v = see(board, sq, attacker)
         if v > best:
             best = v
     return best
