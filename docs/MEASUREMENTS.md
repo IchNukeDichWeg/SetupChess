@@ -782,9 +782,39 @@ specific positions and NOT a law about drafting in general. The direction is
 believable because the mechanism is understood; the magnitude and the sigma
 are not transferable.
 
-`campaigns/pool_drafted_field.json` exists for the honest version: five armies,
-so 20 distinct drafted positions per run instead of one. Nothing has been run
-on it yet.
+### The four-column grid, re-measured with the phase played
+
+Five armies, 1,500 pairs, `plan:plan`, so four distinct drafted matchups
+instead of one. The champion's row against the same field as the shipped grid:
+
+```
+opponent            stamped      drafted (plan)
+bot 08-05           0.9513       0.9667 +/- 0.0163
+bot 08-08           0.9884       0.9833 +/- 0.0126
+13 bishops          0.6891       0.3750 +/- 0.0290
+wall                0.8959       0.9250 +/- 0.0243
+worst column        0.6891       0.3750
+```
+
+**Three columns barely move and one collapses.** That is a far more specific
+claim than "drafting changes everything", and a more damaging one. The
+champion's advantage over the two bot armies and the pawn wall survives the
+placement phase intact -- it even improves slightly. Against the 13-bishop
+army, the one a human actually played and beat us with, it falls from a
+comfortable 0.6891 to a LOSS at 0.3750, reproducing the 0.3800 measured on the
+single matchup.
+
+This matters for the shipping decision specifically. v6 was selected by
+MAXIMIN over that row: 0.6891 was the best worst-column any candidate had. The
+worst column is not 0.6891 once the phase is played, it is 0.3750, and it is
+below 0.5, so the champion does not beat its worst opponent at all. Whether
+maximin still selects the same army is unknown -- the other candidates have
+not been re-measured this way.
+
+The effective drafting sample is 4, not 480: both drafters are deterministic,
+so each matchup contributes one position replayed under node jitter, and the
+intervals above are the referee's noise. Four is enough to show the effect is
+column-specific rather than global, which is the claim being made here.
 
 What this invalidates: the four-column grid, every campaign matrix, and the
 maximin argument that shipped v6 -- all of them rank armies under the stamped
