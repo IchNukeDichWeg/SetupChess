@@ -242,6 +242,12 @@ def _modes_for(i, j):
     so an A/B compares one army's drafting policy against a common field while
     the colour swap stays a genuine colour swap.
     """
+    if _DRAFT is None:
+        # Stamped runs have no modes at all, and this is called unconditionally
+        # from play_pair. Returning None here rather than indexing _DRAFT is
+        # what keeps the DEFAULT path working: indexing it crashed every
+        # non-drafted run, which is most of them.
+        return None, None
     a, b = _DRAFT[0], _DRAFT[1]
     return (a if i == 0 else b), (a if j == 0 else b)
 
