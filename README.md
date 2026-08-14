@@ -25,6 +25,33 @@ project never once sampled. That result is measured and stands
 was established and how far it should be trusted, which turns out to be less
 far than the error bars suggest.
 
+> ### Read this before trusting any number below
+>
+> Every payoff in this repo was built by stamping two **finished** armies onto
+> a board. That models simultaneous blind commitment. The real game alternates
+> placements with full information, so the second player can answer what the
+> first has already committed -- which is how the human who beat us won: he
+> stacked two attackers on a bishop he could already see, and took the
+> exchange at handoff.
+>
+> When the placement phase is actually played out (`draft.py`), the shipped
+> champion's score against its worst column goes from **0.6891 +/- 0.0106 to
+> 0.3800 +/- 0.0235**. A comfortable win becomes a loss, about twelve sigma.
+> A drafter that *searches* the placement game (`psearch.py`) recovers half of
+> it, to 0.5038 +/- 0.0266.
+>
+> So the four-column grid, every campaign matrix, and the maximin argument
+> that selected the current champion all rank armies **under a model of the
+> game nobody plays**. They are not being deleted, because they are honest
+> measurements of what they measured and the machinery is reused, but nothing
+> below has been re-derived yet. Treat every number outside this box as
+> describing simultaneous blind play, and see
+> [docs/MEASUREMENTS.md](docs/MEASUREMENTS.md#the-grid-measures-a-game-nobody-plays).
+>
+> The project's centre of gravity has moved with it: from "which 39 points" to
+> **"what is the best reply to what the opponent just placed"**, which is a
+> search problem over the placement tree rather than a search over armies.
+
 Python is the harness. There is a C move generator, used as a cross-check and
 perft oracle rather than to play anything.
 
@@ -554,11 +581,13 @@ so python-chess with the rights stripped is the reference.
 | `docs/BOT_MODEL.md` | chess.com's own bot, decoded from its shipped client: king to a corner on move one, material ignored while drafting |
 | `rules.py` | placement legality, points, FEN emission, validation |
 | `pool.py` | archetype seeds, mutation and crossover operators |
-| `arena.py` | fills the payoff matrix by playing army against army, resumable |
+| `arena.py` | fills the payoff matrix by playing army against army, resumable. `--draft WHITE:BLACK` plays the placement phase instead of stamping two finished armies |
 | `solve.py` | equilibrium mix, best response, exploitability |
 | `expand.py` | the double-oracle pool expansion loop; `--seed-bot` breeds against the modelled opponent |
 | `stats.py` | Elo, confidence intervals, SPRT |
 | `play.py` | the drafting policy: realises an army against an opponent, then hands the position to the engine. `--opponent bot` is chess.com's own setup policy |
+| `psearch.py` | **searches the placement game**: iterative-deepening alpha-beta, leaf = static exchange + agreement with the solved equilibrium. This is the reply-to-what-they-placed engine |
+| `draft.py` | plays the placement phase out between two strategies (`plan` or `search`) and returns the handoff |
 | `match.py` | paired full-game A/B for a drafting change |
 | `duel.py` | engine versus engine over setup positions, for validating a referee |
 | `watchdog.py` | restarts a stalled campaign; expand.py hangs intermittently |
@@ -610,6 +639,24 @@ them scored against each other:
 
 ```bash
 python3 arena.py --out ~/matrix.json --pool ~/armies.json --engine fairy-stockfish --max-pieces 0 --nodes 20000 --pairs 4 --workers 0
+```
+
+**Measure setups that were actually drafted** rather than stamped together --
+the two sides react to each other, and a cell means "these two plans played",
+not "these two armies were glued to a board". Use the SAME mode on both sides
+or a colour-swapped pair also swaps strategies and the matrix cannot be
+antisymmetrised (arena warns).
+
+```bash
+python3 arena.py --out ~/drafted.json --pool ~/armies.json --engine fairy-stockfish --max-pieces 0 --nodes 20000 --pairs 100 --draft search:search --draft-depth 1 --workers 0
+```
+
+**Ask what to place next in a live game**, searching the placement tree under a
+wall clock. Each depth prints as it lands, so there is always a move even if
+the budget runs out -- chess.com forfeits at roughly 20 seconds.
+
+```bash
+python3 relay.py --color white --search --budget 3 @Bb2 @Qd8
 ```
 
 **A/B a drafting change** over full games, paired so the opponent and colour
