@@ -198,7 +198,7 @@ def game_nodes(base, jitter, i, j, g, color):
     return max(1, int(base * (1.0 + rng.uniform(-jitter, jitter))))
 
 
-def play_game(white_army, black_army, engine, nodes):
+def play_game(white_army, black_army, engine, nodes, modes=None):
     """Returns White's score, the ply count, and whether it was truncated.
 
     A game stopped at PLY_LIMIT scores 0.5, which is indistinguishable from a
@@ -212,7 +212,8 @@ def play_game(white_army, black_army, engine, nodes):
         # The armies REACT to each other instead of being stamped onto a board,
         # so the position is not known until the phase has been played -- and
         # the setup itself can end the game before any engine move.
-        wm, bm, depth, width, _scale, _pst = _DRAFT
+        _a, _b, depth, width, _scale, _pst = _DRAFT
+        wm, bm = modes
         fen, result = draft.handoff(white_army, black_army, wm, bm, depth, width)
         if result is not None:
             score = {"1-0": 1.0, "0-1": 0.0}.get(result, 0.5)
@@ -234,6 +235,17 @@ def play_game(white_army, black_army, engine, nodes):
     return (1.0 if outcome.winner == chess.WHITE else 0.0), board.ply(), cut
 
 
+def _modes_for(i, j):
+    """Draft mode of army i and of army j.
+
+    `--draft A:B` means pool army 0 drafts with A and every other army with B,
+    so an A/B compares one army's drafting policy against a common field while
+    the colour swap stays a genuine colour swap.
+    """
+    a, b = _DRAFT[0], _DRAFT[1]
+    return (a if i == 0 else b), (a if j == 0 else b)
+
+
 def play_pair(ai, aj, nodes, jitter, i, j, g):
     """Both colours of one matchup. Returns the two scores from ai's side.
 
@@ -246,10 +258,18 @@ def play_pair(ai, aj, nodes, jitter, i, j, g):
             if not ok:
                 raise Unplayable(why)
     engine = _worker_engine()
+    # Modes attach to the ARMY, not the colour. Attaching them to colour made
+    # the second game of a pair swap STRATEGIES as well as sides, so it was not
+    # a colour swap at all: with search on White both times, "army i vs army j"
+    # and "army j vs army i" were the same drafted game, the pool was ignored
+    # entirely, and every cell came out 0.5 by construction.
+    mi, mj = _modes_for(i, j)
     w, ply_w, cut_w = play_game(ai, aj, engine,
-                                game_nodes(nodes, jitter, i, j, g, 0))
+                                game_nodes(nodes, jitter, i, j, g, 0),
+                                (mi, mj))
     b, ply_b, cut_b = play_game(aj, ai, engine,
-                                game_nodes(nodes, jitter, i, j, g, 1))
+                                game_nodes(nodes, jitter, i, j, g, 1),
+                                (mj, mi))
     return (w, 1.0 - b), int(cut_w) + int(cut_b)
 
 
@@ -432,6 +452,14 @@ def main():
               "width %d, army-scale %g, pst-scale %g)"
               % (parts[0], parts[1], args.draft_depth, args.draft_width,
                  scale, pst))
+        if parts[0] == parts[1] and parts[0] == "search":
+            print("  WARNING: search on BOTH sides ignores the pool entirely. "
+                  "A searching drafter builds from the position, not from its "
+                  "nominal army, so every cell drafts the same two armies and "
+                  "the matrix measures the search against itself rather than "
+                  "anything about these setups. Measured: three different "
+                  "matchups produced identical drafted armies. Use "
+                  "search:plan to A/B a drafting policy against a fixed field.")
         if parts[0] != parts[1]:
             # play_pair swaps the ARMIES between the two games of a pair, not
             # the modes, so with different modes the second game is not a
@@ -439,10 +467,9 @@ def main():
             # antisymmetry diagnostic below is meaningless then (measured:
             # search:plan gave P[i][j]+P[j][i] = 1.083 where plan:plan gave
             # exactly 1.000), and the matrix cannot be antisymmetrised.
-            print("  WARNING: modes differ, so a colour-swapped pair also "
-                  "swaps strategies. The P[i][j]+P[j][i] check below does NOT "
-                  "apply and this matrix must not be antisymmetrised. Use the "
-                  "same mode on both sides to measure armies.")
+            print("  modes differ: army 0 drafts with %s, every other army "
+                  "with %s. Modes follow the ARMY through the colour swap, so "
+                  "the pair is still a genuine swap." % (parts[0], parts[1]))
 
     meta = {"n": n, "nodes": args.nodes, "jitter": args.jitter,
             "pairs": args.pairs, "engine": os.path.basename(args.engine),
