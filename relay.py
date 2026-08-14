@@ -143,6 +143,13 @@ def main():
             print("  depth %d  %s%s  %+d  (%.1fs)"
                   % (depth, chess.piece_symbol(pt).upper(),
                      chess.square_name(sq), score, time.time() - t0))
+        if pt is None:
+            # A budget too tight to finish even depth 1 leaves search()
+            # yielding nothing. Printing a traceback here costs the game --
+            # this runs under a ~20 second forfeit clock -- so fall back to
+            # the 1-ply best, which is what psearch.best does.
+            pt, sq = psearch.best(state, us, max_depth=1, width=args.width)
+            print("  (budget too short for depth 1; 1-ply fallback)")
     else:
         pt, sq = drafter.choose(state)
     print("PLACE @%s%s" % (chess.piece_symbol(pt).upper(), chess.square_name(sq)))

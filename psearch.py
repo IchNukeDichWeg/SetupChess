@@ -210,9 +210,9 @@ def leaf(state, us, plan=None):
     Two terms. EXCHANGES: what either side can win by capturing at handoff.
     Raw material does not appear -- both sides get the same 39 points, so
     committed plus still-affordable is a constant per side and cancels.
-    ARMY QUALITY: how much measured equilibrium weight sits on the squares each
-    side has actually used, which is what stops the search from playing
-    arbitrarily while the board is still empty.
+    AGREEMENT: how much of each side's placed material an equilibrium army
+    would also have placed (see agreement()), which is what stops the search
+    playing arbitrarily while the board is still empty.
 
     ponytail: the WORST single exchange per side, not the sum of all of them.
     Only one capture can actually be played first, so summing would double-count
@@ -355,10 +355,24 @@ def search(state, us, max_depth=MAX_DEPTH, width=BEAM_WIDTH, plan=None,
 
 def best(state, us, max_depth=MAX_DEPTH, width=BEAM_WIDTH, plan=None,
          budget=None):
-    """Deepest placement within the budget. Convenience over search()."""
+    """Deepest placement within the budget. Convenience over search().
+
+    Never returns None. A budget tight enough to abort during depth 1 leaves
+    search() yielding nothing, and callers place() whatever comes back, so a
+    None here is a crash in the caller rather than a slow move. Fall back to
+    the best placement by the 1-ply score, which costs one _ordered pass.
+    """
     move = None
     for _, move, _ in search(state, us, max_depth, width, plan, budget):
         pass
+    if move is None:
+        if plan is None:
+            plan = default_plan()
+        fallback = _ordered(state, us, 1, plan)
+        if not fallback:
+            raise ValueError("no legal placement for %s"
+                             % chess.COLOR_NAMES[us])
+        move = fallback[0]
     return move
 
 
@@ -412,6 +426,14 @@ def _selfcheck():
                                      plan=bare)
             if mv in set(st2.legal_placements())]
     assert seen == [1, 2, 3], seen
+
+    # A budget too tight to finish depth 1 must still yield a legal placement,
+    # not None: draft.py places whatever best() returns.
+    st_tight = rules.SetupState()
+    mv = best(st_tight, chess.WHITE, max_depth=4, width=8, plan=bare,
+              budget=1e-9)
+    assert mv is not None, "best() returned None under an impossible budget"
+    assert mv in set(st_tight.legal_placements()), mv
 
     # make/unmake must leave the state byte-identical.
     st3 = rules.SetupState()
