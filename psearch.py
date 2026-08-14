@@ -27,9 +27,17 @@ Raw material does not appear -- both sides spend the same 39 points, so
 committed-plus-remaining is a constant and cancels.
 """
 
+import time
+
 import chess
 
 import rules
+
+
+class _Timeout(Exception):
+    """Deadline hit mid-depth. The partial result is discarded: an aborted
+    depth has searched only some of its root moves, so its 'best' is whatever
+    happened to be examined first, not a better answer than the depth below."""
 
 # Centipawns. KING is a stand-in for "never worth trading" -- a king capture
 # cannot actually happen (rules.py ends the setup on mate), so this only has
@@ -266,7 +274,9 @@ def _ordered(state, us, width, plan):
     return [(pt, sq) for _, pt, sq in scored[:width]]
 
 
-def _ab(state, us, depth, alpha, beta, width, plan):
+def _ab(state, us, depth, alpha, beta, width, plan, deadline=None):
+    if deadline is not None and time.monotonic() > deadline:
+        raise _Timeout
     s = _terminal(state, us)
     if s is not None:
         return s
@@ -282,7 +292,8 @@ def _ab(state, us, depth, alpha, beta, width, plan):
     for pt, sq in moves:
         snap = _make(state, pt, sq)
         try:
-            v = _ab(state, us, depth - 1, alpha, beta, width, plan)
+            v = _ab(state, us, depth - 1, alpha, beta, width, plan,
+                    deadline)
         finally:
             _unmake(state, sq, snap)
         if maximising:
@@ -300,7 +311,8 @@ def _ab(state, us, depth, alpha, beta, width, plan):
     return best
 
 
-def search(state, us, max_depth=MAX_DEPTH, width=BEAM_WIDTH, plan=None):
+def search(state, us, max_depth=MAX_DEPTH, width=BEAM_WIDTH, plan=None,
+           budget=None):
     """Yield (depth, (piece_type, square), score) once per completed depth.
 
     A generator so the caller owns the budget: break out on a clock, after a
@@ -316,15 +328,19 @@ def search(state, us, max_depth=MAX_DEPTH, width=BEAM_WIDTH, plan=None):
     if not root:
         raise ValueError("no legal placement for %s" % chess.COLOR_NAMES[us])
 
+    deadline = (time.monotonic() + budget) if budget else None
     for depth in range(1, max_depth + 1):
         best, best_score = None, -MATE_SCORE * 2
         alpha = -MATE_SCORE * 2
         for pt, sq in root:
             snap = _make(state, pt, sq)
             try:
-                v = _ab(state, us, depth - 1, alpha, MATE_SCORE * 2, width, plan)
-            finally:
+                v = _ab(state, us, depth - 1, alpha, MATE_SCORE * 2, width,
+                        plan, deadline)
+            except _Timeout:
                 _unmake(state, sq, snap)
+                return          # discard this depth, keep what was yielded
+            _unmake(state, sq, snap)
             if v > best_score:
                 best, best_score = (pt, sq), v
                 if v > alpha:
@@ -337,10 +353,11 @@ def search(state, us, max_depth=MAX_DEPTH, width=BEAM_WIDTH, plan=None):
             return
 
 
-def best(state, us, max_depth=MAX_DEPTH, width=BEAM_WIDTH, plan=None):
+def best(state, us, max_depth=MAX_DEPTH, width=BEAM_WIDTH, plan=None,
+         budget=None):
     """Deepest placement within the budget. Convenience over search()."""
     move = None
-    for _, move, _ in search(state, us, max_depth, width, plan):
+    for _, move, _ in search(state, us, max_depth, width, plan, budget):
         pass
     return move
 

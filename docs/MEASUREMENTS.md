@@ -690,6 +690,57 @@ raised, and `match.py` discarded a won game as an engine error.
 **`HUNT_WHEN` is left at 6.** Changing it needs an A/B over the real-opponent
 field, not a second guess off four hand-written styles. That is owed.
 
+## The grid measures a game nobody plays
+
+Every payoff in this repo up to here was built by `rules.setup_fen`, which
+stamps two finished armies onto an empty board. That models simultaneous blind
+commitment. Setup Chess is not that: placement ALTERNATES with full
+information, so the second player can answer what the first has already put
+down. A real opponent did exactly that -- stacked two attackers on a defended
+bishop and took the exchange at handoff.
+
+`draft.py` plays the phase instead. Same matchup, same instrument
+(fairy-stockfish, 20,000 nodes), shipped champion `66fd725f` against the
+13-bishop army `c52ed944` that is its worst column:
+
+```
+model                          score           pair-games
+stamped, from the shipped grid 0.6891 +/- 0.0106   400
+stamped, re-run here           0.7026 +/- 0.0277    95
+DRAFTED, plan vs plan          0.3800 +/- 0.0235   200
+DRAFTED, search vs search      0.5038 +/- 0.0266   200
+```
+
+**A comfortable win becomes a loss.** The re-run reproduces the grid, so the
+gap is the model and not the wiring. 0.70 to 0.38 is roughly twelve sigma; no
+sample size argument touches it.
+
+Read the drafted rows carefully, because they are NOT the same matchup and
+mislabelling them would be the easiest mistake here:
+
+- Unopposed, the plan drafter builds 13 bishops exactly (`c52ed944`). Under
+  interaction it does not: it goes off-plan twice and ends on `1P 11B 1R`.
+  The cause is not check -- there are none -- it is `_safe_placements`
+  declining squares that would let the opponent mate during setup.
+- So a drafted cell means "champion PLAN against 13-bishop PLAN", not
+  "champion against 13 bishops". The armies are outputs now, not inputs.
+- Who moves first is derived from placement order rather than assigned to
+  White by convention. Pair antisymmetry still holds exactly (1.0000) under
+  matched modes, so this cancels within a pair and is not the explanation.
+
+**The searching drafter recovers half the gap**, 0.3800 to 0.5038, which is
+the first evidence that answering the opponent is worth anything. It is not a
+clean win: at depth 1 the search still left 600cp hanging in a sampled setup,
+and depth is what it cannot afford yet.
+
+What this invalidates: the four-column grid, every campaign matrix, and the
+maximin argument that shipped v6 -- all of them rank armies under the stamped
+model. What it does NOT invalidate: that the armies are legal, that the
+engines played them, or the basin result below, which is a statement about
+where the search converges rather than about any single cell. Nothing has been
+re-derived yet, and until it is, treat every number above this section as
+describing simultaneous blind play.
+
 ## The basin experiment: bishops are the answer BECAUSE massed bishops exist
 
 v7 asked whether six campaigns agreeing on eleven bishops meant "best army"

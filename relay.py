@@ -47,6 +47,12 @@ import play
 import rules
 
 
+def psearch_max_depth():
+    """Imported lazily: psearch loads the pool, which relay does not always need."""
+    import psearch
+    return psearch.MAX_DEPTH
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -56,6 +62,17 @@ def main():
     ap.add_argument("--seed", type=int, default=2026,
                     help="MUST be the same every turn of one game")
     ap.add_argument("--no-mix", dest="mix", action="store_false", default=play.MIX)
+    ap.add_argument("--search", action="store_true",
+                    help="search the placement game instead of following a "
+                         "pre-chosen army (see psearch.py). Answers what the "
+                         "opponent has actually placed.")
+    ap.add_argument("--budget", type=float, default=3.0,
+                    help="seconds to search before playing (default 3, "
+                         "checked between depths)")
+    ap.add_argument("--depth", type=int, default=psearch_max_depth(),
+                    help="maximum search depth (default %d)" % psearch_max_depth())
+    ap.add_argument("--width", type=int, default=8,
+                    help="beam width per ply (default 8)")
     ap.add_argument("moves", nargs="*", help="every placement so far, in order")
     args = ap.parse_args()
 
@@ -106,7 +123,28 @@ def main():
         print("their legal replies: %d" % len(state.legal_placements()))
         return
 
-    pt, sq = drafter.choose(state)
+    if args.search:
+        # Iterative deepening under a wall clock: print each depth as it lands
+        # so there is always a move to play even if the budget runs out mid
+        # search, which is the whole reason the ~20 second forfeit window is
+        # survivable at all. The deadline is enforced INSIDE the search, so an
+        # overrunning depth is abandoned rather than finished: checking only
+        # between depths turned a 3s budget into a 7.7s answer.
+        import time
+
+        import psearch
+        pt = sq = None
+        t0 = time.time()
+        for depth, move, score in psearch.search(state, us,
+                                                 max_depth=args.depth,
+                                                 width=args.width,
+                                                 budget=args.budget):
+            pt, sq = move
+            print("  depth %d  %s%s  %+d  (%.1fs)"
+                  % (depth, chess.piece_symbol(pt).upper(),
+                     chess.square_name(sq), score, time.time() - t0))
+    else:
+        pt, sq = drafter.choose(state)
     print("PLACE @%s%s" % (chess.piece_symbol(pt).upper(), chess.square_name(sq)))
     print("  our points left after this: %d"
           % (state.points[us] - rules.PIECE_COST[pt]))
