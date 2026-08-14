@@ -85,15 +85,16 @@ def play_setup(white_army, black_army, white_mode="plan", black_mode="plan",
             raise Stuck("no legal placement for %s with %d points left"
                         % (chess.COLOR_NAMES[state.turn],
                            state.points[state.turn]))
-        mover = state.turn
-        pt, sq = pick[mover](state)
+        # NO "0 points and still to move" GUARD HERE. There was one, and it
+        # was wrong: the king costs 0 (rules.PIECE_COST), and rules.done()
+        # returns False for a kingless side, so a player with 0 points who
+        # still owes their king legitimately keeps the move and places it for
+        # free. That is a normal end to a draft, not a spin -- it raised on 10
+        # of 25 matchups in the drafted field and killed a campaign mid-run.
+        # The real stuck case is "no legal placement", which the top of this
+        # loop already raises on, and MAX_PLACEMENTS bounds the rest.
+        pt, sq = pick[state.turn](state)
         state.place(pt, sq)
-        if state.turn == mover and state.points[mover] == 0 and not state.complete:
-            # place() hands the turn back when the other side is done. That is
-            # legal, but a side with nothing left to spend and the move would
-            # spin here forever.
-            raise Stuck("%s has the move with 0 points and an incomplete setup"
-                        % chess.COLOR_NAMES[mover])
     raise Stuck("setup did not finish in %d placements" % MAX_PLACEMENTS)
 
 
@@ -160,6 +161,25 @@ def _selfcheck():
     built = {(p.piece_type, sq) for sq, p in st.board.piece_map().items()
              if p.color == chess.WHITE}
     assert built != set(a), "search mode reproduced the target army exactly"
+
+    # REGRESSION. A side with 0 points that still owes its FREE king keeps the
+    # move legitimately, and a guard here used to call that stuck: it raised on
+    # 10 of 25 matchups in the drafted field and killed a campaign 50 pairs in.
+    # Walk the whole field, because the single-matchup selfchecks above all
+    # missed it.
+    import json
+    import os
+    field_path = "campaigns/pool_drafted_field.json"
+    if os.path.exists(field_path):
+        with open(field_path) as fh:
+            field = [[tuple(x) for x in army] for army in json.load(fh)]
+        for i, ai in enumerate(field):
+            for j, aj in enumerate(field):
+                st = play_setup(ai, aj, "search", "plan", depth=1, width=6)
+                if st.result is None:
+                    assert st.complete, "(%d,%d) returned incomplete" % (i, j)
+                    ok, why = rules.validate_fen(st.handoff_fen())
+                    assert ok, "(%d,%d) %s" % (i, j, why)
 
     # Bad mode is rejected before any work happens.
     try:
