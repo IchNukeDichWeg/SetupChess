@@ -63,11 +63,54 @@ def main():
     ap.add_argument("matrix")
     ap.add_argument("--row", type=int, default=0, help="army index (default 0)")
     ap.add_argument("--vs", help="second matrix to pair against, cell by cell")
+    ap.add_argument("--maximin", metavar="I,J,K",
+                    help="rank EVERY other army by its worst score against "
+                         "these columns. This is the shipping rule: the army "
+                         "with the best worst column wins, and dominance "
+                         "breaks ties.")
     args = ap.parse_args()
 
     cells, meta = load(args.matrix)
     n = len(meta.get("armies", [])) or (max(max(k[0], k[1])
                                             for k in cells) + 1)
+
+    if args.maximin:
+        field = [int(x) for x in args.maximin.split(",")]
+        fps = meta.get("armies", [])
+        draft = meta.get("draft")
+        print("%s  maximin over columns %s  %s"
+              % (args.matrix, field,
+                 ("drafted %s" % draft[:2]) if draft else "stamped"))
+        table = []
+        for i in range(n):
+            if i in field:
+                continue
+            ri = row(cells, n, i)
+            got = {j: ci(ri[j]) for j in field if j in ri}
+            if len(got) != len(field):
+                continue          # incomplete row, cannot be ranked honestly
+            worst = min(m for m, _ in got.values())
+            table.append((worst, i, got))
+        if not table:
+            raise SystemExit("no army has a complete row over %s" % field)
+        table.sort(reverse=True)
+        head = "  %-4s %-18s" % ("army", "fingerprint")
+        print(head + "".join("  vs %-9d" % j for j in field) + "  WORST")
+        for worst, i, got in table:
+            fp = fps[i][:16] if i < len(fps) else ""
+            print("  %-4d %-18s" % (i, fp)
+                  + "".join("  %.4f     " % got[j][0] for j in field)
+                  + "  %.4f" % worst)
+        best = table[0]
+        print()
+        print("  maximin pick: army %d, worst column %.4f" % (best[1], best[0]))
+        if best[0] < 0.5:
+            print("  NOTE: below 0.5 -- the best available army still LOSES to "
+                  "its worst opponent.")
+        print("  effective drafting sample: %d matchups (deterministic drafters "
+              "give one position each)" % (len(table) * len(field)))
+        return
+
     r = row(cells, n, args.row)
     if not r:
         raise SystemExit("no cells for row %d in %s" % (args.row, args.matrix))
