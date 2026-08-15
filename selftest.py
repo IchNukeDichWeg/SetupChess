@@ -381,12 +381,38 @@ def test_mix_default():
     # a constant, so every seed built the same army. Assert what reaches the
     # board, not what the sampler returned.
     shipped_pool, shipped_matrix = play.load_pool(play.DEFAULT_POOL)
+
+    # CONTRACT CHANGE, deliberate. The shipped champion now carries an EMPTY
+    # support, so mixing falls through to the fixed army. v6's support was
+    # selected under the stamped model; measured with the placement phase
+    # played out, that mixture draws the shipped champion only 13.8% of the
+    # time and otherwise draws armies whose worst column is 0.39 to 0.45,
+    # against the champion's 0.5767 -- so mixing would hand back most of the
+    # gain. Re-deriving a mixing distribution under drafted play is owed; see
+    # campaigns/champion_drafted.json's meta.
+    with open(play.DEFAULT_TARGET) as f:
+        if json.load(f).get("support"):
+            fail("the shipped champion carries a support again: either mixing "
+                 "was re-derived under DRAFTED measurement, in which case "
+                 "update this test and champion_drafted.json's meta, or a "
+                 "stamped-era support has been reintroduced")
+    if play.sample_target(play.DEFAULT_TARGET, shipped_pool,
+                          random.Random(0)) is not None:
+        fail("sample_target returned an army for a support-less champion")
+
+    # The mechanism still has to be pinned, or turning mixing off for the
+    # shipped champion would quietly delete the regression this test exists
+    # for: a draw that the drafter discards on its first placement, because
+    # _retarget runs on the empty board where the best response is a constant.
+    # Exercise it on a champion that DOES carry a support.
+    mix_pool, mix_matrix = play.load_pool("campaigns/expand_v6.json")
     built = set()
     for s in range(12):
-        tgt = play.sample_target(play.DEFAULT_TARGET, shipped_pool,
+        tgt = play.sample_target("campaigns/champion_v6.json", mix_pool,
                                  random.Random(s))
-        d = play.Drafter(tgt, chess.WHITE, pool=shipped_pool,
-                         matrix=shipped_matrix)
+        if tgt is None:
+            fail("champion_v6 lost its support; this test needs one")
+        d = play.Drafter(tgt, chess.WHITE, pool=mix_pool, matrix=mix_matrix)
         d.choose(rules.SetupState())
         built.add(tuple(sorted(d.target)))
     if len(built) < 2:
@@ -414,10 +440,11 @@ def test_mix_default():
     if not d.retargets:
         fail("re-targeting never fired after the opponent revealed 6 pieces")
 
-    print("PASS: mixing is on by default, draws %d distinct legal in-pool "
-          "armies from the support, BUILDS %d distinct armies through the "
-          "drafter, re-targeting still fires once they reveal, and --no-mix "
-          "turns it off" % (len(drawn), len(built)))
+    print("PASS: mixing is on by default and draws %d distinct legal in-pool "
+          "armies, BUILDS %d distinct armies through the drafter, re-targeting "
+          "fires once they reveal, --no-mix turns it off, and the SHIPPED "
+          "champion deliberately carries no support so it plays fixed"
+          % (len(drawn), len(built)))
 
 
 def test_ply_limit_reported():

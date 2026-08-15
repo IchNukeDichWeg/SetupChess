@@ -782,6 +782,60 @@ specific positions and NOT a law about drafting in general. The direction is
 believable because the mechanism is understood; the magnitude and the sigma
 are not transferable.
 
+### The answer was in the pool; the stamped grid picked the wrong member
+
+33 armies, 1,089 cells, 75 pairs each -- 163,350 games, 0 errors, diagonal
+0.4998 and pair symmetry 1.0002. 29 candidates (every v6 and v7 support army,
+all six past champions, the hand-written archetypes) ranked by worst column
+against the four real opponents, with the placement phase played out.
+
+```
+idx  vs bot1  vs bot2  vs 13B   vs wall  WORST   what it is
+ 4   0.9983   0.9883   0.5767   0.9400   0.5767  v6 support, 6P 11B, Ke1
+ 7   0.9950   0.9917   0.5533   0.9117   0.5533  v6 support, 6P 11B, Kf1
+ 8   0.9817   0.9650   0.5150   0.9200   0.5150  v6 support, 3P 12B
+11   0.8483   0.9083   0.5067   0.9383   0.5067  champion v2, 3P 9B 1Q
+ 5   0.9650   0.9900   0.3917   0.9350   0.3917  SHIPPED v6 -- 13th
+ 9   0.9967   0.9967   0.0517   0.9483   0.0517  v7 queen army
+```
+
+**Four armies beat all four real opponents. The shipped champion is not one of
+them**, and it ranks 13th of 29. The registered prediction that ~15% of the
+time anything would clear 0.5 on the 13-bishop column was too pessimistic:
+four did.
+
+The new pick, `1a6aa81575387e54`, was in the v6 pool the whole time. It has the
+SAME composition as the shipped champion (6P 11B) and the same king square, and
+differs in the placement of three pieces out of eighteen. That is the whole gap
+between losing to thirteen bishops at 0.3917 and beating them at 0.5767, and it
+beats the shipped champion head to head at **0.7167 +/- 0.0165**.
+
+So the stamped grid was not wrong about bishops, or about the pool. It was
+wrong about WHICH member of its own pool to ship, because the quantity it
+ranked on -- performance from a position where neither side could answer the
+other -- is not the quantity that decides a real game. The v7 queen army is the
+sharpest illustration: 0.9967 and 0.9967 against both bot armies, and 0.0517
+against thirteen bishops.
+
+**The equilibrium disagrees with maximin, and the disagreement is informative.**
+Solved over the full 33-army matrix, exploitability 0.0000:
+
+```
+76.41%  setup 11   champion v2, 3P 9B 1Q
+14.36%  setup  7   v6 support, 6P 11B
+ 9.23%  setup  4   v6 support, 6P 11B  <- the maximin pick
+```
+
+These answer different questions and both are honest. Maximin asks what
+survives the worst REAL opponent; the equilibrium asks what is unexploitable
+against the whole 33-army field, most of which nobody plays. The old v2
+champion carrying 76% of an unexploitable mix while ranking fourth on maximin
+says it is broadly solid and specifically vulnerable. Shipping follows maximin,
+because the field that matters is the one people actually play.
+
+Effective drafting sample is 116 matchups for the ranking (29 candidates x 4
+opponents), against the 4 behind every drafted number measured before it.
+
 ### The placement search: REJECTED as an army builder
 
 Same field, same opponents, same game indices; the only change is whether the

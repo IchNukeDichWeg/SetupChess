@@ -25,6 +25,14 @@ project never once sampled. That result is measured and stands
 was established and how far it should be trusted, which turns out to be less
 far than the error bars suggest.
 
+**The shipping army changed on 2026-08-15**, to `1a6aa81575387e54`, after the
+placement phase was measured properly for the first time. It is still eleven
+bishops and six pawns, still king e1, and differs from the previous champion in
+the placement of three pieces out of eighteen -- which is the whole difference
+between losing to thirteen bishops at 0.3917 and beating them at 0.5767. It was
+in the pool the entire time; the old measurement simply ranked the wrong member
+of it.
+
 > ### Read this before trusting any number below
 >
 > Every payoff in this repo was built by stamping two **finished** armies onto
@@ -40,9 +48,13 @@ far than the error bars suggest.
 >
 > Measured across a four-opponent field, the collapse is **one column**, not
 > the whole grid: the champion holds against both bot armies and the pawn wall
-> and loses only to the 13-bishop army a human actually beat us with. That is
-> also the column maximin selected v6 on, at 0.6891; played out it is 0.3750,
-> below 0.5, so the shipped army does not beat its worst opponent.
+> and loses only to the 13-bishop army a human actually beat us with.
+>
+> Re-ranking all 29 candidates that way (33 armies, 163,350 games) changed the
+> shipping decision. **Four armies beat all four real opponents; the previously
+> shipped champion was 13th of 29** at 0.3917. The new pick clears its worst
+> column at **0.5767** and beats the old champion head to head at 0.7167 +/-
+> 0.0165.
 >
 > **Searching the placement game is REJECTED**: -0.1125 +/- 0.0200 paired
 > against simply following the plan, and worst on the column that mattered

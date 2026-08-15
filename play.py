@@ -183,7 +183,14 @@ OPTIONALITY = False
 MIX = True
 
 DEFAULT_POOL = "campaigns/expand_v6.json"
-DEFAULT_TARGET = "campaigns/champion_v6.json"
+# The first champion chosen under DRAFTED measurement, where the placement
+# phase is actually played rather than two finished armies being stamped onto
+# a board. It was already in the v6 pool -- the stamped grid simply picked the
+# wrong member of it. Against the four real opponents its worst column is
+# 0.5767 where champion_v6's is 0.3917, and it beats champion_v6 head to head
+# 0.7167 +/- 0.0165. Same composition, same king square, three pieces moved.
+# See docs/MEASUREMENTS.md.
+DEFAULT_TARGET = "campaigns/champion_drafted.json"
 
 
 def sample_target(champion_path, armies, rng):

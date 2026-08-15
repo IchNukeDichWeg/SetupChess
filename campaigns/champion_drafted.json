@@ -1,0 +1,96 @@
+{
+ "army": [
+  [
+   6,
+   4
+  ],
+  [
+   3,
+   9
+  ],
+  [
+   1,
+   12
+  ],
+  [
+   1,
+   13
+  ],
+  [
+   1,
+   14
+  ],
+  [
+   3,
+   8
+  ],
+  [
+   3,
+   0
+  ],
+  [
+   3,
+   1
+  ],
+  [
+   3,
+   2
+  ],
+  [
+   3,
+   3
+  ],
+  [
+   3,
+   16
+  ],
+  [
+   3,
+   17
+  ],
+  [
+   3,
+   21
+  ],
+  [
+   3,
+   19
+  ],
+  [
+   3,
+   20
+  ],
+  [
+   1,
+   15
+  ],
+  [
+   1,
+   11
+  ],
+  [
+   1,
+   22
+  ]
+ ],
+ "support": {},
+ "meta": {
+  "from": "campaigns/pool_maximin_wide.json",
+  "index": 4,
+  "fingerprint": "1a6aa81575387e54",
+  "engine": "fairy-stockfish",
+  "max_pieces": 0,
+  "measurement": "DRAFTED (arena --draft plan:plan): the placement phase is played out, not stamped from two finished armies",
+  "chosen_by": "best worst column over the four real opponents, 0.5767",
+  "columns": {
+   "bot 08-05": 0.9983,
+   "bot 08-08": 0.9883,
+   "13 bishops": 0.5767,
+   "wall": 0.94
+  },
+  "vs_champion_v6": "0.7167 +/- 0.0165 head to head",
+  "replaces": "campaigns/champion_v6.json (66fd725f21948911, worst column 0.3917 drafted, ranked 13th of 29)",
+  "note": "same composition (6P 11B) and king square as champion_v6; three of eighteen pieces are placed differently",
+  "campaign": "campaigns/maximin_wide.json, 1089 cells x 75 pairs, 163350 games, 0 errors"
+ }
+}
