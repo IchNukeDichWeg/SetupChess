@@ -47,6 +47,13 @@ VALUE = {chess.PAWN: 100, chess.KNIGHT: 300, chess.BISHOP: 300,
 
 MATE_SCORE = 100000
 
+# A score this close to MATE_SCORE is a mate rather than a big evaluation.
+# Mate scores are reduced by the ply they were found at, so the check has to
+# be a window rather than equality; ply never exceeds the search depth, so
+# anything comfortably above MAX_DEPTH does. (MAX_PLY in cuci.py is the C
+# core's unrelated search limit -- do not reuse it here.)
+MATE_WINDOW = 128
+
 # Placement branching is enormous: six piece types times up to ~24 squares is
 # several hundred moves at the root, where ordinary chess has ~35. A full-width
 # search is hopeless, so each ply keeps only the BEAM_WIDTH best-looking
@@ -276,14 +283,23 @@ def leaf(state, us, plan=None):
     return score
 
 
-def _terminal(state, us):
-    """Score if the setup has already been decided, else None."""
+def _terminal(state, us, ply=0):
+    """Score if the setup has already been decided, else None.
+
+    Mate scores are DEPTH-ADJUSTED by `ply`, the distance from the root. Every
+    mate used to score exactly MATE_SCORE however far away it was, which left
+    the search indifferent between winning now and winning in three more
+    placements -- and, worse, indifferent between losing now and losing later,
+    so a lost position had no reason to put up resistance. Subtracting the ply
+    makes the nearest win and the furthest loss the best-scoring ones.
+    """
     if state.result is None:
         return None
     if state.result == "1/2-1/2":
         return 0
     winner = chess.WHITE if state.result == "1-0" else chess.BLACK
-    return MATE_SCORE if winner == us else -MATE_SCORE
+    score = MATE_SCORE - ply
+    return score if winner == us else -score
 
 
 def _make(state, pt, sq):
@@ -303,12 +319,12 @@ def _unmake(state, sq, snap):
      state.result) = snap
 
 
-def _ordered(state, us, width, plan):
+def _ordered(state, us, width, plan, ply=1):
     """The `width` most promising placements, best first, by a 1-ply score."""
     scored = []
     for pt, sq in state.legal_placements():
         snap = _make(state, pt, sq)
-        s = _terminal(state, us)
+        s = _terminal(state, us, ply)
         if s is None:
             s = leaf(state, us, plan)
         _unmake(state, sq, snap)
@@ -319,16 +335,16 @@ def _ordered(state, us, width, plan):
     return [(pt, sq) for _, pt, sq in scored[:width]]
 
 
-def _ab(state, us, depth, alpha, beta, width, plan, deadline=None):
+def _ab(state, us, depth, alpha, beta, width, plan, deadline=None, ply=0):
     if deadline is not None and time.monotonic() > deadline:
         raise _Timeout
-    s = _terminal(state, us)
+    s = _terminal(state, us, ply)
     if s is not None:
         return s
     if depth == 0 or state.complete:
         return leaf(state, us, plan)
 
-    moves = _ordered(state, us, width, plan)
+    moves = _ordered(state, us, width, plan, ply + 1)
     if not moves:
         return leaf(state, us, plan)
 
@@ -338,7 +354,7 @@ def _ab(state, us, depth, alpha, beta, width, plan, deadline=None):
         snap = _make(state, pt, sq)
         try:
             v = _ab(state, us, depth - 1, alpha, beta, width, plan,
-                    deadline)
+                    deadline, ply + 1)
         finally:
             _unmake(state, sq, snap)
         if maximising:
@@ -360,16 +376,18 @@ def search(state, us, max_depth=MAX_DEPTH, width=BEAM_WIDTH, plan=None,
            budget=None):
     """Yield (depth, (piece_type, square), score) once per completed depth.
 
-    A generator so the caller owns the budget: break out on a clock, after a
-    depth, or when the move stops changing. Nothing here reads a timer, which
-    keeps the same code usable for a 3-second live placement and an overnight
-    analysis.
+    A generator so the caller owns the pacing: break out after a depth, or
+    when the move stops changing. `budget` seconds, when given, is enforced
+    INSIDE the tree -- an overrunning depth is abandoned and its partial result
+    discarded, since an aborted depth has only examined the root moves it
+    happened to reach. The same code serves a 3-second live placement and an
+    overnight analysis; only `budget` differs.
     """
     if state.turn != us:
         raise ValueError("not %s to place" % chess.COLOR_NAMES[us])
     if plan is None:
         plan = default_plan()
-    root = _ordered(state, us, width, plan)
+    root = _ordered(state, us, width, plan, 1)
     if not root:
         raise ValueError("no legal placement for %s" % chess.COLOR_NAMES[us])
 
@@ -381,7 +399,7 @@ def search(state, us, max_depth=MAX_DEPTH, width=BEAM_WIDTH, plan=None,
             snap = _make(state, pt, sq)
             try:
                 v = _ab(state, us, depth - 1, alpha, MATE_SCORE * 2, width,
-                        plan, deadline)
+                        plan, deadline, 1)
             except _Timeout:
                 _unmake(state, sq, snap)
                 return          # discard this depth, keep what was yielded
@@ -394,7 +412,8 @@ def search(state, us, max_depth=MAX_DEPTH, width=BEAM_WIDTH, plan=None,
         # best, which is what makes the alpha-beta cutoffs pay.
         root.sort(key=lambda m: m == best, reverse=True)
         yield depth, best, best_score
-        if abs(best_score) == MATE_SCORE:
+        # depth-adjusted, so a mate is anything within MAX_PLY of the top
+        if abs(best_score) >= MATE_SCORE - MATE_WINDOW:
             return
 
 
@@ -413,7 +432,7 @@ def best(state, us, max_depth=MAX_DEPTH, width=BEAM_WIDTH, plan=None,
     if move is None:
         if plan is None:
             plan = default_plan()
-        fallback = _ordered(state, us, 1, plan)
+        fallback = _ordered(state, us, 1, plan, 1)
         if not fallback:
             raise ValueError("no legal placement for %s"
                              % chess.COLOR_NAMES[us])
@@ -471,6 +490,24 @@ def _selfcheck():
                                      plan=bare)
             if mv in set(st2.legal_placements())]
     assert seen == [1, 2, 3], seen
+
+    # Mate scores must fall off with distance, or the search is indifferent
+    # between winning now and winning later -- and between losing now and
+    # losing later, which is what makes a lost position resist.
+    st_m = rules.SetupState()
+    st_m.result = "1-0"
+    near = _terminal(st_m, chess.WHITE, 0)
+    far = _terminal(st_m, chess.WHITE, 4)
+    assert near == MATE_SCORE, near
+    assert far == MATE_SCORE - 4, far
+    assert near > far, "a nearer win must score higher"
+    lose_near = _terminal(st_m, chess.BLACK, 0)
+    lose_far = _terminal(st_m, chess.BLACK, 4)
+    assert lose_far > lose_near, "a further loss must score higher"
+    st_m.result = "1/2-1/2"
+    assert _terminal(st_m, chess.WHITE, 3) == 0, "a draw is not depth-adjusted"
+    st_m.result = None
+    assert _terminal(st_m, chess.WHITE, 3) is None
 
     # Material must cancel EXACTLY out of the piece-square term, or it just
     # re-introduces the tempo artifact that agreement() was written to avoid.
