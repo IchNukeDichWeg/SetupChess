@@ -414,6 +414,22 @@ def main():
                          "best on it (0.9425) is the one that cannot beat a "
                          "real opponent. campaigns/pool_real_opponents.json "
                          "holds every army ever actually played against us")
+    ap.add_argument("--draft", action="store_true",
+                    help="play the PLACEMENT PHASE for every game instead of "
+                         "stamping two finished armies onto a board. Without "
+                         "this the loop breeds and screens against a model of "
+                         "the game nobody plays: measured, the shipped "
+                         "champion's worst column moves 0.6891 -> 0.3917 once "
+                         "the phase is played, and the stamped ranking picked "
+                         "the wrong member of its own pool. Costs roughly 2-3x "
+                         "the wall clock. NO search-drafting option here, "
+                         "deliberately: a searching drafter builds from the "
+                         "position rather than from its army, so both sides "
+                         "would draft the same thing and the matrix would "
+                         "compare nothing -- verified, four different army "
+                         "pairs produced one distinct army. arena.py offers it "
+                         "for A/B-ing a drafting policy against a fixed field, "
+                         "which is a different question.")
     ap.add_argument("--max-pieces", type=int, default=32,
                     help="piece ceiling for the engine; 0 for none, which is "
                          "correct for ./cuci.py (default: %(default)s)")
@@ -442,6 +458,9 @@ def main():
             # --seed drives the per-round breeding rng, so a resume under a
             # different one silently changes the stream while state["seed"]
             # still records the original
+            # in meta, so the full-dict comparison below refuses to pool a
+            # drafted campaign with a stamped one. They measure different games.
+            "draft": bool(args.draft) or None,
             "seed": args.seed}
     extra = []
     for path in (args.seed_army or []):
@@ -485,7 +504,7 @@ def main():
     # `seed` that means a legacy file cannot have its seed verified -- it is
     # taken on trust -- but refusing to resume every campaign in git is worse.
     for k, default in (("max_pieces", 32), ("seed_bot", False),
-                       ("seed_army", []), ("seed", args.seed)):
+                       ("seed_army", []), ("seed", args.seed), ("draft", None)):
         state["meta"].setdefault(k, default)
     if state["meta"] != meta:
         sys.exit("state was built with different settings:\n  file: %r\n  now:  %r"
@@ -499,8 +518,19 @@ def main():
     # engine already gone. arena.py has always built one pool per run and has
     # never stalled. This makes expand.py the same shape -- one teardown, at
     # the very end, after everything is checkpointed.
+    # Every game expand plays routes through arena.play_cell or
+    # arena.play_match, and both already honour arena._DRAFT, so drafting the
+    # whole campaign is a matter of handing the config to the workers.
+    draft_cfg = None
+    if args.draft:
+        import psearch
+        # plan on BOTH sides: the depth/width slots are unused by plan mode and
+        # are carried only because arena's config tuple has that shape.
+        draft_cfg = ("plan", "plan", 1, 6, psearch.ARMY_SCALE, psearch.PST_SCALE)
+        print("drafting the placement phase for every game (plan drafting)",
+              flush=True)
     pool = mp.Pool(workers, initializer=arena.worker_init,
-                   initargs=(args.engine, args.max_pieces))
+                   initargs=(args.engine, args.max_pieces, draft_cfg))
 
     # the seed pool needs a full matrix before the first solve
     armies = [poolmod.from_json(a) for a in state["armies"]]

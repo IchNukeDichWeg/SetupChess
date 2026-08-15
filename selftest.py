@@ -1837,6 +1837,7 @@ def main():
     test_engine(args.fens, args.engine, rng)
     test_arena_smoke(args.engine, args.scratch or tempfile.gettempdir())
     test_expand_smoke(args.engine, args.scratch or tempfile.gettempdir())
+    test_expand_draft(args.engine, args.scratch or tempfile.gettempdir())
     test_play_smoke(args.engine, args.scratch or tempfile.gettempdir())
     test_match_smoke(args.engine, args.scratch or tempfile.gettempdir())
     test_duel_smoke(args.engine, args.scratch or tempfile.gettempdir())
@@ -1972,6 +1973,45 @@ def test_blind_matrix_guard():
     vals = [v for v in narrow.values()]
     assert len(vals) > 8 and (max(vals) - min(vals)) < 0.02
     print("PASS: blind and near-blind matrices are distinguishable from real ones")
+
+
+def test_expand_draft(engine, scratch):
+    """expand --draft plays the placement phase, and cannot pool with a stamped
+    campaign. Also pins that search-drafting is NOT offered here: both sides
+    would draft the same army and the matrix would compare nothing."""
+    import subprocess
+    state = os.path.join(scratch, "selftest_expand_draft.json")
+    for p in (state, state + ".gate"):
+        if os.path.exists(p):
+            os.remove(p)
+    base = [sys.executable, "expand.py", "--state", state, "--rounds", "1",
+            "--max-pool", "10", "--pairs", "1", "--screen-pairs", "1",
+            "--final-games", "4", "--engine", engine, "--max-pieces", "0",
+            "--nodes", "300", "--workers", "2"]
+    r = subprocess.run(base + ["--draft"], capture_output=True, text=True)
+    if r.returncode != 0:
+        fail("expand --draft exited %d:\n%s" % (r.returncode, r.stderr[-800:]))
+    if "drafting the placement phase" not in r.stdout:
+        fail("expand --draft did not report that it was drafting")
+    with open(state) as f:
+        if not json.load(f)["meta"].get("draft"):
+            fail("a drafted campaign did not record draft in its meta, so it "
+                 "could be pooled with a stamped one")
+
+    # a stamped resume must refuse the drafted state file
+    r2 = subprocess.run(base, capture_output=True, text=True)
+    if "different settings" not in (r2.stdout + r2.stderr):
+        fail("a stamped run resumed a DRAFTED state file: the two measure "
+             "different games and must never pool")
+
+    # search-drafting must not be reachable from expand
+    r3 = subprocess.run(base + ["--draft", "search"], capture_output=True,
+                        text=True)
+    if r3.returncode == 0:
+        fail("expand accepted --draft search; both sides would draft the same "
+             "army and the matrix would compare nothing")
+    print("PASS: expand --draft plays the placement phase, refuses to pool "
+          "with a stamped campaign, and does not offer search drafting")
 
 if __name__ == "__main__":
     main()
