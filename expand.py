@@ -288,6 +288,52 @@ def screen_blind(vals, admitted, margin):
     return bool(vals) and not admitted and all(v == margin for v in vals)
 
 
+def abort_if_blind(cells, label, allow, state_path):
+    """Kill the campaign when the referee is not separating anything.
+
+    A blind matrix looks HEALTHY from the outside -- right cell count, no
+    errors, symmetry checks passing -- and says nothing at all, so the loop
+    happily reports "converged" after hours of work. That is what wasted the
+    v5 campaign, and warning about it is not a safeguard when the run is
+    unattended for ten hours: nobody is reading the scrollback at 3am.
+
+    Two bands, both measured rather than guessed. Every value identical means
+    zero information. Everything inside a 0.02 spread means the referee is
+    barely separating these armies, which is a kill filter at best and cannot
+    support a breeding decision.
+    """
+    vals = [v for v in cells.values() if v is not None]
+    if len(vals) < 8:
+        return
+    spread = max(vals) - min(vals)
+    if len(set(vals)) == 1:
+        why = ("every one of the %d measured cells is exactly %.4f"
+               % (len(vals), vals[0]))
+    elif spread < 0.02:
+        why = ("all %d measured cells lie within %.4f of each other"
+               % (len(vals), spread))
+    else:
+        return
+
+    msg = ("\nSTOPPING: the %s matrix carries no usable information -- %s.\n"
+           "  The referee is not separating these armies, so every round after\n"
+           "  this one would breed and screen against noise and the loop would\n"
+           "  eventually report 'converged' having measured nothing. This is\n"
+           "  the failure that wasted the v5 campaign.\n"
+           "  Fix the instrument, not the campaign: raise --nodes, use a\n"
+           "  stronger --engine, or raise --pairs/--screen-pairs. State is\n"
+           "  saved at %s and the run resumes once the instrument changes\n"
+           "  (note that changing --nodes or --engine starts a new campaign,\n"
+           "  which is correct: they are different instruments).\n"
+           "  Pass --allow-blind to continue anyway." % (label, why, state_path))
+    if allow:
+        print(msg.replace("STOPPING", "WARNING (--allow-blind)"), flush=True)
+        return
+    print(msg, flush=True)
+    arena.stop_pool()
+    sys.exit(3)
+
+
 def our_strategies(weights, pinned):
     """Equilibrium weights with pinned opponents removed and renormalised.
 
@@ -414,6 +460,11 @@ def main():
                          "best on it (0.9425) is the one that cannot beat a "
                          "real opponent. campaigns/pool_real_opponents.json "
                          "holds every army ever actually played against us")
+    ap.add_argument("--allow-blind", action="store_true",
+                    help="continue even when the matrix carries no information. "
+                         "Off by default: an unattended run that cannot "
+                         "separate its armies would breed against noise for "
+                         "hours and then report 'converged'.")
     ap.add_argument("--draft", action="store_true",
                     help="play the PLACEMENT PHASE for every game instead of "
                          "stamping two finished armies onto a board. Without "
@@ -546,6 +597,11 @@ def main():
 
         run_pairs(todo, pool, cells_of(state), "seed", persist)
 
+    # EARLY, on the seed matrix, before a single round: this is the whole point
+    # of the check. A doomed instrument is just as detectable in minute two as
+    # in hour ten, and finding out in hour ten costs the night.
+    abort_if_blind(cells_of(state), "seed", args.allow_blind, args.state)
+
     loop_start = time.time()
     rounds_at_start = len(state["rounds"])   # for the --max-minutes message
     for rnd in range(len(state["rounds"]), args.rounds):
@@ -676,6 +732,14 @@ def main():
                   "not settled. Raise --screen-pairs (2 was used for the "
                   "campaigns that worked) or seed a strong army so a fortress "
                   "cannot hold the whole support." % args.screen_margin)
+            if not args.allow_blind:
+                print("STOPPING: a blind screen cannot admit anything, so "
+                      "every remaining round would repeat this one and the "
+                      "loop would then report 'converged' having measured "
+                      "nothing. State is saved at %s. Pass --allow-blind to "
+                      "continue anyway." % args.state, flush=True)
+                arena.stop_pool()
+                sys.exit(3)
 
         if not admitted:
             state["rounds"].append({"round": rnd, "admitted": 0,

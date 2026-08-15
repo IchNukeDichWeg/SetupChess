@@ -1838,6 +1838,7 @@ def main():
     test_arena_smoke(args.engine, args.scratch or tempfile.gettempdir())
     test_expand_smoke(args.engine, args.scratch or tempfile.gettempdir())
     test_expand_draft(args.engine, args.scratch or tempfile.gettempdir())
+    test_blind_failsafe()
     test_play_smoke(args.engine, args.scratch or tempfile.gettempdir())
     test_match_smoke(args.engine, args.scratch or tempfile.gettempdir())
     test_duel_smoke(args.engine, args.scratch or tempfile.gettempdir())
@@ -2012,6 +2013,42 @@ def test_expand_draft(engine, scratch):
              "army and the matrix would compare nothing")
     print("PASS: expand --draft plays the placement phase, refuses to pool "
           "with a stamped campaign, and does not offer search drafting")
+
+
+def test_blind_failsafe():
+    """The campaign must DIE on an instrument that separates nothing.
+
+    Warning about it is not a safeguard for a run left unattended overnight:
+    the loop would breed against noise for hours and then report "converged",
+    which is exactly how the v5 campaign was wasted. Exercised as a subprocess
+    because the guard exits the process.
+    """
+    import subprocess
+    src = (
+        "import sys, expand\n"
+        "cells = {'identical': {(0,1,g): 0.5 for g in range(20)},\n"
+        "         'narrow': {(0,1,g): 0.5 + 0.001*(g%3) for g in range(20)},\n"
+        "         'healthy': {(0,1,g): g/20.0 for g in range(20)},\n"
+        "         'few': {(0,1,g): 0.5 for g in range(4)}}[sys.argv[1]]\n"
+        "expand.abort_if_blind(cells, 'test', sys.argv[2] == 'allow', '/tmp/x')\n"
+    )
+    want = {("identical", "no"): 3,    # zero information
+            ("narrow", "no"): 3,       # inside 0.02: a kill filter at best
+            ("healthy", "no"): 0,      # a real spread must not trip it
+            ("few", "no"): 0,          # too few cells to judge
+            ("identical", "allow"): 0}
+    for (case, allow), code in sorted(want.items()):
+        r = subprocess.run([sys.executable, "-c", src, case, allow],
+                           capture_output=True, text=True)
+        if r.returncode != code:
+            fail("abort_if_blind(%s, allow=%s) exited %d, wanted %d:\n%s"
+                 % (case, allow, r.returncode, code, r.stdout + r.stderr))
+        if code == 3 and "STOPPING" not in r.stdout:
+            fail("the fail-safe aborted on %s without saying why" % case)
+        if (case, allow) == ("identical", "allow") and "WARNING" not in r.stdout:
+            fail("--allow-blind neither aborted nor warned")
+    print("PASS: the blind-instrument fail-safe stops the campaign, spares a "
+          "real spread, ignores tiny samples, and can be overridden")
 
 if __name__ == "__main__":
     main()
