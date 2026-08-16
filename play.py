@@ -190,7 +190,14 @@ OPTIONALITY = False
 # up front costs nothing. See docs/MEASUREMENTS.md.
 MIX = True
 
-DEFAULT_POOL = "campaigns/expand_v6.json"
+# MOVES WITH DEFAULT_TARGET, always. Re-targeting only considers armies inside
+# the pool, so a champion that is not a member is abandoned on the opponent's
+# first reveal -- shipped exactly that way for one commit: the target switched
+# from 8446327c to a v6 bishop army after a single revealed placement, so the
+# army chosen by the measurement was never actually played. The v9 pool is also
+# the right one on its own terms: its matrix is DRAFTED, so the best response
+# re-targeting computes comes from the model that decides real games.
+DEFAULT_POOL = "campaigns/expand_v9.json"
 # The first army BRED under drafted measurement, and the first shipped one
 # with a QUEEN. Worst column over the four real opponents 0.7462 +/- 0.0107,
 # against 0.5713 +/- 0.0137 for the army it replaces, measured as the control

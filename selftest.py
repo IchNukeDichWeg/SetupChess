@@ -1839,6 +1839,7 @@ def main():
     test_expand_smoke(args.engine, args.scratch or tempfile.gettempdir())
     test_expand_draft(args.engine, args.scratch or tempfile.gettempdir())
     test_blind_failsafe()
+    test_champion_in_pool()
     test_play_smoke(args.engine, args.scratch or tempfile.gettempdir())
     test_match_smoke(args.engine, args.scratch or tempfile.gettempdir())
     test_duel_smoke(args.engine, args.scratch or tempfile.gettempdir())
@@ -2049,6 +2050,40 @@ def test_blind_failsafe():
             fail("--allow-blind neither aborted nor warned")
     print("PASS: the blind-instrument fail-safe stops the campaign, spares a "
           "real spread, ignores tiny samples, and can be overridden")
+
+
+def test_champion_in_pool():
+    """The shipped champion must be a MEMBER of the shipped pool.
+
+    Re-targeting only considers armies inside the pool, so a champion that is
+    not one is abandoned the moment the opponent reveals anything -- the army
+    chosen by the measurement would never actually be played. Shipped exactly
+    that way for one commit: DEFAULT_TARGET moved to the v9 champion while
+    DEFAULT_POOL still pointed at v6, and a single revealed placement switched
+    the target to an unrelated bishop army.
+    """
+    champ = play.load_army(play.DEFAULT_TARGET)
+    fp = pool.fingerprint(champ)
+    armies, matrix = play.load_pool(play.DEFAULT_POOL)
+    if not any(pool.fingerprint(a) == fp for a in armies):
+        fail("the shipped champion %s is not in DEFAULT_POOL (%s): re-targeting "
+             "will abandon it on the opponent's first reveal"
+             % (fp, play.DEFAULT_POOL))
+
+    # and prove the abandonment does not happen in practice
+    d = play.Drafter(champ, chess.WHITE, pool=armies, matrix=matrix)
+    st = rules.SetupState()
+    st.place(chess.QUEEN, chess.D1)
+    st.turn = chess.BLACK
+    st.place(chess.BISHOP, chess.B7)
+    st.turn = chess.WHITE
+    d._retarget(st)
+    if not any(pool.fingerprint(sorted(d.target)) == pool.fingerprint(a)
+               for a in armies):
+        fail("after re-targeting the drafter is building an army outside the "
+             "pool, which the off-plan fallback then wrecks")
+    print("PASS: the shipped champion is in the shipped pool, and re-targeting "
+          "stays inside it")
 
 if __name__ == "__main__":
     main()
