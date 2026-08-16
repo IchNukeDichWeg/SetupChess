@@ -176,7 +176,13 @@ def main():
     # counted AFTER the placement, because it prints under two lines that say
     # "after this". It used to read the pre-placement board and disagree with
     # its own heading.
-    after = set(drafter._revealed(state, us)) | {(pt, sq)}
+    # OWN PERSPECTIVE on both halves. _revealed mirrors Black's squares and the
+    # pool is stored in own perspective, but the placement above is in BOARD
+    # coordinates -- mixing them made every Black placement look like it left
+    # 0 of 90 armies reachable, which reads as "the drafter has gone off-plan"
+    # in the middle of a live game. White was unaffected, so it never showed.
+    own = (pt, sq if us == chess.WHITE else chess.square_mirror(sq))
+    after = set(drafter._revealed(state, us)) | {own}
     reach = sum(1 for a in armies if after <= set(a))
     print("  pool armies still reachable after this: %d of %d"
           % (reach, len(armies)))

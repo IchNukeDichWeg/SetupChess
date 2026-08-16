@@ -1840,6 +1840,7 @@ def main():
     test_expand_draft(args.engine, args.scratch or tempfile.gettempdir())
     test_blind_failsafe()
     test_champion_in_pool()
+    test_relay_reachability_both_colours()
     test_play_smoke(args.engine, args.scratch or tempfile.gettempdir())
     test_match_smoke(args.engine, args.scratch or tempfile.gettempdir())
     test_duel_smoke(args.engine, args.scratch or tempfile.gettempdir())
@@ -2084,6 +2085,32 @@ def test_champion_in_pool():
              "pool, which the off-plan fallback then wrecks")
     print("PASS: the shipped champion is in the shipped pool, and re-targeting "
           "stays inside it")
+
+
+def test_relay_reachability_both_colours():
+    """relay's reachability line must be in OWN perspective for both colours.
+
+    _revealed mirrors Black's squares and the pool is stored in own
+    perspective, but drafter.choose returns BOARD coordinates. Mixing them made
+    every Black placement report 0 armies reachable, which reads as "the
+    drafter has gone off-plan" in the middle of a live game under a ~20 second
+    forfeit clock. White was unaffected, so it never showed.
+    """
+    import subprocess
+    for colour, moves in (("white", []), ("black", ["@Qd1"])):
+        r = subprocess.run([sys.executable, "relay.py", "--color", colour,
+                            "--no-mix"] + moves, capture_output=True, text=True)
+        if r.returncode != 0:
+            fail("relay --color %s exited %d: %s"
+                 % (colour, r.returncode, r.stderr[-400:]))
+        line = [l for l in r.stdout.splitlines() if "reachable" in l]
+        if not line:
+            fail("relay --color %s printed no reachability line" % colour)
+        got = int(line[0].split(":")[1].strip().split()[0])
+        if got == 0:
+            fail("relay --color %s reports 0 pool armies reachable on its FIRST "
+                 "placement, which can only be a perspective bug" % colour)
+    print("PASS: relay reports reachability in own perspective for both colours")
 
 if __name__ == "__main__":
     main()
