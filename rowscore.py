@@ -23,6 +23,22 @@ import json
 import math
 
 
+def draft_label(meta):
+    """Human label for the draft config, across BOTH file shapes.
+
+    arena writes a list -- [white_mode, black_mode, depth, width, ...] -- and
+    expand writes a plain True, because a breeding campaign has one mode on
+    both sides by construction. Assuming arena's shape crashed on every
+    campaign file.
+    """
+    d = meta.get("draft")
+    if not d:
+        return "stamped"
+    if isinstance(d, (list, tuple)):
+        return "drafted %s" % (list(d[:2]),)
+    return "drafted"
+
+
 def load(path):
     with open(path) as fh:
         state = json.load(fh)
@@ -79,8 +95,7 @@ def main():
         fps = meta.get("armies", [])
         draft = meta.get("draft")
         print("%s  maximin over columns %s  %s"
-              % (args.matrix, field,
-                 ("drafted %s" % draft[:2]) if draft else "stamped"))
+              % (args.matrix, field, draft_label(meta)))
         table = []
         for i in range(n):
             if i in field:
@@ -116,8 +131,7 @@ def main():
         raise SystemExit("no cells for row %d in %s" % (args.row, args.matrix))
 
     draft = meta.get("draft")
-    print("%s  row %d  %s" % (args.matrix, args.row,
-                              ("drafted %s" % draft[:2]) if draft else "stamped"))
+    print("%s  row %d  %s" % (args.matrix, args.row, draft_label(meta)))
     allv = []
     for j in sorted(r):
         m, e = ci(r[j])
@@ -158,8 +172,8 @@ def main():
         print("  %+.4f +/- %.4f over %d shared cells" % (m, e, len(paired)))
         print("  %s" % ("EXCLUDES zero" if abs(m) > e and not math.isnan(e)
                         else "includes zero: no difference established"))
-        if draft and d2:
-            print("  arms: %s vs %s" % (draft[:2], d2[:2]))
+        if draft or d2:
+            print("  arms: %s vs %s" % (draft_label(meta), draft_label(meta2)))
 
 
 if __name__ == "__main__":
