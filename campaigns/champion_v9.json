@@ -1,0 +1,80 @@
+{
+ "army": [
+  [
+   6,
+   4
+  ],
+  [
+   3,
+   16
+  ],
+  [
+   3,
+   18
+  ],
+  [
+   3,
+   19
+  ],
+  [
+   3,
+   20
+  ],
+  [
+   3,
+   21
+  ],
+  [
+   3,
+   22
+  ],
+  [
+   3,
+   8
+  ],
+  [
+   1,
+   12
+  ],
+  [
+   1,
+   13
+  ],
+  [
+   1,
+   14
+  ],
+  [
+   5,
+   15
+  ],
+  [
+   3,
+   0
+  ],
+  [
+   3,
+   6
+  ]
+ ],
+ "support": {},
+ "meta": {
+  "from": "campaigns/expand_v9.json",
+  "index": 59,
+  "fingerprint": "8446327c0489e9f9",
+  "engine": "fairy-stockfish",
+  "max_pieces": 0,
+  "measurement": "DRAFTED end to end: bred, screened and confirmed with the placement phase played (expand --draft, arena --draft)",
+  "chosen_by": "best worst column over the four real opponents, 0.7462 +/- 0.0107",
+  "columns": {
+   "bot 08-05": 0.8113,
+   "bot 08-08": 0.9437,
+   "13 bishops": 0.7462,
+   "wall": 0.9119
+  },
+  "vs_champion_drafted": "0.9838 +/- 0.0060 head to head over 400 pair-games",
+  "replaces": "campaigns/champion_drafted.json (1a6aa81575387e54), whose worst column re-measured at 0.5713 +/- 0.0137 as the control arm of this same run",
+  "note": "3P 9B 1Q -- the first shipped army with a QUEEN. Every stamped campaign said pure bishops; three independent drafted measurements said queen plus bishops.",
+  "confirmation": "campaigns/confirm_v9.json, 200 pairs a cell, 400 pair-games per column, 0 errors"
+ }
+}

@@ -782,6 +782,56 @@ specific positions and NOT a law about drafting in general. The direction is
 believable because the mechanism is understood; the magnitude and the sigma
 are not transferable.
 
+### Bred under drafted play, the answer grows a QUEEN
+
+v9 is the first campaign bred and screened with the placement phase played
+(`expand --draft`). 14 rounds, pool 90, support 15, exploitability 0, gate
+0.7937 +/- 0.0154. Its top five candidates by worst column ALL carry a queen.
+
+Confirmed at 200 pairs a cell, 400 pair-games a column, with the shipped
+champion included as a CONTROL ARM so the comparison needs no cross-run
+assumption:
+
+```
+                        bot 08-05  bot 08-08  13 bishops  wall     worst
+v9 s59  3P 9B 1Q        0.8113     0.9437     0.7462      0.9119   0.7462
+v9 s78  3P 1N 8B 1Q     0.9087     0.9756     0.7019      0.9656   0.7019
+v9 s82  3P 1N 8B 1Q     0.9831     0.9825     0.6475      0.9688   0.6475
+v9 s60  3P 1N 8B 1Q     0.8925     0.6819     0.6325      0.9169   0.6325
+6P 11B  (control)       0.9969     0.9812     0.5713      0.9231   0.5713
+v9 s35  3P 1N 8B 1Q     0.9975     0.9881     0.4994      0.9844   0.4994
+```
+
+The control re-measured at **0.5713 +/- 0.0137** against the 0.5767 from its
+own confirmation, so the instrument agrees with itself. Head to head the new
+champion beats it **0.9838 +/- 0.0060** over 400 pair-games.
+
+**The screen did not flatter its winner.** The campaign cell that surfaced
+s59 was 0.7500 on eight pair-games; confirmed at fifty times the sample it is
+0.7462 +/- 0.0107. The registered prediction that it would "regress
+substantially" was wrong -- it barely moved. The two predictions that held:
+~60% that something confirmed above the champion (four did) and ~35% that
+anything held above 0.70 (two did).
+
+**A queen, after six campaigns of pure bishops.** Three independent drafted
+measurements agree: the drafted equilibrium over 33 armies put 76.4% on a
+3P 9B 1Q army, the first drafted campaign bred queen armies into all five top
+slots, and this confirmation put four of them above the old champion. The
+stamped campaigns were not wrong about the pool they searched -- they were
+measuring what survives when neither side can answer the other, and a queen's
+value is precisely that it punishes a reactive opponent. Bishops win a
+commitment game; a queen wins a conversation.
+
+Worst column over the whole project, on the only field that matters:
+
+```
+v2 champ    0.4700 stamped
+v4 champ    0.6369 stamped
+v6 s57      0.6891 stamped   -> 0.3917 drafted
+1a6aa815    0.5767 drafted
+8446327c    0.7462 drafted   <- ships
+```
+
 ### The answer was in the pool; the stamped grid picked the wrong member
 
 33 armies, 1,089 cells, 75 pairs each -- 163,350 games, 0 errors, diagonal

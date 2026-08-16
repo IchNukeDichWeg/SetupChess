@@ -84,35 +84,43 @@ HUNT_THEIR_POINTS = 12
 # inside the pool, so a target that is not a member gets abandoned on the first
 # placement.
 #
-# Both point at the v6 campaign, index 57. Armies are judged on the WORST
-# COLUMN over the four armies anyone has ever actually played against us --
-# the bot's two, thirteen bishops from a human, and a fifteen-pawn wall from a
-# human -- never on the twelve hand-written archetypes, which nobody plays.
-# 800 games a cell, fairy-stockfish, no piece ceiling:
+# Armies are judged on the WORST COLUMN over the four armies anyone has ever
+# actually played against us -- the bot's two, thirteen bishops from a human,
+# and a fifteen-pawn wall from a human -- never on the twelve hand-written
+# archetypes, which nobody plays.
 #
-#             bot 08-05  bot 08-08  13 bishops  wall     worst
-#   v2 champ  0.9172     0.4869     0.4700      -        0.4700
-#   v4 champ  0.9684     0.9850     0.6369      0.8912   0.6369
-#   v6 s57    0.9513     0.9884     0.6891      0.8959   0.6891   <- ships
-#   v6 s33    0.9931     0.9969     0.6713      0.9137   0.6713
+# EVERY NUMBER BELOW IS DRAFTED: the placement phase is played out rather than
+# two finished armies being stamped onto a board. That distinction reordered
+# the whole table. Under the old stamped measurement v6 s57 shipped on a worst
+# column of 0.6891; played out, the same army scores 0.3917 and ranks 13th of
+# 29. See docs/MEASUREMENTS.md.
 #
-# THE TWO RULES DISAGREE HERE and the registered one wins. Worst column is
-# primary, dominance only breaks ties: 57 leads 33 by 0.0178 against a
-# combined margin of 0.0153, so this is not a tie and the criterion is not
-# being re-chosen after seeing the numbers. Note what that costs -- 33
-# DOMINATES the previous champion on all four columns and has the better mean
-# (0.8938 against 0.8812), while 57 gives up 0.0171 on bot 08-05. Maximin buys
-# the floor and pays for it in the average. Switch DEFAULT_TARGET to a frozen
-# index-33 champion if you would rather have the mean.
+#                        bot 08-05  bot 08-08  13 bishops  wall     worst
+#   v9 s59  3P 9B 1Q     0.8113     0.9437     0.7462      0.9119   0.7462  <- ships
+#   v9 s78  3P 1N 8B 1Q  0.9087     0.9756     0.7019      0.9656   0.7019
+#   v6 s?   6P 11B       0.9969     0.9812     0.5713      0.9231   0.5713
+#   v6 s57  6P 11B       0.9650     0.9900     0.3917      0.9350   0.3917
 #
-# Index 33 is also the first competitive army in six campaigns that is NOT
-# pure bishops: 9 bishops, 6 pawns and 2 KNIGHTS.
+# 200 pairs a cell, 400 pair-games a column, fairy-stockfish, no ceiling. The
+# 6P 11B row is the previous champion re-measured as the CONTROL ARM of the
+# same run, so the comparison needs no cross-run assumption; it re-measured at
+# 0.5713 against 0.5767 from its own confirmation. Head to head the shipping
+# army wins 0.9838 +/- 0.0060.
 #
-# The whole mixture is certified, not just the target. All 9 support armies
-# were played against all 4 real opponents and none scores below 0.5; the
-# weakest worst is 0.5050 at index 54. That screen is checklist step 7 and it
-# exists because a support member was quietly LOSING to a real opponent for
-# the whole of v2 (index 83 of the v4 campaign, 0.4481).
+# THE FIRST SHIPPED ARMY WITH A QUEEN. Every stamped campaign said pure
+# bishops. Three independent drafted measurements said queen plus bishops: the
+# drafted equilibrium over 33 armies put 76.4% on a 3P 9B 1Q army, the first
+# drafted campaign bred queen armies into all five top slots, and this
+# confirmation put four of them above the old champion. Bishops were never
+# wrong about the pool -- they were what survives when neither side can answer
+# the other, which is not the game.
+#
+# The mixture is NOT certified here, and mixing is off for this champion: the
+# v9 support spans confirmed worst columns from 0.4994 to 0.7462, so drawing
+# from it would dilute the shipping army with ones that lose to thirteen
+# bishops. A drafted mixing distribution weighted by confirmed worst column is
+# OWED. The certification screen that caught a losing support member in v2
+# still applies the moment a support is restored.
 #
 # The archetype gate is a screen, never the decision: the champion with the
 # best gate score ever measured here (0.9425) is the one army that cannot beat
@@ -183,14 +191,12 @@ OPTIONALITY = False
 MIX = True
 
 DEFAULT_POOL = "campaigns/expand_v6.json"
-# The first champion chosen under DRAFTED measurement, where the placement
-# phase is actually played rather than two finished armies being stamped onto
-# a board. It was already in the v6 pool -- the stamped grid simply picked the
-# wrong member of it. Against the four real opponents its worst column is
-# 0.5767 where champion_v6's is 0.3917, and it beats champion_v6 head to head
-# 0.7167 +/- 0.0165. Same composition, same king square, three pieces moved.
-# See docs/MEASUREMENTS.md.
-DEFAULT_TARGET = "campaigns/champion_drafted.json"
+# The first army BRED under drafted measurement, and the first shipped one
+# with a QUEEN. Worst column over the four real opponents 0.7462 +/- 0.0107,
+# against 0.5713 +/- 0.0137 for the army it replaces, measured as the control
+# arm of the same run; head to head it wins 0.9838 +/- 0.0060. Every stamped
+# campaign said pure bishops. See docs/MEASUREMENTS.md.
+DEFAULT_TARGET = "campaigns/champion_v9.json"
 
 
 def sample_target(champion_path, armies, rng):

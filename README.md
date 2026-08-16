@@ -25,13 +25,19 @@ project never once sampled. That result is measured and stands
 was established and how far it should be trusted, which turns out to be less
 far than the error bars suggest.
 
-**The shipping army changed on 2026-08-15**, to `1a6aa81575387e54`, after the
-placement phase was measured properly for the first time. It is still eleven
-bishops and six pawns, still king e1, and differs from the previous champion in
-the placement of three pieces out of eighteen -- which is the whole difference
-between losing to thirteen bishops at 0.3917 and beating them at 0.5767. It was
-in the pool the entire time; the old measurement simply ranked the wrong member
-of it.
+**The shipping army now has a QUEEN**, after the first campaign bred with the
+placement phase actually played: `8446327c0489e9f9`, three pawns, nine bishops
+and a queen. Against the four opponents anyone has really played against us its
+worst column is **0.7462 +/- 0.0107**, where the previous pure-bishop champion
+re-measures at 0.5713 as the control arm of the same run, and it wins the head
+to head **0.9838 +/- 0.0060**.
+
+Six campaigns of stamped measurement said pure bishops. Three independent
+drafted measurements said queen plus bishops. The stamped campaigns were not
+wrong about the pool they searched -- they were measuring what survives when
+neither side can answer the other, and a queen's value is that it punishes an
+opponent who reacts. Bishops win a commitment game; a queen wins a
+conversation.
 
 > ### Read this before trusting any number below
 >
@@ -52,9 +58,11 @@ of it.
 >
 > Re-ranking all 29 candidates that way (33 armies, 163,350 games) changed the
 > shipping decision. **Four armies beat all four real opponents; the previously
-> shipped champion was 13th of 29** at 0.3917. The new pick clears its worst
-> column at **0.5767** and beats the old champion head to head at 0.7167 +/-
-> 0.0165.
+> shipped champion was 13th of 29** at 0.3917.
+>
+> Then the first campaign BRED under drafted play went further and grew a
+> queen: `8446327c`, worst column **0.7462 +/- 0.0107**, beating the best
+> pure-bishop army 0.9838 +/- 0.0060 head to head.
 >
 > **Searching the placement game is REJECTED**: -0.1125 +/- 0.0200 paired
 > against simply following the plan, and worst on the column that mattered
@@ -82,15 +90,20 @@ Current version **v4**; what shipped and what it does not know are in
 
 ## What it found
 
-**Bishops dominate, and it is not an artifact.** The shipping army is eleven
-bishops and six pawns:
+**The shipping army is three pawns, nine bishops and a queen**, bred and
+confirmed with the placement phase played out:
 
 ```
-  3 | P B B B B . B P
-  2 | B P B P B P . P
-  1 | . K . B . B B .
+  3 | B . B B B B B .
+  2 | B . . . P P P Q
+  1 | B . . . K . B .
       a b c d e f g h
 ```
+
+Everything in the rest of this section is the BISHOP era and its stamped
+measurements. It is kept because it is what those runs honestly measured and
+because the machinery is reused, but the ranking it produced was overturned
+once the placement phase was played -- see the box above.
 
 Every earlier campaign was refereed by Stockfish, which **segfaults above 32
 pieces**, so every high-piece-count matchup was an unmeasured hole and dense
