@@ -885,10 +885,32 @@ def main():
                      "Resuming would pool two different fields into one "
                      "statistic; delete %s to replay the gate."
                      % (prev_field, gate_field, gate_path))
-        gate = {int(k): v for k, v in prev.get("by_index", {}).items()}
-        if gate:
-            print("\nresuming the gate match: %d pairs already recorded (%d "
-                  "playable)" % (len(gate), sum(1 for v in gate.values() if v)))
+        # THE MIX IS PART OF THE GAME. The comment above says game k is
+        # determined by (k, seed, mix), and the guard checked the field but
+        # never the mix -- so a resumed campaign whose pool grew reused the
+        # OLD mixture's games while writing the NEW support into the file.
+        # Caught on v9: the pool went 90 -> 135 armies and the support changed
+        # completely, yet the gate reported a byte-identical 0.7937 +/- 0.0154
+        # with W/D/L 584/198/18, because it replayed nothing. The number
+        # described a mixture that no longer existed.
+        #
+        # Discard rather than exit: a support change is the NORMAL outcome of
+        # resuming a campaign that improved, so refusing would block every
+        # useful resume, and the gate is minutes next to the rounds.
+        prev_sup = prev.get("support")
+        now_sup = {str(k): v for k, v in sorted(gate_w.items())}
+        if prev_sup is not None and prev_sup != now_sup:
+            print("\nthe solved mix CHANGED since the recorded gate (support %s "
+                  "-> %s), so those games were played against a different "
+                  "mixture and are being discarded. Replaying the gate."
+                  % (sorted(int(k) for k in prev_sup),
+                     sorted(int(k) for k in now_sup)), flush=True)
+        else:
+            gate = {int(k): v for k, v in prev.get("by_index", {}).items()}
+            if gate:
+                print("\nresuming the gate match: %d pairs already recorded (%d "
+                      "playable)" % (len(gate),
+                                     sum(1 for v in gate.values() if v)))
 
     tasks = []
     for k in range(args.final_games):
