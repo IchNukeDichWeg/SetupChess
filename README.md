@@ -25,12 +25,11 @@ project never once sampled. That result is measured and stands
 was established and how far it should be trusted, which turns out to be less
 far than the error bars suggest.
 
-**The shipping army now has a QUEEN**, after the first campaign bred with the
-placement phase actually played: `8446327c0489e9f9`, three pawns, nine bishops
-and a queen. Against the four opponents anyone has really played against us its
-worst column is **0.7462 +/- 0.0107**, where the previous pure-bishop champion
-re-measures at 0.5713 as the control arm of the same run, and it wins the head
-to head **0.9838 +/- 0.0060**.
+**The shipping army has a QUEEN**: `79fc9211c60313b6`, three pawns, nine
+bishops and a queen, bred and confirmed with the placement phase played out.
+Against the four opponents anyone has really played against us its worst column
+is **0.7800 +/- 0.0128**, and it dominates the previous champion on all four
+columns, which re-measured at 0.7367 as the control arm of the same run.
 
 Six campaigns of stamped measurement said pure bishops. Three independent
 drafted measurements said queen plus bishops. The stamped campaigns were not
@@ -60,9 +59,14 @@ conversation.
 > shipping decision. **Four armies beat all four real opponents; the previously
 > shipped champion was 13th of 29** at 0.3917.
 >
-> Then the first campaign BRED under drafted play went further and grew a
-> queen: `8446327c`, worst column **0.7462 +/- 0.0107**, beating the best
-> pure-bishop army 0.9838 +/- 0.0060 head to head.
+> Then campaigns BRED under drafted play grew a queen and kept improving:
+> worst column 0.5767 -> 0.7462 -> **0.7800 +/- 0.0128**, each step confirmed
+> against the previous champion as a control arm in the same run.
+>
+> Confirmation is not optional. The last campaign's two highest-screening
+> armies, both 0.8125 on eight pair-games, came back at 0.7800 and **0.6392**
+> at 300 pair-games. Shipping a screen leader would have shipped an army worse
+> than the one it replaced.
 >
 > **Searching the placement game is REJECTED**: -0.1125 +/- 0.0200 paired
 > against simply following the plan, and worst on the column that mattered
@@ -95,8 +99,8 @@ confirmed with the placement phase played out:
 
 ```
   3 | B . B B B B B .
-  2 | B . . . P P P Q
-  1 | B . . . K . B .
+  2 | B B P B P P . Q
+  1 | . . K . . . . .
       a b c d e f g h
 ```
 

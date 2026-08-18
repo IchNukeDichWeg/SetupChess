@@ -782,6 +782,44 @@ specific positions and NOT a law about drafting in general. The direction is
 believable because the mechanism is understood; the magnitude and the sigma
 are not transferable.
 
+### Confirmation is not optional: the screen flattered its winners
+
+The v9 campaign was extended to 29 rounds and 135 armies -- it had never
+converged, it ran out of pool space while still admitting 4-8 armies a round.
+Ten candidates screening at or above the shipped champion were confirmed at 150
+pairs a cell, 300 pair-games a column, 67,500 games, with the champion as a
+control arm:
+
+```
+                       bot 08-05  bot 08-08  13 bishops  wall     worst
+v9 s105  3P 9B 1Q      0.9375     0.9708     0.7800      0.9617   0.7800
+v9 s95   3P 9B 1Q      0.8342     0.9608     0.7592      0.9108   0.7592
+v9 s59   (control)     0.8283     0.9525     0.7367      0.8967   0.7367
+v9 s134  3P 9B 1Q      0.6392     0.9650     0.8258      0.9150   0.6392
+```
+
+**The two armies the screen ranked highest, both at 0.8125 on eight pair-games,
+came back at 0.7800 and 0.6392.** s134 lost a quarter of a point on the bot
+08-05 column alone. That is the winner's curse working exactly as advertised,
+and it is the answer to "why not just ship the screen leader": last time the
+leader happened to hold, and treating that as the rule would have shipped an
+army that is worse than the one it replaced. The control re-measured at 0.7367
+against 0.7462 from its own confirmation, so the instrument is steady.
+
+s105 ships. It DOMINATES the previous champion on all four columns and has the
+better worst column, so maximin and dominance agree -- the first time in this
+project they have not had to be adjudicated. The worst columns are separated:
+gap 0.0433 against a combined margin of 0.0248.
+
+**Their head to head is a FORTRESS, not a measurement.** s105 against s59 is
+0.5000 +/- 0.0000 over 300 pair-games, every single pair drawn. That is real:
+the drafted handoff evaluates +235 for White and still draws by the fifty-move
+rule at both 20k and 60k nodes. Two massed same-colour bishop armies with
+blocked pawns cannot make progress against each other. So a head to head
+between queen-bishop armies carries no information at all, and the four columns
+are the entire decision. Worth knowing before anyone reaches for a head to head
+to break a future tie.
+
 ### Bred under drafted play, the answer grows a QUEEN
 
 v9 is the first campaign bred and screened with the placement phase played

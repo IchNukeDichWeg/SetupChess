@@ -1,0 +1,79 @@
+{
+ "army": [
+  [
+   6,
+   2
+  ],
+  [
+   3,
+   8
+  ],
+  [
+   1,
+   12
+  ],
+  [
+   1,
+   13
+  ],
+  [
+   1,
+   10
+  ],
+  [
+   5,
+   15
+  ],
+  [
+   3,
+   9
+  ],
+  [
+   3,
+   11
+  ],
+  [
+   3,
+   16
+  ],
+  [
+   3,
+   18
+  ],
+  [
+   3,
+   19
+  ],
+  [
+   3,
+   20
+  ],
+  [
+   3,
+   21
+  ],
+  [
+   3,
+   22
+  ]
+ ],
+ "support": {},
+ "meta": {
+  "from": "campaigns/expand_v9.json",
+  "index": 105,
+  "fingerprint": "79fc9211c60313b6",
+  "engine": "fairy-stockfish",
+  "max_pieces": 0,
+  "measurement": "DRAFTED end to end: bred, screened and confirmed with the placement phase played",
+  "chosen_by": "best worst column over the four real opponents, 0.7800 +/- 0.0128; it also DOMINATES the previous champion on all four columns, so maximin and dominance agree for once",
+  "columns": {
+   "bot 08-05": 0.9375,
+   "bot 08-08": 0.9708,
+   "13 bishops": 0.78,
+   "wall": 0.9617
+  },
+  "vs_champion_v9": "0.5000 +/- 0.0000 over 300 pair-games -- a genuine FORTRESS, not a bug: the handoff evaluates +235 for White yet draws by the fifty-move rule at 20k and 60k nodes. Two massed same-colour bishop armies deadlock, so the head to head is uninformative and the columns decide.",
+  "replaces": "campaigns/champion_v9.json (8446327c0489e9f9), re-measured as the CONTROL ARM of this same run at 0.7367 +/- 0.0119, against 0.7462 from its own confirmation",
+  "confirmation": "campaigns/confirm_v9c.json, 150 pairs a cell, 300 pair-games per column, 67,500 games, 0 errors"
+ }
+}

@@ -96,16 +96,30 @@ HUNT_THEIR_POINTS = 12
 # 29. See docs/MEASUREMENTS.md.
 #
 #                        bot 08-05  bot 08-08  13 bishops  wall     worst
-#   v9 s59  3P 9B 1Q     0.8113     0.9437     0.7462      0.9119   0.7462  <- ships
-#   v9 s78  3P 1N 8B 1Q  0.9087     0.9756     0.7019      0.9656   0.7019
-#   v6 s?   6P 11B       0.9969     0.9812     0.5713      0.9231   0.5713
+#   v9 s105 3P 9B 1Q     0.9375     0.9708     0.7800      0.9617   0.7800  <- ships
+#   v9 s95  3P 9B 1Q     0.8342     0.9608     0.7592      0.9108   0.7592
+#   v9 s59  3P 9B 1Q     0.8283     0.9525     0.7367      0.8967   0.7367
 #   v6 s57  6P 11B       0.9650     0.9900     0.3917      0.9350   0.3917
 #
-# 200 pairs a cell, 400 pair-games a column, fairy-stockfish, no ceiling. The
-# 6P 11B row is the previous champion re-measured as the CONTROL ARM of the
-# same run, so the comparison needs no cross-run assumption; it re-measured at
-# 0.5713 against 0.5767 from its own confirmation. Head to head the shipping
-# army wins 0.9838 +/- 0.0060.
+# s105 DOMINATES s59 on all four columns AND has the better worst column, so
+# maximin and dominance agree here -- the first time in this project they have
+# not had to be adjudicated. The worst columns are separated: gap 0.0433
+# against a combined margin of 0.0248.
+#
+# Their HEAD TO HEAD is 0.5000 +/- 0.0000 over 300 pair-games and that is a
+# real FORTRESS, not a blind cell: the drafted handoff evaluates +235 for White
+# and still draws by the fifty-move rule at 20k and 60k nodes. Two massed
+# same-colour bishop armies deadlock, so a head to head between them carries no
+# information and the columns are the whole decision.
+#
+# 150 pairs a cell, 300 pair-games a column, fairy-stockfish, no ceiling. The
+# s59 row is the previous champion re-measured as the CONTROL ARM of the same
+# run, so the comparison needs no cross-run assumption; it re-measured at
+# 0.7367 against 0.7462 from its own confirmation.
+#
+# The screen DID flatter its winners this time, which is why confirmation is
+# not optional: the two armies the campaign ranked highest at 0.8125 on eight
+# pair-games came back at 0.7800 and 0.6392.
 #
 # THE FIRST SHIPPED ARMY WITH A QUEEN. Every stamped campaign said pure
 # bishops. Three independent drafted measurements said queen plus bishops: the
@@ -203,7 +217,7 @@ DEFAULT_POOL = "campaigns/expand_v9.json"
 # against 0.5713 +/- 0.0137 for the army it replaces, measured as the control
 # arm of the same run; head to head it wins 0.9838 +/- 0.0060. Every stamped
 # campaign said pure bishops. See docs/MEASUREMENTS.md.
-DEFAULT_TARGET = "campaigns/champion_v9.json"
+DEFAULT_TARGET = "campaigns/champion_v9b.json"
 
 
 def sample_target(champion_path, armies, rng):
