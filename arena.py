@@ -412,6 +412,11 @@ def main():
                     help="placement search depth for --draft (default 2)")
     ap.add_argument("--draft-width", type=int, default=8,
                     help="placement search beam width for --draft (default 8)")
+    ap.add_argument("--columns", metavar="I,J,K",
+                    help="only play cells that touch these army indices. For "
+                         "scoring a whole pool against a small field: every "
+                         "army gets a complete row over the field, and the "
+                         "army-vs-army cells nobody reads are skipped.")
     ap.add_argument("--pst-scale", type=float, default=None,
                     help="weight on the engine's piece-square knowledge in the "
                          "placement eval (default psearch.PST_SCALE, 0=off). "
@@ -486,9 +491,21 @@ def main():
             "draft": list(_DRAFT) if _DRAFT else None,
             "armies": [poolmod.fingerprint(a) for a in armies]}
     cells = check_resume(stored, meta, cells)
+    # --columns restricts play to cells that TOUCH the named field. Confirming
+    # 135 armies against 4 real opponents needs 540 matchups; the full matrix
+    # is 19,321 cells, nearly all of them army-vs-army pairings nobody reads.
+    # Deliberately NOT in meta: it changes which cells are played, never how a
+    # cell is measured, so a later run may widen the set and pool the results.
+    cols = None
+    if args.columns:
+        cols = set(int(x) for x in args.columns.split(","))
+        bad = [c for c in cols if not 0 <= c < n]
+        if bad:
+            sys.exit("--columns %s out of range for a %d-army pool" % (bad, n))
     tasks = [(i, j, g, (armies[i], armies[j]), args.nodes, args.jitter)
              for i in range(n) for j in range(n)
-             for g in range(args.pairs) if (i, j, g) not in cells]
+             for g in range(args.pairs) if (i, j, g) not in cells
+             and (cols is None or i in cols or j in cols)]
     workers = args.workers or os.cpu_count()
 
     global _CHECKPOINT
@@ -498,6 +515,10 @@ def main():
 
     print("%d setups, %d cells, %d game pairs to play (%d already done), "
           "%d workers" % (n, n * n, len(tasks), len(cells), workers))
+    if cols:
+        print("  columns %s: playing only cells that touch them, so the "
+              "diagonal and symmetry checks below cover the field only"
+              % sorted(cols))
     if not tasks:
         print("nothing to do")
         return

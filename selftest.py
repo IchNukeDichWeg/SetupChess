@@ -1836,6 +1836,7 @@ def main():
     test_uci(args.scratch or tempfile.gettempdir())
     test_engine(args.fens, args.engine, rng)
     test_arena_smoke(args.engine, args.scratch or tempfile.gettempdir())
+    test_arena_columns(args.engine, args.scratch or tempfile.gettempdir())
     test_expand_smoke(args.engine, args.scratch or tempfile.gettempdir())
     test_expand_draft(args.engine, args.scratch or tempfile.gettempdir())
     test_blind_failsafe()
@@ -2111,6 +2112,62 @@ def test_relay_reachability_both_colours():
             fail("relay --color %s reports 0 pool armies reachable on its FIRST "
                  "placement, which can only be a perspective bug" % colour)
     print("PASS: relay reports reachability in own perspective for both colours")
+
+
+def test_arena_columns(engine, scratch):
+    """--columns plays only cells touching the field, and every other army
+    still ends with a COMPLETE row over it.
+
+    Scoring a whole pool against a small field is the useful shape -- 135
+    armies against 4 real opponents is 540 matchups, where the full matrix is
+    18,225 cells of mostly army-vs-army pairings nobody reads. A partial
+    matrix is only safe if the rows that matter are whole, so that is what
+    this asserts.
+    """
+    import subprocess
+    out = os.path.join(scratch, "selftest_columns.json")
+    if os.path.exists(out):
+        os.remove(out)
+    poolf = os.path.join(scratch, "selftest_columns_pool.json")
+    armies = [pool.from_json(a) for a in
+              json.load(open("campaigns/pool_confirm_v9c.json"))]
+    with open(poolf, "w") as fh:
+        json.dump([pool.to_json(a) for a in armies], fh)
+    n = len(armies)
+    field = [n - 2, n - 1]
+
+    r = subprocess.run([sys.executable, "arena.py", "--out", out, "--pool", poolf,
+                        "--engine", engine, "--max-pieces", "0", "--nodes", "200",
+                        "--pairs", "1", "--workers", "2",
+                        "--columns", ",".join(str(c) for c in field)],
+                       capture_output=True, text=True)
+    if r.returncode != 0:
+        fail("arena --columns exited %d: %s" % (r.returncode, r.stderr[-500:]))
+
+    with open(out) as fh:
+        cells = {tuple(int(x) for x in k.split(",")): v
+                 for k, v in json.load(fh)["cells"].items()}
+    stray = [(i, j) for (i, j, g) in cells if i not in field and j not in field]
+    if stray:
+        fail("--columns played %d cells touching neither column, e.g. %s"
+             % (len(stray), stray[:3]))
+    for i in range(n):
+        if i in field:
+            continue
+        for j in field:
+            if not any((a, b) in ((i, j), (j, i))
+                       for (a, b, g) in cells):
+                fail("army %d has no games against column %d, so its row "
+                     "cannot be ranked" % (i, j))
+
+    bad = subprocess.run([sys.executable, "arena.py", "--out", out, "--pool", poolf,
+                          "--engine", engine, "--max-pieces", "0", "--nodes", "200",
+                          "--pairs", "1", "--workers", "2", "--columns", "999"],
+                         capture_output=True, text=True)
+    if bad.returncode == 0:
+        fail("--columns accepted an index outside the pool")
+    print("PASS: --columns plays only field-touching cells (%d of %d), leaves "
+          "every row complete, and rejects a bad index" % (len(cells), n * n))
 
 if __name__ == "__main__":
     main()
