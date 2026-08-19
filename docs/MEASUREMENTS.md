@@ -782,6 +782,53 @@ specific positions and NOT a law about drafting in general. The direction is
 believable because the mechanism is understood; the magnitude and the sigma
 are not transferable.
 
+### The champion holds, and the screen's ranking power is measured
+
+The 19 highest-screening candidates not yet confirmed, plus the champion as a
+control, at 110 pairs a cell -- 220 pair-games a column, 126,720 games, 0
+errors, diagonal 0.5009 and pair symmetry 1.0001.
+
+```
+army                       worst column
+79fc9211 (champion)        0.7784   <- still the best
+239c91ed                   0.7443
+0f5c0406                   0.6966
+...
+aa15d503                   0.5068
+```
+
+**Nothing beat it.** The control re-measured 0.7784 against 0.7800 from its own
+confirmation, 0.0016 apart, so the instrument is steady and this is a real
+null. The registered prediction -- ~50% that something would beat 0.7800 --
+was wrong, and ~15% for anything clearing 0.85 was too.
+
+The by-product is worth more than the verdict: **how much ranking power does a
+campaign screen actually have?** Comparing each army's screen worst column
+against its confirmed one, over 20 armies:
+
+```
+mean regression   -0.0090
+range             -0.1494 to +0.0881
+improved on screen 9 of 20
+Pearson r         +0.546
+Spearman rho      +0.263
+```
+
+So it is NOT a systematic winner's curse -- nearly half improved. It is noise
+with a weak signal underneath. Spearman +0.263 is the honest figure; the higher
+Pearson is carried mostly by the champion sitting at the top of both lists. A
+screen cell is 4 pair-games at CI +/- 0.49, so this is exactly what the error
+bars predict.
+
+Two consequences. Selecting candidates by screen rank is only slightly better
+than selecting at random from the pool, which is why nineteen of them produced
+nothing. And a campaign cannot be trusted to have found its own best member --
+the good armies have come from confirming a wide net, never from the loop's
+own ordering.
+
+The one composition question this could have reopened stays closed: the single
+`9P 10B` pawn-heavy army in the field confirmed at 0.5341, rank 18 of 20.
+
 ### Confirmation is not optional: the screen flattered its winners
 
 The v9 campaign was extended to 29 rounds and 135 armies -- it had never
