@@ -782,6 +782,59 @@ specific positions and NOT a law about drafting in general. The direction is
 believable because the mechanism is understood; the magnitude and the sigma
 are not transferable.
 
+### The pool is mined out, and thirteen bishops is the whole problem
+
+Every one of the 131 candidates in the v9 pool scored against all four real
+opponents in a single pass -- 1,064 cells, 127,680 games, 0 errors, diagonal
+0.4990 and pair symmetry 1.0004. Not a sample of the pool: the pool.
+
+**Nothing beat the champion.** Three armies tie at the top, and the tie is real
+rather than quantisation:
+
+```
+239c91ed   0.7583 +/- 0.0246
+79fc9211   0.7583 +/- 0.0265   <- the shipped champion
+07a28576   0.7583 +/- 0.0231
+8446327c   0.7375 +/- 0.0173   (the champion before it)
+```
+
+That is the THIRD consecutive null on this pool, after confirming the top 5 and
+then the top 19. The champion's worst column now reads 0.7800, 0.7784 and
+0.7583 across three independent runs at falling precision, all overlapping. The
+registered ~35% was wrong again, and three misses in the same direction is the
+signal: **this pool has no better army in it.** More breeding or more
+confirming is spending compute to re-derive a null.
+
+**The structural finding is worth more.** For 104 of 131 armies -- 79% -- the
+binding constraint is the same opponent:
+
+```
+worst column is    13 bishops   104  (79%)
+                   wall          12   (9%)
+                   bot 08-05      8   (6%)
+                   bot 08-08      7   (5%)
+```
+
+And the ceiling per column, over every army in the pool:
+
+```
+bot 08-05    1.0000
+bot 08-08    1.0000
+wall         0.9917
+13 bishops   0.8104
+```
+
+Three of the four real opponents are SOLVED -- some army in the pool beats each
+of them essentially every game. Thirteen bishops is the only one that resists,
+and it caps the whole project: since shipping is maximin, the worst column IS
+the score, so "improve the army" has meant "improve against thirteen bishops"
+for some time without that being stated.
+
+So the honest frontier is not a better army but a better answer to one specific
+opponent, and the pool was never bred for that -- it was bred against a field of
+four, three of which stopped mattering. A campaign seeded and gated on thirteen
+bishops ALONE is the experiment that has never been run.
+
 ### The champion holds, and the screen's ranking power is measured
 
 The 19 highest-screening candidates not yet confirmed, plus the champion as a
