@@ -1,15 +1,15 @@
 # Setup Chess
 
-**Finding the strongest opening army for the chess.com variant
-[Setup Chess](https://www.chess.com/variants/setup-chess).** Before play, each
-side spends **39 points** placing an army on its own first three ranks (P=1,
+Finding the strongest opening army for the chess.com variant
+[Setup Chess](https://www.chess.com/variants/setup-chess). Before play, each
+side spends 39 points placing an army on its own first three ranks (P=1,
 N=3, B=3, R=5, Q=9, king free and mandatory, duplicates unlimited). Once both
 armies are down, it is ordinary chess.
 
-This is **not a chess engine**, and deliberately so. Once the armies are placed
+This is not a chess engine. Once the armies are placed
 the position is ordinary chess, and `fairy-stockfish` plays it far better than
 anything here would. The whole question is the half that has no theory yet:
-**which 39 points, and on which squares.**
+which 39 points, and on which squares.
 
 So the repo is a measurement apparatus for one question. It breeds a pool of
 candidate armies, plays them against each other to fill a payoff matrix, solves
@@ -18,29 +18,28 @@ space of armies. A drafting policy then realises the chosen army against a live
 opponent, handling the tactics the placement phase actually has, including two
 ways to win before a move is played.
 
-**The answer it arrived at is eleven bishops and six pawns** -- and a real
-opponent then beat it with **thirteen bishops and no pawns**, an army this
+The answer it arrived at is eleven bishops and six pawns -- and a real
+opponent then beat it with thirteen bishops and no pawns, an army this
 project never once sampled. That result is measured and stands
 ([below](#the-pool-is-a-sample-not-a-cover)). Everything here is how the answer
 was established and how far it should be trusted, which turns out to be less
 far than the error bars suggest.
 
-**The shipping army has a QUEEN**: `79fc9211c60313b6`, three pawns, nine
+The shipping army has a QUEEN: `79fc9211c60313b6`, three pawns, nine
 bishops and a queen, bred and confirmed with the placement phase played out.
 Against the four opponents anyone has really played against us its worst column
-is **0.7800 +/- 0.0128**, and it dominates the previous champion on all four
+is 0.7800 +/- 0.0128, and it dominates the previous champion on all four
 columns, which re-measured at 0.7367 as the control arm of the same run.
 
 Six campaigns of stamped measurement said pure bishops. Three independent
 drafted measurements said queen plus bishops. The stamped campaigns were not
 wrong about the pool they searched -- they were measuring what survives when
 neither side can answer the other, and a queen's value is that it punishes an
-opponent who reacts. Bishops win a commitment game; a queen wins a
-conversation.
+opponent who reacts.
 
 > ### Read this before trusting any number below
 >
-> Every payoff in this repo was built by stamping two **finished** armies onto
+> Every payoff in this repo was built by stamping two finished armies onto
 > a board. That models simultaneous blind commitment. The real game alternates
 > placements with full information, so the second player can answer what the
 > first has already committed -- which is how the human who beat us won: he
@@ -48,53 +47,53 @@ conversation.
 > exchange at handoff.
 >
 > When the placement phase is actually played out (`draft.py`), the shipped
-> champion's score against its worst column goes from **0.6891 +/- 0.0106 to
-> 0.3800 +/- 0.0235**. A comfortable win becomes a loss, about twelve sigma.
+> champion's score against its worst column goes from 0.6891 +/- 0.0106 to
+> 0.3800 +/- 0.0235. A comfortable win becomes a loss, about twelve sigma.
 >
-> Measured across a four-opponent field, the collapse is **one column**, not
+> Measured across a four-opponent field, the collapse is one column, not
 > the whole grid: the champion holds against both bot armies and the pawn wall
 > and loses only to the 13-bishop army a human actually beat us with.
 >
 > Re-ranking all 29 candidates that way (33 armies, 163,350 games) changed the
-> shipping decision. **Four armies beat all four real opponents; the previously
-> shipped champion was 13th of 29** at 0.3917.
+> shipping decision. Four armies beat all four real opponents; the previously
+> shipped champion was 13th of 29 at 0.3917.
 >
 > Then campaigns BRED under drafted play grew a queen and kept improving:
-> worst column 0.5767 -> 0.7462 -> **0.7800 +/- 0.0128**, each step confirmed
+> worst column 0.5767 -> 0.7462 -> 0.7800 +/- 0.0128, each step confirmed
 > against the previous champion as a control arm in the same run.
 >
 > Confirmation is not optional. The last campaign's two highest-screening
-> armies, both 0.8125 on eight pair-games, came back at 0.7800 and **0.6392**
+> armies, both 0.8125 on eight pair-games, came back at 0.7800 and 0.6392
 > at 300 pair-games. Shipping a screen leader would have shipped an army worse
 > than the one it replaced.
 >
-> **Searching the placement game is REJECTED**: -0.1125 +/- 0.0200 paired
+> Searching the placement game is REJECTED: -0.1125 +/- 0.0200 paired
 > against simply following the plan, and worst on the column that mattered
 > (0.3750 -> 0.0792). It does its tactical job -- hung material goes 300cp to
 > 0 -- but it cannot choose an army. Composition belongs to the measured pool;
 > the search's place is as a filter inside a plan, not a substitute for one.
 >
 > So the four-column grid, every campaign matrix, and the maximin argument
-> that selected the current champion all rank armies **under a model of the
-> game nobody plays**. They are not being deleted, because they are honest
+> that selected the current champion all rank armies under a model of the
+> game nobody plays. They are not being deleted, because they are honest
 > measurements of what they measured and the machinery is reused, but nothing
 > below has been re-derived yet. Treat every number outside this box as
 > describing simultaneous blind play, and see
 > [docs/MEASUREMENTS.md](docs/MEASUREMENTS.md#the-grid-measures-a-game-nobody-plays).
 >
-> The project's centre of gravity has moved with it: from "which 39 points" to
-> **"what is the best reply to what the opponent just placed"**, which is a
-> search problem over the placement tree rather than a search over armies.
+> The question the project is really asking has moved with it, from "which 39
+> points" to "what is the best reply to what the opponent just placed". That is
+> a search over the placement tree rather than over armies.
 
 Python is the harness. There is a C move generator, used as a cross-check and
 perft oracle rather than to play anything.
 
-Current version **v4**; what shipped and what it does not know are in
+Current version v4; what shipped and what it does not know are in
 [docs/RELEASES.md](docs/RELEASES.md).
 
 ## What it found
 
-**The shipping army is three pawns, nine bishops and a queen**, bred and
+The shipping army is three pawns, nine bishops and a queen, bred and
 confirmed with the placement phase played out:
 
 ```
@@ -109,11 +108,11 @@ measurements. It is kept because it is what those runs honestly measured and
 because the machinery is reused, but the ranking it produced was overturned
 once the placement phase was played -- see the box above.
 
-Every earlier campaign was refereed by Stockfish, which **segfaults above 32
-pieces**, so every high-piece-count matchup was an unmeasured hole and dense
+Every earlier campaign was refereed by Stockfish, which segfaults above 32
+pieces, so every high-piece-count matchup was an unmeasured hole and dense
 armies were harder to keep. Dense is exactly what beats a pawn wall, so the
 bishop result could have been survivorship. It is not. Rebuilt from scratch
-with `fairy-stockfish`, which has no piece ceiling and left **zero** cells
+with `fairy-stockfish`, which has no piece ceiling and left zero cells
 unmeasured, the equilibrium is bishop-heavy in all thirteen of its members:
 
 ```
@@ -123,7 +122,7 @@ unmeasured, the equilibrium is bishop-heavy in all thirteen of its members:
   ...seven more, all 11 bishops + 6 pawns
 ```
 
-The censoring did change **which** bishop army wins. The previous champion's
+The censoring did change which bishop army wins. The previous champion's
 twelve-bishops-and-three-pawns survives at 1.9% of the mix, and head to head
 under one referee the new army beats it:
 
@@ -136,7 +135,7 @@ SPRT    | [0,4] LLR +27.661 -> ACCEPT H1
 TC      | 20,000 nodes, 15% jitter, fairy-stockfish, no piece ceiling
 ```
 
-That result is **harder** than it looks: the new pool was capped at 60 setups
+That result is harder than it looks: the new pool was capped at 60 setups
 while the old champion came from 87, so the handicap ran against the winner.
 
 Against the twelve hand-written archetypes, sampled uniformly:
@@ -164,11 +163,11 @@ and one of them scores 0.016. See [Known limits](#known-limits).
 ### The superseded Stockfish numbers
 
 Kept because they are what the earlier commits measured, and because the two
-sets are **different instruments and cannot be differenced**. The old champion
+sets are different instruments and cannot be differenced. The old champion
 scored 0.9346, +462.06 [+440.79, +485.88] over 1,820 of 2,000 games, with 90
 pairs unplayable, on an 87-setup pool after 21 rounds.
 
-**It holds at ten times the depth, and the head-to-head gain transfers.**
+It holds at ten times the depth, and the head-to-head gain transfers.
 The current champion against the twelve archetypes, `fairy-stockfish`, no
 piece ceiling, so nothing is dropped:
 
@@ -178,7 +177,7 @@ piece ceiling, so nothing is dropped:
 Pairs  | 480 of 480 both times, 0 lost outright
 ```
 
-At 200,000 nodes **no pair scores below 0.5 at all**. Both node counts solve to
+At 200,000 nodes no pair scores below 0.5 at all. Both node counts solve to
 an equilibrium that is pure on the champion with exploitability 0.0000, and
 neither drops an archetype.
 
@@ -191,8 +190,8 @@ same opponent, same game index, same node jitter, only our army differs:
 200k   480 pairs   +0.0203 +/- 0.0122   118 cells changed
 ```
 
-Both exclude zero, so the +112 Elo head-to-head advantage **does** show up
-against the archetype field. It does **not** show up against the modelled
+Both exclude zero, so the +112 Elo head-to-head advantage does show up
+against the archetype field. It does not show up against the modelled
 opponent, where the two champions are indistinguishable. Same two armies, two
 opponents, two different answers -- which is why a single headline number is
 not enough.
@@ -208,7 +207,7 @@ chess.com's setup policy rebuilt from its shipped client
 (`docs/BOT_MODEL.md`): king to a corner on move one, then 16 pawns and 7
 knights, because material is absent from its setup eval entirely.
 
-> **The second half of that model is REFUTED.** Two full setup phases played
+> The second half of that model is REFUTED. Two full setup phases played
 > against the live bot, both as Black, both spending all 39 points:
 >
 > ```
@@ -216,7 +215,7 @@ knights, because material is absent from its setup eval entirely.
 > 2026-08-08   Ka8  Qb7 Qb8 Qa7  Nb6 Nc6  Bg6  Pa6 Pe6 Ph7
 > ```
 >
-> **Three queens in both** -- 27 of 39 points on the piece the model says it
+> Three queens in both -- 27 of 39 points on the piece the model says it
 > avoids. The king clause is confirmed twice more, a corner on the very first
 > placement. Reading the minified eval gave us the tie-breaks and not the terms
 > that decide.
@@ -225,7 +224,7 @@ knights, because material is absent from its setup eval entirely.
 > pins. Every number below against `--opponent bot` describes the modelled
 > opponent, not the real one.
 
-The **current** champion (11 bishops + 6 pawns):
+The current champion (11 bishops + 6 pawns):
 
 ```
 we are white | 0.9400 +/- 0.0246   +477.99 [+413.65, +574.24]  W/D/L 178/20/2
@@ -234,10 +233,10 @@ Games        | 200 per colour, 20,000 nodes, 15% jitter
 Referee      | fairy-stockfish, no piece ceiling
 ```
 
-357 wins, 39 draws, 4 losses in 400 games. The **previous** champion scored
+357 wins, 39 draws, 4 losses in 400 games. The previous champion scored
 0.9200 and 0.9400 on the identical instrument, so the intervals overlap almost
-entirely and **there is no measured difference between the two against this
-opponent** -- even though the new army beats the old one by +112 Elo head to
+entirely and there is no measured difference between the two against this
+opponent -- even though the new army beats the old one by +112 Elo head to
 head. Two armies can be far apart against each other and indistinguishable
 against a third.
 
@@ -248,13 +247,13 @@ Games        | 200 per colour, 20,000 nodes, 15% jitter
 Referee      | fairy-stockfish, no piece ceiling
 ```
 
-345 wins, 54 draws, **one loss** in 400 games.
+345 wins, 54 draws, one loss in 400 games.
 
 ### What the referee was hiding
 
 The first version of this gate was refereed by our C core, because 40 pieces is
 over vanilla Stockfish's ceiling. It reported 0.6500 as White and 0.8475 as
-Black with **201 of 400 games drawn**, and two conclusions were drawn from it.
+Black with 201 of 400 games drawn, and two conclusions were drawn from it.
 Both were wrong, and both are withdrawn:
 
 * *"The pawn-and-knight wall is genuinely hard to break."* It is not. The draws
@@ -265,25 +264,25 @@ Both were wrong, and both are withdrawn:
   about re-targeting swapping in a rook as Black has no measurement behind it.
 
 The archetype gate scores 0.9346. This one scores 0.92 to 0.94. Those are
-**different referees and cannot be differenced**, but there is no sign the
+different referees and cannot be differenced, but there is no sign the
 modelled opponent is a harder field than the twelve hand-written armies.
 
 ### What still limits it
 
-* **The intervals carry chess-phase variance only.** Both drafters are
+* The intervals carry chess-phase variance only. Both drafters are
   deterministic, so this is ONE setup per colour and 200 games of node jitter
   on top. Drafting variance is unmeasured.
-* **We move first in both colours** (checked: both handoff FENs give us the
+* We move first in both colours (checked: both handoff FENs give us the
   move), since the bot spends 24 placements to our 16 and always places last.
-* **Different instrument from every Stockfish number above.** Separate
+* Different instrument from every Stockfish number above. Separate
   campaign, separate file, never pooled.
 
 ### Breeding against it
 
 `expand.py --seed-bot` breeds the pool against this army instead of only
 against itself. Three parts, all load-bearing: the wall joins the starting
-pool, it is **pinned** so the prune cannot drop it, and a challenger must clear
-`--screen-margin` against it **as well as** against the equilibrium support.
+pool, it is pinned so the prune cannot drop it, and a challenger must clear
+`--screen-margin` against it as well as against the equilibrium support.
 Without the third the whole thing is a no-op, because the wall draws rather
 than wins, so the solver gives it no weight and the screen only ever plays
 challengers against the support.
@@ -312,7 +311,7 @@ referee, not a subtraction.
 
 Played on chess.com's own analysis board against its built-in bot,
 2026-08-08. We drafted with `--mix` on, so the army came from the equilibrium
-support rather than the argmax: **12 bishops and 3 pawns, king b1**.
+support rather than the argmax: 12 bishops and 3 pawns, king b1.
 
 ```
 setup   1. @Bg1 @Ka8   2. @Bb3 @Qb7   3. @Bc3 @Pa6   4. @Bf1 @Nb6
@@ -325,16 +324,16 @@ chess   16... e5  17. Bxb6 Qaxb6  18. Bxb6 Bxd3  19. Bexd3 h5
         24. Bxe5+ Ka8  25. Bd5 Qxd5  26. Bxd5+ Ka7  27. Be3#
 ```
 
-**1-0, checkmate on move 27.** The chess phase was played by `fairy-stockfish`
+1-0, checkmate on move 27. The chess phase was played by `fairy-stockfish`
 at 2M nodes per move; the drafting was ours.
 
 Three things the game settled, none of which a self-play campaign could:
 
-* the bot placed its king in a **corner on its first placement**, as
+* the bot placed its king in a corner on its first placement, as
   `docs/BOT_MODEL.md` predicts from the shipped client
-* it then bought **three queens** -- 27 of 39 points on the piece that model
+* it then bought three queens -- 27 of 39 points on the piece that model
   says it avoids. The piece-preference half of our model is refuted
-* White placed 16th and last, so **Black moved first** in the chess phase, the
+* White placed 16th and last, so Black moved first in the chess phase, the
   turn-parity rule confirmed live once more
 
 The bishop mass ate the queens: every queen that captured on b6 was recaptured
@@ -343,8 +342,8 @@ The evaluation was +21 within one move of the handoff.
 
 ## The pool is a sample, not a cover
 
-A real game surfaced an army the expansion loop never produced: **thirteen
-bishops, no pawns**, all 39 points on bishops. Head to head against the
+A real game surfaced an army the expansion loop never produced: thirteen
+bishops, no pawns, all 39 points on bishops. Head to head against the
 champion under one referee:
 
 ```
@@ -355,7 +354,7 @@ Elo     | -20.87  [-28.51, -13.25]
 SPRT    | [0,4] LLR -6.077 -> ACCEPT H0
 ```
 
-**The champion loses.** Not by much, and 488 of 800 pairs are drawn, but the
+The champion loses. Not by much, and 488 of 800 pairs are drawn, but the
 decisive pairs break 199 to 107 against it and the interval is clear of zero.
 
 Not one of the 60 setups in the pool is a pure bishop army. Every survivor
@@ -370,14 +369,14 @@ keeps at least three pawns:
 ```
 
 This is worth being precise about, because it is easy to read as the
-measurements being wrong. They are not. Exploitability 0 means **no army in
-the pool** beats the equilibrium mix, and that was true. It says nothing about
+measurements being wrong. They are not. Exploitability 0 means no army in
+the pool beats the equilibrium mix, and that was true. It says nothing about
 armies outside the pool, and the mutation operators never walked all the way to
 the corner of the space where 13 bishops lives. A double oracle is only as good
 as what its challengers reach.
 
 So the honest status of "eleven bishops and six pawns" is: the best army this
-search **found**, beaten by the first outside army anyone tried it against.
+search found, beaten by the first outside army anyone tried it against.
 
 ### Handing the gap to the loop fixes it
 
@@ -392,16 +391,16 @@ v2 vs 13 bishops           0.4700  -20.87 [-28.51, -13.25]  ACCEPT H0
 v3 vs v2, head to head     0.4975   -1.74 [-11.43,  +7.96]  CONTINUE
 ```
 
-A **28 Elo swing** on the matchup that was seeded, and **no measured
-difference** between the two champions head to head. The double oracle could
+A 28 Elo swing on the matchup that was seeded, and no measured
+difference between the two champions head to head. The double oracle could
 not invent 13 bishops, but handed it, it found answers.
 
-It was not free. Against the twelve archetypes the v3 mix scores **0.9038**
-where v2 scored **0.9425** on the same instrument -- nine losses in 800 games
+It was not free. Against the twelve archetypes the v3 mix scores 0.9038
+where v2 scored 0.9425 on the same instrument -- nine losses in 800 games
 against four. Hedging against an army the archetypes do not contain costs
 something against everything else.
 
-Note also how drawish this matchup is: **717 of 800 pairs drew**. The two
+Note also how drawish this matchup is: 717 of 800 pairs drew. The two
 armies are close enough that the chess phase usually cannot separate them.
 
 ### Judged on real opponents instead, the answer changes again
@@ -418,8 +417,8 @@ v3     b1     0.9734      0.9641      0.5109       0.5109   0.9038
 v4     f1     0.9006      0.9569      0.6247       0.6247   0.9406
 ```
 
-All three champions are the **same 11 bishops and 6 pawns**. v2 and v4 differ
-by **two pieces**: the king moves e1 to f1 and one bishop moves d1 to g3,
+All three champions are the same 11 bishops and 6 pawns. v2 and v4 differ
+by two pieces: the king moves e1 to f1 and one bishop moves d1 to g3,
 nothing else. Those two squares are the difference between 0.4869 and 0.9569
 against the bot army we actually met. v3 is a genuinely different arrangement,
 8 of its 17 non-king pieces elsewhere.
@@ -427,9 +426,9 @@ against the bot army we actually met. v3 is a genuinely different arrangement,
 That is the result: against real opponents, arrangement decides these matchups
 and material does not.
 
-Read the v2 row. It has the **best archetype gate of the three** and it is the
+Read the v2 row. It has the best archetype gate of the three and it is the
 only army here that cannot beat a real opponent -- against the bot army we
-actually met over the board it draws **764 of 800 pairs** and scores 0.4869,
+actually met over the board it draws 764 of 800 pairs and scores 0.4869,
 with truncation at 1.1%, so those are real draws and not the ply limit. An
 army can look best against a field of guesses and be a fortress against the
 thing you will actually face.
@@ -451,9 +450,9 @@ v6 idx 57   0.9513     0.9884     0.6891      0.8959   0.6891   <- ships
 v6 idx 33   0.9931     0.9969     0.6713      0.9137   0.6713
 ```
 
-`play.py` defaults to **v6 index 57**, 11 bishops and 6 pawns with the king on
+`play.py` defaults to v6 index 57, 11 bishops and 6 pawns with the king on
 e1. Index 33 -- the first competitive non-bishop army in six campaigns, with
-two knights -- **dominates the old champion on all four columns** and has the
+two knights -- dominates the old champion on all four columns and has the
 better mean, but a lower floor. The rule registered before the run was worst
 column primary with dominance only as a tiebreak, so 57 ships; the trade is
 that maximin buys the floor and pays in the average. See `docs/RELEASES.md`.
@@ -473,31 +472,31 @@ champion vs its own best response   0.4566 +/- 0.0143
 
 Online, placements are visible and opponents play you repeatedly, so being
 predictable is not a hypothetical cost. Note also what the counter *is*: the
-same composition on different squares. **Arrangement beats composition here**,
+same composition on different squares. Arrangement beats composition here,
 and this project has spent its whole budget searching compositions.
 
-> **A methodological correction worth keeping.** That counter was found as the
+> A methodological correction worth keeping. That counter was found as the
 > argmin over 94 columns of a matrix whose cells hold 8 pairs each, and the
 > screen said 0.3438, or -112.3 Elo -- nearly four times the real effect. The
 > minimum of 94 noisy samples is biased low by construction. Every number in
 > this repo read off the matrix by taking a max or min over many cells carries
 > the same inflation. The reactive ceiling that motivated `--optionality` was
-> recomputed on the shrunk matrix and fell from **+179.8 to +46.0 Elo** --
+> recomputed on the shrunk matrix and fell from +179.8 to +46.0 Elo --
 > against which measured re-targeting already captures +6.71.
 >
-> **Averages are fine, and measurably so.** Split-half reliability of the army
-> ranking is **r = 0.995** over 93 armies, because an army's mean score
+> Averages are fine, and measurably so. Split-half reliability of the army
+> ranking is r = 0.995 over 93 armies, because an army's mean score
 > averages ~370 pairs even though each cell holds four. The rule is: average
 > over the matrix freely, never read an extreme off it. Every mistake here was
 > an extreme; every result that survived scrutiny was an average.
 
-**Mixing is ON by default.** `play.py` draws from the stored equilibrium
+Mixing is ON by default. `play.py` draws from the stored equilibrium
 support each game rather than always playing the argmax -- 9 distinct armies
 on the v6 campaign. `--no-mix` restores the single-army behaviour.
 
 Every one of those nine is screened against all four real opponents before the
 campaign ships, and none scores below 0.5. That check exists because v2 shipped
-with a support member quietly **losing** at 0.4481 while holding 9.1% of the
+with a support member quietly losing at 0.4481 while holding 9.1% of the
 weight, so the drafter chose an already-beaten army about one game in eleven.
 
 That is a judgement about the opponent, not a measured improvement, and it
@@ -518,15 +517,15 @@ round   pure      mix
 second half   pure 0.4479 (-36.3 Elo)   mix 0.5002 (+0.2 Elo)
 ```
 
-**A fixed army is solved after one game and stays solved.** From round 2 the
+A fixed army is solved after one game and stays solved. From round 2 the
 pure strategy is pinned at exactly one value forever, because the opponent
 found its counter and never has to look again. Searching for a better fixed
 army does not fix that; it only changes which army gets countered.
 
-**The levels are corrected, and the correction is calibrated against a real
-match.** The opponent's best response is an argmax over cells backed by four
+The levels are corrected, and the correction is calibrated against a real
+match. The opponent's best response is an argmax over cells backed by four
 pairs, which lands on whichever cell got lucky -- raw, it valued the counter at
-0.3438 where a 400-pair match measured **0.4566**. Shrinking each cell toward
+0.3438 where a 400-pair match measured 0.4566. Shrinking each cell toward
 0.5 by 8 pseudo-observations predicts that cell to within 0.009. It is a
 single-point calibration, so treat the ~36 Elo as an order of magnitude.
 
@@ -543,11 +542,11 @@ is known exactly, and pins the shrinkage against the 400-pair cell.
 Two ways the game ends before a single move is played, both verified against
 the shipped chess.com client:
 
-* **Checkmate during setup.** A placement can give check, and the checked
+* Checkmate during setup. A placement can give check, and the checked
   side can only answer by placing a blocker inside its own three ranks. If
   nothing reaches, it is mate. Triggered live on chess.com's own analysis
   board with `@Qe1#` against a king on the third rank.
-* **King lockout.** A player who ends setup without a king loses outright
+* King lockout. A player who ends setup without a king loses outright
   (the client says `"failed to set up his king"`). A king may not be placed
   on an attacked square, so covering every empty square in the opponent's
   zone wins without any checkmate at all.
@@ -567,24 +566,24 @@ Sparse armies get punished; dense ones shield themselves.
 ## Choosing the referee, which mattered more than anything else
 
 Every army here is judged by playing games, so the engine doing the judging
-**is** the measuring instrument. Getting it wrong does not add noise, it
+is the measuring instrument. Getting it wrong does not add noise, it
 manufactures results.
 
 Setup Chess positions are legal in the variant and illegal in *standard*
 chess: sixteen pawns, nine bishops, up to 48 pieces on the board. python-chess
 rejects them by ordinary-chess history rules, and Stockfish's data structures
 assume 32 pieces -- the 42-piece pawn-wall mirror answers `depth 4` fine and
-then **segfaults at 20,000 nodes** (measured threshold on this build: 36
+then segfaults at 20,000 nodes (measured threshold on this build: 36
 pieces survive, 38 crash). The 40-piece champion-versus-bot matchup dies the
 same way, exit code -11.
 
-Every campaign built that way silently dropped its **high-piece-count** cells,
+Every campaign built that way silently dropped its high-piece-count cells,
 and dense armies are exactly what a pawn wall loses to. Two results turned out
 to be artifacts of that hole:
 
 * the wrong bishop army was crowned -- the uncensored rebuild's champion beats
-  it by **+112 Elo**
-* re-targeting looked worth **+24.63 Elo** and is actually worth **+6.71**
+  it by +112 Elo
+* re-targeting looked worth +24.63 Elo and is actually worth +6.71
 
 `fairy-stockfish` 14.0.1 plays all of it: the 40-piece matchup, the 42-piece
 wall, and the 48-piece mirror of the bot's army, which is this variant's
@@ -593,7 +592,7 @@ Stockfish on three forced-tactic oracles, and costs 34.9 ms/move against our C
 core's 15.6 ms at 20,000 nodes on the 40-piece position. Being a Stockfish 14
 derivative it is vastly stronger than our core's -327 Elo.
 
-**Pass `--engine fairy-stockfish --max-pieces 0` to every harness here.** It
+Pass `--engine fairy-stockfish --max-pieces 0` to every harness here. It
 also removes the case for training an NNUE, which existed only because nothing
 strong could play these positions.
 
@@ -625,7 +624,7 @@ so python-chess with the rights stripped is the reference.
 | `expand.py` | the double-oracle pool expansion loop; `--seed-bot` breeds against the modelled opponent |
 | `stats.py` | Elo, confidence intervals, SPRT |
 | `play.py` | the drafting policy: realises an army against an opponent, then hands the position to the engine. `--opponent bot` is chess.com's own setup policy |
-| `psearch.py` | **searches the placement game**: iterative-deepening alpha-beta, leaf = static exchange + agreement with the solved equilibrium. This is the reply-to-what-they-placed engine |
+| `psearch.py` | searches the placement game: iterative-deepening alpha-beta, leaf = static exchange + agreement with the solved equilibrium. This is the reply-to-what-they-placed engine |
 | `draft.py` | plays the placement phase out between two strategies (`plan` or `search`) and returns the handoff |
 | `match.py` | paired full-game A/B for a drafting change |
 | `duel.py` | engine versus engine over setup positions, for validating a referee |
@@ -652,7 +651,7 @@ referee](#choosing-the-referee-which-mattered-more-than-anything-else)).
 python3 selftest.py
 ```
 
-**Play the answer against something.** One game each colour, setup through
+Play the answer against something. One game each colour, setup through
 result, using the shipping army:
 
 ```bash
@@ -663,7 +662,7 @@ python3 play.py --opponent bot --engine fairy-stockfish --max-pieces 0
 client. `--opponent stdin` reads placements as `@Qd1` tokens instead, which is
 how a real game elsewhere gets driven; `--live` relays a game move by move.
 
-**Re-derive the answer from scratch.** Hours, resumable, Ctrl-C checkpoints:
+Re-derive the answer from scratch. Hours, resumable, Ctrl-C checkpoints:
 
 ```bash
 python3 expand.py --state ~/expand.json --engine fairy-stockfish --max-pieces 0 --rounds 30 --challengers 32 --pairs 4 --screen-pairs 2 --workers 0 --final-games 400
@@ -673,14 +672,14 @@ That is the double oracle: breed challengers, screen them against the current
 equilibrium, admit the survivors, re-solve, repeat. It ends on a 400-pair gate
 against the twelve hand-written archetypes.
 
-**Fill a payoff matrix directly**, if you have a pool of armies and just want
+Fill a payoff matrix directly, if you have a pool of armies and just want
 them scored against each other:
 
 ```bash
 python3 arena.py --out ~/matrix.json --pool ~/armies.json --engine fairy-stockfish --max-pieces 0 --nodes 20000 --pairs 4 --workers 0
 ```
 
-**Measure setups that were actually drafted** rather than stamped together --
+Measure setups that were actually drafted rather than stamped together --
 the two sides react to each other, and a cell means "these two plans played",
 not "these two armies were glued to a board". Use the SAME mode on both sides
 or a colour-swapped pair also swaps strategies and the matrix cannot be
@@ -690,7 +689,7 @@ antisymmetrised (arena warns).
 python3 arena.py --out ~/drafted.json --pool ~/armies.json --engine fairy-stockfish --max-pieces 0 --nodes 20000 --pairs 100 --draft search:search --draft-depth 1 --workers 0
 ```
 
-**Ask what to place next in a live game**, searching the placement tree under a
+Ask what to place next in a live game, searching the placement tree under a
 wall clock. Each depth prints as it lands, so there is always a move even if
 the budget runs out -- chess.com forfeits at roughly 20 seconds.
 
@@ -698,7 +697,7 @@ the budget runs out -- chess.com forfeits at roughly 20 seconds.
 python3 relay.py --color white --search --budget 3 @Bb2 @Qd8
 ```
 
-**A/B a drafting change** over full games, paired so the opponent and colour
+A/B a drafting change over full games, paired so the opponent and colour
 cancel:
 
 ```bash
@@ -710,16 +709,16 @@ python3 match.py --target campaigns/champion_fsf.json --pool campaigns/expand_fs
 
 ## Known limits
 
-* **The baseline is weak.** +462 Elo is against hand-written archetypes, one
+* The baseline is weak. +462 Elo is against hand-written archetypes, one
   of which scores 0.016 against the field. It is not a measurement against
   strong opposition.
-* ~~9% of gate pairs are unmeasured~~ **CLOSED for the champion gate**: rerun on
+* ~~9% of gate pairs are unmeasured~~ CLOSED for the champion gate: rerun on
   fairy-stockfish at no ceiling it is 480 of 480 pairs, zero piece-count skips,
   and archetype 3 measured for the first time. Every OTHER campaign in
   `campaigns/` is still Stockfish-refereed and still has the holes, including
   the 87-setup pool the champion was bred from, which is the one that matters
   and has not been re-run.
-* ~~The champion gate is 20,000 nodes only~~ **now also measured at 200,000**:
+* ~~The champion gate is 20,000 nodes only~~ now also measured at 200,000:
   the champion scores 0.9324, +455.82 [+423.88, +493.83], and the 13-army
   equilibrium is pure on it. Twelve bishops are not a shallow-search artifact.
   The depth-only comparison is now done on a matched pool and comes out flat:
@@ -727,50 +726,50 @@ python3 match.py --target campaigns/champion_fsf.json --pool campaigns/expand_fs
   and it is the important one: the field is still the same twelve hand-written
   archetypes, so a deeper search has only confirmed dominance over weak
   opposition. Depth was never the weak link in that claim -- the field is.
-* **One whole archetype is missing from the depth gate.** Archetype 3 lost all
+* One whole archetype is missing from the depth gate. Archetype 3 lost all
   40 of its pairs to Stockfish's piece ceiling, so 11 of 12 opponents are
   measured rather than a scattered 9%. Only one archetype offers real
   resistance at depth (0.6312); the rest sit above 0.87.
-* **Re-targeting is NOT confirmed on the pool that ships.** On the clean
-  fairy-stockfish pool it measures **+5.91 Elo [-0.18, +12.00]** over 3,000
+* Re-targeting is NOT confirmed on the pool that ships. On the clean
+  fairy-stockfish pool it measures +5.91 Elo [-0.18, +12.00] over 3,000
   pairs with nothing unplayable, SPRT LLR +1.619 -> CONTINUE. The interval
   still includes zero; extending from 1,200 pairs moved the estimate down from
   +7.53 rather than up. It was +24.63 on the old pool, but that pool was itself built
   under the censored matrix, so the two are not a fair before-and-after. The
   toggle stays on only because the test is still trending rather than flat;
   if it settles NULL the default should become `--no-pool`.
-* ~~The bot gate is withdrawn~~ **replaced**: `campaigns/gate_bot_fsf_200.json`
+* ~~The bot gate is withdrawn~~ replaced: `campaigns/gate_bot_fsf_200.json`
   measures 0.92 as White and 0.94 as Black on fairy-stockfish. The superseded
   `campaigns/gate_bot_200.json` is kept only as the record of what a weak
   referee does to a number. What the replacement does NOT fix: one setup per
   colour, so drafting variance is still unmeasured.
-* **Best-response re-targeting still gives up a forced setup mate**, because
+* Best-response re-targeting still gives up a forced setup mate, because
   the payoff matrix is measured by playing the *chess* phase from finished
   armies and cannot see setup tactics. It is on anyway, and CONFIRMED on the
-  87-setup pool the defaults use: **+24.63 Elo [+18.06, +31.22]** over 1,187
+  87-setup pool the defaults use: +24.63 Elo [+18.06, +31.22] over 1,187
   pairs, SPRT [0,4] LLR +8.101 -> ACCEPT H1 at full budget. `--no-pool`
   disables it. Teaching the matrix about the placement phase is the open work
   here, and would probably recover that forced mate on top.
-* **That number is the re-run after the handoff turn-order fix**, and it was a
+* That number is the re-run after the handoff turn-order fix, and it was a
   real re-run: `match.py` plays from `handoff_fen()`, and the fix changed the
-  outcome of **494 of the 1,187 pairs**. The pre-fix reading on the same pool
+  outcome of 494 of the 1,187 pairs. The pre-fix reading on the same pool
   was +29.63 [+23.46, +35.83]; the ranges overlap heavily, so the fix did not
   measurably change the effect, but the point estimate is about 5 Elo lower
-  and only the post-fix one describes the shipping code. **The 19-setup pool's
-  +17.13 [+12.36, +21.91] has NOT been re-run** and is still a pre-fix number.
+  and only the post-fix one describes the shipping code. The 19-setup pool's
+  +17.13 [+12.36, +21.91] has NOT been re-run and is still a pre-fix number.
   The champion gate never shared the problem: `arena.py` goes through
   `setup_fen()`, which did not change.
-* **Re-targeting survives a 10x deeper search**, which is the only longer-TC
+* Re-targeting survives a 10x deeper search, which is the only longer-TC
   result in the repo. At 200,000 nodes on the same 1,187 pairs it measures
-  **+29.93 Elo [+23.66, +36.21]**, LLR +11.037 -> ACCEPT H1, against +24.63
+  +29.93 Elo [+23.66, +36.21], LLR +11.037 -> ACCEPT H1, against +24.63
   [+18.06, +31.22] at 20,000. The ranges overlap, so the honest reading is
   "no measured decay with depth", not "it gets better". 409 of the 1,187 pairs
   came out differently at the deeper search, so the two are genuinely separate
   instruments and are not pooled.
-* ~~One rule is assumed~~ **Verified on the live board 2026-08-05**: a king
+* ~~One rule is assumed~~ Verified on the live board 2026-08-05: a king
   may not be placed onto an attacked square, and non-king pieces may. The
   lockout tactic rests on real rules, not an assumption.
-* **The chess phase does not always start with White**, which cost a live game
+* The chess phase does not always start with White, which cost a live game
   before it was measured. A finished side *passes* rather than being skipped
   (the server writes `P` in the move list), so the turns keep alternating and
   whoever follows the final placement moves first. Verified over a full
@@ -779,11 +778,11 @@ python3 match.py --target campaigns/champion_fsf.json --pool campaigns/expand_fs
   `handoff_fen()` is the only correct source for this; `setup_fen()` gives
   White the move by convention because two finished armies carry no placement
   order.
-* **The payoff matrix therefore always hands White the tempo**, while a real
+* The payoff matrix therefore always hands White the tempo, while a real
   game hands it to whichever side the placement count lands on. Both colours
   are played in every pair so it cancels in aggregate, but the armies were
   never selected for the parity they will actually get. Unmeasured.
-* **The pool is finite.** 87 armies after 21 expansion rounds, and it stopped
+* The pool is finite. 87 armies after 21 expansion rounds, and it stopped
   because it filled rather than because it converged: at `--max-pool` every
   further round only prunes and re-admits at rising cost while exploitability
   has been pinned at 0 throughout. The equilibrium is now genuinely mixed over
