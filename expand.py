@@ -34,7 +34,30 @@ import solve
 import stats
 
 
-def new_state(seed, meta, seed_bot=False, extra=None, start_pool=None):
+def _pin_all(armies, pinned, incoming):
+    """Append `incoming` as PINNED opponents, pinning any copy already present.
+
+    Same dedup seed_bot needs and for the same reason: an army reachable
+    through --start-pool or --seed-army would otherwise sit in the pool twice,
+    once pinned and once not, and our_strategies strips only the pinned index
+    -- so the unpinned copy of an OPPONENT can take the whole equilibrium
+    weight and become both the sole breeding parent and the entire gate mix.
+    """
+    seen = {poolmod.army_key(a): i for i, a in enumerate(armies)}
+    for army in incoming:
+        key = poolmod.army_key(army)
+        if key in seen:
+            if seen[key] not in pinned:
+                pinned.append(seen[key])
+            continue
+        seen[key] = len(armies)
+        pinned.append(len(armies))
+        armies = armies + [army]
+    return armies, pinned
+
+
+def new_state(seed, meta, seed_bot=False, extra=None, start_pool=None,
+              pin=None):
     """Fresh campaign. `seed_bot` adds the bot's wall and PINS it.
 
     `extra` is a list of armies to add to the STARTING pool as ordinary
@@ -77,22 +100,21 @@ def new_state(seed, meta, seed_bot=False, extra=None, start_pool=None):
         # exactly what our_strategies exists to prevent. Measured on a
         # 6-army state: duplicate pairs (0,4) and (1,5), weights {1: 0.765,
         # 4: 0.219, 5: 0.016}, and our_strategies returned {1: 1.0}.
-        seen = {poolmod.army_key(a): i for i, a in enumerate(armies)}
-        for army in poolmod.BOT_OBSERVED.values():
-            key = poolmod.army_key(army)
-            if key in seen:
-                pinned.append(seen[key])
-                continue
-            seen[key] = len(armies)
-            pinned.append(len(armies))
-            armies = armies + [army]
+        armies, pinned = _pin_all(armies, pinned,
+                                  list(poolmod.BOT_OBSERVED.values()))
+    # --pin-pool: the SAME machinery for an arbitrary opponent file. The
+    # conjunctive screen then requires a challenger to beat every pin
+    # separately, which is what "breed against this opponent" has to mean.
+    if pin:
+        armies, pinned = _pin_all(armies, pinned, list(pin))
     return {"meta": meta, "armies": [poolmod.to_json(a) for a in armies],
             "cells": {}, "rounds": [], "seed": seed, "pinned": pinned}
 
 
-def load_state(path, seed, meta, seed_bot=False, extra=None, start_pool=None):
+def load_state(path, seed, meta, seed_bot=False, extra=None, start_pool=None,
+               pin=None):
     if not os.path.exists(path):
-        return new_state(seed, meta, seed_bot, extra, start_pool)
+        return new_state(seed, meta, seed_bot, extra, start_pool, pin)
     with open(path) as f:
         state = json.load(f)
     state.setdefault("pinned", [])
@@ -460,6 +482,14 @@ def main():
                          "best on it (0.9425) is the one that cannot beat a "
                          "real opponent. campaigns/pool_real_opponents.json "
                          "holds every army ever actually played against us")
+    ap.add_argument("--pin-pool", metavar="JSON",
+                    help="add these armies to the pool as PINNED opponents. A "
+                         "pin is measured against, never bred from or shipped, "
+                         "and the screen then requires a challenger to beat "
+                         "EVERY pin separately. Use it to breed against one "
+                         "specific opponent -- 13 bishops is the binding "
+                         "column for 79%% of the pool, and the other three "
+                         "real opponents are already at ceiling 1.0000.")
     ap.add_argument("--allow-blind", action="store_true",
                     help="continue even when the matrix carries no information. "
                          "Off by default: an unattended run that cannot "
@@ -512,6 +542,10 @@ def main():
             # in meta, so the full-dict comparison below refuses to pool a
             # drafted campaign with a stamped one. They measure different games.
             "draft": bool(args.draft) or None,
+            # a pinned opponent changes which cells the equilibrium is solved
+            # over, so a pinned and an unpinned campaign are not poolable
+            "pin_pool": (os.path.basename(args.pin_pool)
+                         if args.pin_pool else None),
             "seed": args.seed}
     extra = []
     for path in (args.seed_army or []):
@@ -538,6 +572,18 @@ def main():
                 sys.exit("gate-pool army is illegal: %s" % why)
         print("gate field: %d armies from %s"
               % (len(gate_base), os.path.basename(args.gate_pool)))
+    pin_armies = None
+    if args.pin_pool:
+        with open(args.pin_pool) as f:
+            pin_armies = [poolmod.from_json(a) for a in json.load(f)]
+        for army in pin_armies:
+            ok, why = rules.validate_army(army)
+            if not ok:
+                sys.exit("pin-pool army is illegal: %s" % why)
+        print("pinned opponents: %d from %s (measured against, never bred "
+              "from or shipped)"
+              % (len(pin_armies), os.path.basename(args.pin_pool)))
+
     start = None
     if args.start_pool:
         with open(args.start_pool) as f:
@@ -548,14 +594,16 @@ def main():
                 sys.exit("start-pool army is illegal: %s" % why)
         print("starting pool: %d armies from %s (the 12 archetypes are NOT used)"
               % (len(start), os.path.basename(args.start_pool)))
-    state = load_state(args.state, args.seed, meta, args.seed_bot, extra, start)
+    state = load_state(args.state, args.seed, meta, args.seed_bot, extra,
+                       start, pin_armies)
     # A campaign written before these keys existed was built at their defaults,
     # so fill them in rather than refusing to resume every state file in git.
     # backfill so a campaign written before a key existed still resumes. For
     # `seed` that means a legacy file cannot have its seed verified -- it is
     # taken on trust -- but refusing to resume every campaign in git is worse.
     for k, default in (("max_pieces", 32), ("seed_bot", False),
-                       ("seed_army", []), ("seed", args.seed), ("draft", None)):
+                       ("seed_army", []), ("seed", args.seed), ("draft", None),
+                       ("pin_pool", None)):
         state["meta"].setdefault(k, default)
     if state["meta"] != meta:
         sys.exit("state was built with different settings:\n  file: %r\n  now:  %r"

@@ -1839,6 +1839,7 @@ def main():
     test_arena_columns(args.engine, args.scratch or tempfile.gettempdir())
     test_expand_smoke(args.engine, args.scratch or tempfile.gettempdir())
     test_expand_draft(args.engine, args.scratch or tempfile.gettempdir())
+    test_expand_pin_pool()
     test_blind_failsafe()
     test_champion_in_pool()
     test_relay_reachability_both_colours()
@@ -2168,6 +2169,65 @@ def test_arena_columns(engine, scratch):
         fail("--columns accepted an index outside the pool")
     print("PASS: --columns plays only field-touching cells (%d of %d), leaves "
           "every row complete, and rejects a bad index" % (len(cells), n * n))
+
+
+def test_expand_pin_pool():
+    """--pin-pool adds opponents that are measured against but never ours.
+
+    A pin must (a) land in state["pinned"] so our_strategies strips it from the
+    mix, (b) DEDUP against an army already in the starting pool, and (c) mark
+    the campaign so a pinned and an unpinned run cannot pool. The dedup is the
+    subtle one: an opponent sitting in the pool twice, once pinned and once
+    not, lets the unpinned copy take the equilibrium weight and become both the
+    breeding parent and the gate mix -- the exact failure our_strategies exists
+    to prevent.
+    """
+    import subprocess
+    scratch = tempfile.gettempdir()
+    pinf = os.path.join(scratch, "selftest_pin.json")
+    opp = [pool.from_json(a) for a in
+           json.load(open("campaigns/pool_real_opponents.json"))][2]
+    with open(pinf, "w") as fh:
+        json.dump([pool.to_json(opp)], fh)
+    tgt = pool.fingerprint(opp)
+
+    state = os.path.join(scratch, "selftest_pin_state.json")
+    for p in (state, state + ".gate"):
+        if os.path.exists(p):
+            os.remove(p)
+    base = [sys.executable, "expand.py", "--state", state, "--rounds", "1",
+            "--max-pool", "40", "--pairs", "1", "--screen-pairs", "1",
+            "--final-games", "4", "--engine", "./cuci.py", "--max-pieces", "0",
+            "--nodes", "300", "--workers", "2", "--draft",
+            "--start-pool", "campaigns/pool_maximin_wide.json"]
+    r = subprocess.run(base + ["--pin-pool", pinf], capture_output=True, text=True)
+    if r.returncode != 0:
+        fail("expand --pin-pool exited %d: %s" % (r.returncode, r.stderr[-600:]))
+
+    with open(state) as fh:
+        st = json.load(fh)
+    armies = [pool.from_json(a) for a in st["armies"]]
+    hits = [i for i, a in enumerate(armies) if pool.fingerprint(a) == tgt]
+    if len(hits) != 1:
+        fail("the pinned army appears %d times in the pool; a duplicate lets "
+             "the unpinned copy take the equilibrium weight" % len(hits))
+    if st["pinned"] != hits:
+        fail("pinned=%s but the army sits at %s" % (st["pinned"], hits))
+    if not st["meta"].get("pin_pool"):
+        fail("a pinned campaign did not record pin_pool in its meta")
+
+    # our_strategies must strip it
+    import expand
+    w = {i: 1.0 / len(armies) for i in range(len(armies))}
+    if hits[0] in expand.our_strategies(w, st["pinned"]):
+        fail("our_strategies kept a pinned opponent in OUR mix")
+
+    r2 = subprocess.run(base, capture_output=True, text=True)
+    if "different settings" not in (r2.stdout + r2.stderr):
+        fail("an unpinned run resumed a PINNED campaign; the pin changes which "
+             "cells the equilibrium is solved over")
+    print("PASS: --pin-pool pins without duplicating, is stripped from our "
+          "mix, and cannot pool with an unpinned campaign")
 
 if __name__ == "__main__":
     main()
