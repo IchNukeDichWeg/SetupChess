@@ -226,18 +226,50 @@ def main():
     mapped = [(d + 1.0) / 2.0 for d in diffs]
     st = stats.score_stats(mapped)
 
+    def _wdl(scores):
+        w = sum(1 for s in scores if s > 0.75)
+        l = sum(1 for s in scores if s < 0.25)
+        return w, len(scores) - w - l, l
+
+    def _ptnml(arm):
+        """Pentanomial over COLOUR pairs within one arm. Index k and k+F play
+        the same opponent from opposite colours (see the task loop), so the
+        pair is (k, k+F) for even passes -- the standard LL/LD/DD+WL/WD/WW
+        buckets. Pairs with either half missing (skips, odd tails) are
+        dropped and the count says how many were scored."""
+        f = len(field)
+        buckets = [0] * 5
+        for k in order:
+            if (k // f) % 2 or k + f not in done:
+                continue
+            s = done[k][arm] + done[k + f][arm]
+            buckets[int(s * 2)] += 1
+        return buckets
+
     label = args.test
-    print("\n%s OFF: %.4f over %d games"
-          % (label, sum(plain) / len(plain), len(plain)))
-    print("%s ON : %.4f over %d games"
-          % (label, sum(retarget) / len(retarget), len(retarget)))
+    n = len(plain)
+    print()
+    for name, scores in (("OFF", plain), ("ON ", retarget)):
+        w, d, l = _wdl(scores)
+        print("%s %s: %d games   W %d (%.1f%%)  D %d (%.1f%%)  L %d (%.1f%%)"
+              "   score %.1f%%"
+              % (label, name, n, w, 100.0 * w / n, d, 100.0 * d / n,
+                 l, 100.0 * l / n, 100.0 * sum(scores) / n))
+    print("\nPtnml (LL / LD / DD+WL / WD / WW), colour pairs within each arm")
+    for name, arm in (("OFF", 0), ("ON ", 1)):
+        b = _ptnml(arm)
+        print("%s %s: %s   (%d pairs)"
+              % (label, name, " / ".join(str(x) for x in b), sum(b)))
     print("\npaired difference (ON minus OFF)")
     print("Pairs:   %d" % st["n"])
-    print("Better:  %d   Same: %d   Worse: %d"
-          % (sum(1 for d in diffs if d > 0), sum(1 for d in diffs if d == 0),
-             sum(1 for d in diffs if d < 0)))
-    print("Diff:    %+.4f +/- %.4f" % (sum(diffs) / len(diffs),
-                                       1.96 * st["se"] * 2))
+    better = sum(1 for d in diffs if d > 0)
+    same = sum(1 for d in diffs if d == 0)
+    worse = sum(1 for d in diffs if d < 0)
+    print("Better:  %d (%.1f%%)   Same: %d (%.1f%%)   Worse: %d (%.1f%%)"
+          % (better, 100.0 * better / len(diffs), same,
+             100.0 * same / len(diffs), worse, 100.0 * worse / len(diffs)))
+    print("Diff:    %+.2f%% +/- %.2f%%   (percentage points of score)"
+          % (100.0 * sum(diffs) / len(diffs), 100.0 * 1.96 * st["se"] * 2))
     # THE AXIS HAS TO BE NAMED. `mapped` has mean 0.5 + (ON - OFF)/2, so this
     # Elo is of a HALF-sized edge, not the gap between the arms: measured over
     # three simulated arm pairs at 400k games each, printed/arm-vs-arm came out
