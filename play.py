@@ -163,15 +163,21 @@ HUNT_THEIR_POINTS = 12
 # and re-targeting already takes +6.71 of that for free.
 OPTIONALITY = False
 
-# PENDING A/B (match.py --test retarget-see). Score each re-target candidate by
-# the exchange balance of its PROJECTED handoff -- the candidate army fully
-# placed against what the opponent has actually revealed -- on top of the
-# matrix payoff. This is the answer to the real loss that started the drafted
-# rebuild: an off-pool opponent double-stacked a defended bishop, the
-# similarity prior went flat, the matrix could not see the stack, and the plan
-# walked into the exchange. The matrix knows pool-vs-pool averages; only SEE
-# on the revealed board can see THIS opponent's stack.
-RETARGET_SEE = True
+# REJECTED (match.py --test retarget-see): -0.0683 +/- 0.0101 over 4,000
+# paired games, -47.50 Elo [-54.53, -40.48] arm scale, worse in 848 pairs
+# against better in 404. Score each re-target candidate by the exchange
+# balance of its PROJECTED handoff on top of the matrix payoff. The idea was
+# the double-stack loss; the failure is the projection's one-sidedness, which
+# its own docstring named as the risk: our FULL army against their PARTIAL
+# reveal sees exchanges the finished opponent will not actually offer, and the
+# drafter re-targeted away from good armies to dodge threats that never
+# materialised. It fired in 1,252 of 4,000 pairs, which is far too often for a
+# filter meant to catch a rare stack. A version worth retrying would have to
+# project THEIR completion too, or fire only above a threshold that phantom
+# threats cannot reach. The oracle case itself still passes -- against a real
+# revealed stack the term picks the defending army -- so the mechanism is
+# right and the trigger is wrong.
+RETARGET_SEE = False
 
 # Centipawns to score. One point on it: the e1-variant sweep measured one
 # clean bishop of army value at 0.477 of game score (docs/MEASUREMENTS.md,

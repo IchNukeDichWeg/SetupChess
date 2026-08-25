@@ -877,6 +877,49 @@ champion drew all 8 screen games -- same composition, same fortress recorded
 below. The columns were the entire decision, and this is the second time that
 has been true.
 
+### SEE-aware re-targeting: REJECTED, the projection sees phantom threats
+
+The placement search's post-mortem assigned it a narrower job -- a tactical
+filter inside a plan -- and this was that filter, at the one point where the
+drafter chooses between futures. Placement order cancels at handoff, so the
+real response lever is which pool army to complete into, and re-targeting
+scored candidates only by matrix payoff against a similarity prior: both blind
+to what THIS opponent has actually placed. The off-pool double-stack that
+started the drafted rebuild was invisible to it. The term added the SEE
+balance of each candidate's projected handoff against the revealed pieces.
+
+Measured with match.py --test retarget-see, both arms re-targeting, only the
+SEE term varying, 4,000 paired full games at 20k nodes:
+
+```
+OFF:     0.7691
+ON:      0.7009
+paired   -0.0683 +/- 0.0101   (better 404, same 2748, worse 848)
+Elo      -47.50 [-54.53, -40.48] arm scale
+SPRT     [0,8] arm-vs-arm, LLR -32.305 -> ACCEPT H0
+```
+
+REJECTED, decisively. The mechanism failed exactly where its docstring said
+the risk was: the projection is one-sided, our FULL army against their PARTIAL
+reveal, so it scores exchanges the finished opponent will never actually
+offer. Mid-draft, most revealed pieces look attackable precisely because their
+defenders have not been placed yet -- the phantom threat is the COMMON case,
+not the corner case. The term fired in 1,252 of 4,000 pairs, far too often for
+a filter meant to catch a rare stack, and re-targeted away from good armies to
+dodge nothing.
+
+What survives: the selftest oracle still passes -- against a genuinely
+revealed stack the term picks the defending army -- so the mechanism is right
+and the trigger is wrong. A retry would have to project the opponent's
+completion too, or fire only above a threshold phantom threats cannot reach.
+The toggle ships OFF.
+
+Registered caveat from before the run, still true in reverse: this A/B
+measures pool-vs-pool drafts, where genuine stacks are rare. It proves the
+term hurts against normal opponents; it says nothing about what it would earn
+against a real stacker. But -47 Elo of standing cost for an unmeasured benefit
+in a rare case is not a trade, it is a donation.
+
 ### The champion holds, and the screen's ranking power is measured
 
 The 19 highest-screening candidates not yet confirmed, plus the champion as a
