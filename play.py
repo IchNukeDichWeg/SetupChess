@@ -32,6 +32,7 @@ import chess.engine
 
 import arena
 import pool as poolmod
+import psearch
 import rules
 import solve
 import stats
@@ -162,6 +163,23 @@ HUNT_THEIR_POINTS = 12
 # and re-targeting already takes +6.71 of that for free.
 OPTIONALITY = False
 
+# PENDING A/B (match.py --test retarget-see). Score each re-target candidate by
+# the exchange balance of its PROJECTED handoff -- the candidate army fully
+# placed against what the opponent has actually revealed -- on top of the
+# matrix payoff. This is the answer to the real loss that started the drafted
+# rebuild: an off-pool opponent double-stacked a defended bishop, the
+# similarity prior went flat, the matrix could not see the stack, and the plan
+# walked into the exchange. The matrix knows pool-vs-pool averages; only SEE
+# on the revealed board can see THIS opponent's stack.
+RETARGET_SEE = True
+
+# Centipawns to score. One point on it: the e1-variant sweep measured one
+# clean bishop of army value at 0.477 of game score (docs/MEASUREMENTS.md,
+# "One bishop is worth 0.477"), giving 0.48/300 per cp. That is a calibration
+# from a DIFFERENT quantity (army composition, not a handoff exchange), so it
+# sets the order of magnitude and nothing more; the A/B is the judge.
+SEE_TO_SCORE = 0.48 / 300.0
+
 # ON. Draw the target from the equilibrium support each game instead of always
 # playing the single best army. --no-mix restores the old behaviour.
 #
@@ -291,7 +309,8 @@ class Drafter:
     """
 
     def __init__(self, target, color, pool=None, matrix=None,
-                 hunt_when=HUNT_WHEN, optionality=OPTIONALITY):
+                 hunt_when=HUNT_WHEN, optionality=OPTIONALITY,
+                 retarget_see=RETARGET_SEE):
         self.color = color
         self.target = (target if color == chess.WHITE
                        else rules.mirror_army(target))
@@ -300,6 +319,7 @@ class Drafter:
         self.matrix = matrix
         self.hunt_when = hunt_when
         self.optionality = optionality
+        self.retarget_see = retarget_see
         self.retargets = 0
         self.optional_moves = 0
 
@@ -331,6 +351,26 @@ class Drafter:
             return [1.0 / len(self.pool)] * len(self.pool)
         return [r / total for r in raw]
 
+    def _projected_exchange(self, state, army):
+        """Exchange balance (cp, our side) of `army` completed against what
+        they have revealed so far.
+
+        The projection is one-sided by construction: our candidate is placed in
+        FULL, theirs is only what is on the board. Their unplaced pieces could
+        defend or add attackers later, so this is a heuristic about the current
+        threat, not the true handoff -- but the current threat is exactly what
+        the double-stack was, and the matrix term already carries the average
+        case. Zone ranks cannot collide, so completing our side never lands on
+        one of their pieces.
+        """
+        board = state.board.copy(stack=False)
+        for pt, sq in army:
+            if self.color == chess.BLACK:
+                sq = chess.square_mirror(sq)
+            if board.piece_at(sq) is None:
+                board.set_piece_at(sq, chess.Piece(pt, self.color))
+        return psearch.exchange_balance(board, self.color)
+
     def _retarget(self, state):
         """Swap the plan for the best still-reachable answer to their army.
 
@@ -359,6 +399,9 @@ class Drafter:
             row = self.matrix[i]
             val = sum(w[j] * (row[j] if row[j] is not None else 0.5)
                       for j in range(len(self.pool)))
+            if self.retarget_see:
+                val += SEE_TO_SCORE * self._projected_exchange(state,
+                                                               self.pool[i])
             if best_val is None or val > best_val:
                 best, best_val = i, val
         if best is None:

@@ -1457,6 +1457,47 @@ def test_drafter():
                                  len(got)))
 
 
+def test_retarget_see():
+    """The double-stack oracle: re-targeting must see an exchange the matrix
+    cannot. The opponent reveals a rook bearing on our placed bishop. Two pool
+    armies are reachable; the matrix slightly prefers the one that leaves the
+    bishop undefended, and only the SEE term knows the difference. With the
+    term ON the drafter must re-target to the defending army, OFF it must
+    follow the matrix into the losing one -- both directions, or the A/B in
+    match.py is not isolating anything."""
+    filler = [(chess.QUEEN, chess.D1), (chess.QUEEN, chess.E1),
+              (chess.QUEEN, chess.F1), (chess.ROOK, chess.G1),
+              (chess.PAWN, chess.A2), (chess.KING, chess.H1),
+              (chess.BISHOP, chess.B2)]
+    defended = sorted(filler + [(chess.KNIGHT, chess.D3)])  # Nd3 defends b2
+    exposed = sorted(filler + [(chess.KNIGHT, chess.H3)])   # Nh3 does not
+    for army in (defended, exposed):
+        ok, why = rules.validate_army(army)
+        if not ok:
+            fail("oracle army illegal: %s" % why)
+
+    # matrix prefers the exposed army by 0.01 -- inside noise, but decisive
+    # for a tie-break, which is exactly the situation under test
+    matrix = [[0.5, 0.49], [0.51, 0.5]]
+
+    for on, want in ((True, defended), (False, exposed)):
+        state = rules.SetupState()
+        state.place(chess.BISHOP, chess.B2)   # us: the target of the stack
+        state.place(chess.ROOK, chess.B7)     # them: the attacker, revealed
+        us = play.Drafter(defended, chess.WHITE,
+                          pool=[defended, exposed], matrix=matrix,
+                          retarget_see=on)
+        us.placed = {defended.index((chess.BISHOP, chess.B2))}
+        us._retarget(state)
+        if set(us.target) != set(want):
+            fail("retarget_see=%s picked the wrong army (SEE balance "
+                 "defended=%d exposed=%d)"
+                 % (on, us._projected_exchange(state, defended),
+                    us._projected_exchange(state, exposed)))
+    print("PASS: SEE-aware re-targeting defends the double-stack target, and "
+          "only when the toggle is on")
+
+
 def test_play_smoke(engine_path, tmpdir):
     out = os.path.join(tmpdir, "selftest_play_%d.json" % os.getpid())
     r = subprocess.run([sys.executable, "play.py", "--target",
@@ -1831,6 +1872,7 @@ def main():
     test_stats()
     test_expand_units(args.scratch or tempfile.gettempdir())
     test_drafter()
+    test_retarget_see()
     test_c_core(rng)
     test_search(rng)
     test_uci(args.scratch or tempfile.gettempdir())

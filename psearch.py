@@ -197,6 +197,15 @@ def see(board, sq, side):
     return score
 
 
+def exchange_balance(board, us):
+    """Centipawns of exchange swing at handoff, positive when `us` is winning
+    the capture race. This is the tactical half of leaf(), published on its own
+    because play.Drafter's re-targeting uses it to score PROJECTED handoffs --
+    the "tactical filter inside a plan" role docs/MEASUREMENTS.md assigns this
+    module after rejecting it as an army builder."""
+    return _worst_exchange(board, not us) - _worst_exchange(board, us)
+
+
 def _worst_exchange(board, victim_color):
     """Best single capture sequence available AGAINST `victim_color`.
 

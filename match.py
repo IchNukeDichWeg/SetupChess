@@ -47,7 +47,8 @@ def _game(args):
     pool withheld versus pool given. "optionality" gives BOTH arms the pool and
     varies only whether the drafter places to stay uncommitted, which is the
     right isolation: re-targeting and optionality both read the pool, so an arm
-    without it would be testing two changes at once.
+    without it would be testing two changes at once. "retarget-see" isolates
+    the same way: both arms re-target, only the exchange term differs.
     """
     (k, ours, theirs, color, nodes, jitter, pool_armies, matrix, test) = args
     engine = arena._worker_engine()
@@ -56,6 +57,11 @@ def _game(args):
         if test == "optionality":
             us = play.Drafter(ours, color, pool=pool_armies, matrix=matrix,
                               optionality=on)
+        elif test == "retarget-see":
+            # both arms re-target off the pool; only the SEE term varies, so
+            # the pair isolates the tactical filter and not re-targeting itself
+            us = play.Drafter(ours, color, pool=pool_armies, matrix=matrix,
+                              retarget_see=on)
         else:
             us = play.Drafter(ours, color,
                               pool=pool_armies if on else None,
@@ -109,7 +115,8 @@ def main():
     ap.add_argument("--engine", default="stockfish")
     ap.add_argument("--nodes", type=int, default=20000)
     ap.add_argument("--jitter", type=float, default=0.15)
-    ap.add_argument("--test", choices=("retarget", "optionality"),
+    ap.add_argument("--test", choices=("retarget", "optionality",
+                                       "retarget-see"),
                     default="retarget",
                     help="which toggle to A/B (default: %(default)s)")
     ap.add_argument("--max-pieces", type=int, default=32,
