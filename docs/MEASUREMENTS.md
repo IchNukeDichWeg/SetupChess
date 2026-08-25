@@ -835,6 +835,48 @@ opponent, and the pool was never bred for that -- it was bred against a field of
 four, three of which stopped mattering. A campaign seeded and gated on thirteen
 bishops ALONE is the experiment that has never been run.
 
+### Pinning one opponent OVERFITS to it: v10 is REJECTED
+
+The experiment the section above called for has now been run. `expand --pin-pool`
+pins an opponent into the matrix as something to be measured against but never
+bred from, and v10 pinned thirteen bishops alone: 120 armies, 9 rounds, 20
+admitted, and still admitting 1-4 a round when the 350-minute cap stopped it.
+That alone is worth noting -- v9 died on three consecutive nulls, so the pin
+does open ground the unpinned campaign had exhausted.
+
+The maximin pick is a new PLACEMENT of the champion's own composition, 1Q 9B 3P
+1K, screening 0.9062 against the pin where the champion screens 0.8125.
+Confirmed at 150 pairs a cell, 4,800 pairs, 9,600 games, 0 errors, diagonal
+0.4971 and pair symmetry 1.0096, with the champion as a control arm:
+
+```
+                       real 0     real 1     13 bishops  real 3   worst
+v10 s115  3P 9B 1Q     0.5933     0.6750     0.9408      0.9558   0.5933
+79fc9211  (control)    0.9358     0.9817     0.7658      0.9483   0.7658
+```
+
+**It bought +0.1750 +/- 0.0209 on the pinned column and paid -0.3425 +/- 0.0326
+and -0.3067 +/- 0.0282 for it.** The fourth column is a null, +0.0075 +/-
+0.0190. Its worst column is 0.5933 against the champion's 0.7658, so it is
+REJECTED and nothing ships.
+
+This is a finding about the METHOD, not about one army. Breeding against a
+single pinned opponent optimises the pinned column and nothing else, and since
+shipping is maximin, a gain on one column bought with losses on two others is
+strictly negative. The mined-out section was right that thirteen bishops caps
+the project and wrong that a campaign against thirteen bishops alone is the way
+out -- a pin has to be bred against the pinned opponent AND the rest of the
+field at once, or the maximin rule simply throws the result away.
+
+The control re-measured at **0.7658 +/- 0.0160** against 0.7800 +/- 0.0128 from
+`confirm_v9c`. The gap of 0.0142 sits inside the combined margin of 0.0205, so
+the instrument agrees with itself across a rebuilt field.
+
+**The head to head was useless again, exactly as predicted.** Challenger and
+champion drew all 8 screen games -- same composition, same fortress recorded
+below. The columns were the entire decision, and this is the second time that
+has been true.
+
 ### The champion holds, and the screen's ranking power is measured
 
 The 19 highest-screening candidates not yet confirmed, plus the champion as a

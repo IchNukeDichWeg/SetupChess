@@ -486,10 +486,12 @@ def main():
                     help="add these armies to the pool as PINNED opponents. A "
                          "pin is measured against, never bred from or shipped, "
                          "and the screen then requires a challenger to beat "
-                         "EVERY pin separately. Use it to breed against one "
-                         "specific opponent -- 13 bishops is the binding "
-                         "column for 79%% of the pool, and the other three "
-                         "real opponents are already at ceiling 1.0000.")
+                         "EVERY pin separately. PIN THE WHOLE FIELD, NOT ONE "
+                         "OPPONENT: v10 pinned 13 bishops alone and the winner "
+                         "bought +0.1750 on that column for -0.3425 and "
+                         "-0.3067 on two others, so maximin threw it away "
+                         "(REJECTED, see docs/MEASUREMENTS.md). A single pin "
+                         "optimises a single column and nothing else.")
     ap.add_argument("--allow-blind", action="store_true",
                     help="continue even when the matrix carries no information. "
                          "Off by default: an unattended run that cannot "
